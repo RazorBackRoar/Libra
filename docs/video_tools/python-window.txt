@@ -1,0 +1,471 @@
+Perfect! Here's the complete implementation guide for your Python app window - all three panels with every detail:
+
+---
+
+# **COMPLETE PYTHON APP LAYOUT - ALL THREE PANELS**
+
+---
+
+## **LEFT SIDEBAR - Controls Panel**
+
+**Full structure with all changes:**
+
+```
+┌─────────────────────────┐
+│      CONTROLS           │
+├─────────────────────────┤
+│ Resolution              │
+│  ☐ 4K Resolution        │
+│  ☐ 1080p Resolution     │
+│  ☐ 720p Resolution      │
+│                         │
+│ Device                  │
+│  ☐ Make: Apple          │
+│  ☐ Model: iPhone        │
+│                         │
+│ Content                 │
+│  ☑ GPS                  │
+│  ☑ Duplicates           │
+│  ☐ Snapchat             │ ← NEW
+│                         │
+│ Report                  │
+│ ┌─────────────────────┐ │
+│ │     DRY RUN         │ │ ← Yellow box, black text, centered
+│ └─────────────────────┘ │
+│  CSV Report             │
+│  JSON Report            │ ← Changed from TXT
+│                         │
+│ Scan Complete           │
+└─────────────────────────┘
+```
+
+**Implementation specs:**
+
+**Panel dimensions:**
+- Width: 200-220px
+- Height: Match center table height
+- Background: `#1a1a1a` or `#2d2d2d`
+- Padding: 20px
+
+**Section headers (Resolution, Device, Content, Report):**
+- Font size: 13px
+- Font weight: 600 (semi-bold)
+- Color: `#ffffff`
+- Margin-bottom: 10px
+- Text transform: uppercase or regular
+
+**Checkboxes:**
+- Size: 16x16px
+- Margin-right: 8px
+- Color when checked: `#4CAF50` (green) or `#2196F3` (blue)
+- Label font size: 13px
+- Label color: `#cccccc`
+
+**DRY RUN button:**
+- Background: `#FFC107` (yellow)
+- Text color: `#000000` (black)
+- Padding: 10px 16px
+- Border radius: 4px
+- Font weight: 600
+- Text align: center
+- Margin: 10px 0
+- Width: 100%
+
+**CSV Report / JSON Report:**
+- Font size: 13px
+- Color: `#cccccc`
+- Padding: 8px 0
+- Cursor: pointer
+- Hover color: `#ffffff`
+
+**Scan Complete:**
+- Font size: 13px
+- Color: `#888888`
+- Margin-top: 20px
+
+---
+
+## **CENTER PANEL - File List Table**
+
+**Full table structure with proper column spacing:**
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ Filename          Resolution      Framerate       Duplicate            │
+├────────────────────────────────────────────────────────────────────────┤
+│ 📄 VID_9021.MOV   3840x2160       30 fps          No                   │
+│ 📄 VID_9022.MP4   1920x1080       30 fps          No                   │
+│ 📄 VID_9023.MOV   1280x720        30 fps          Yes                  │ ← Red
+│ 📄 VID_9024.MOV   1280x720        30 fps          Yes                  │ ← Red
+│ 📄 VID_9026.MOV   1920x1080       30 fps          No                   │
+│ 📄 VID_9027.mp4   1440x980        30 fps          No                   │
+│ 📄 VID_9029.mp4   1830x720        60 fps          Similar              │ ← Green
+│ 📄 VID_9030.mp4   1280x720        60 fps          Similar              │ ← Green
+│ 📄 VID_9029.mpv   1280x720        60 fps          No                   │
+│ 📄 VID_9031.MOV   1440x960        30 fps          No                   │
+│ 📄 VID_9032.mp4   1920x960        30 fps          No                   │
+│ 📄 VID_9034.MOV   854x480         30 fps          No                   │
+│ 📄 VID_9035.mp4   854x480         30 fps          No                   │
+│ 📄 VID_9036.mp4   854x480         30 fps          Similar              │ ← Green
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Table dimensions:**
+- Width: Flexible (takes remaining space between sidebars)
+- Height: 600-700px (taller to fit more rows)
+- Background: `#1a1a1a`
+
+**Column widths (EVENLY SPACED):**
+```css
+Filename column:   40% (widest - needs space for long names)
+Resolution column: 22% 
+Framerate column:  19%
+Duplicate column:  19%
+```
+
+**Header row:**
+- Background: `#2d2d2d` or `#333333`
+- Font size: 13px
+- Font weight: 600
+- Color: `#ffffff`
+- Padding: 12px 16px
+- Border-bottom: 1px solid `#444444`
+- Text alignment:
+  - Filename: left
+  - Resolution: center
+  - Framerate: center
+  - Duplicate: center
+
+**Data rows:**
+- Font size: 13px
+- Color: `#cccccc`
+- Padding: 12px 16px
+- Border-bottom: 1px solid `#2d2d2d` (subtle separator)
+- Hover background: `#2a2a2a` (slightly lighter)
+
+**Row highlighting:**
+- **Red rows (Duplicate = Yes):** Background `#4a1a1a` or `#3d1f1f`
+- **Green rows (Duplicate = Similar):** Background `#1a3d1a` or `#1f3d1f`
+- **Normal rows:** Background transparent or `#1a1a1a`
+
+**File icon (📄):**
+- Size: 16x16px
+- Margin-right: 8px
+- Color: `#888888`
+
+**Text alignment in cells:**
+- Filename: left-aligned with icon
+- Resolution: center-aligned
+- Framerate: center-aligned
+- Duplicate: center-aligned
+
+**Cell padding for even spacing:**
+- Top/Bottom: 12px
+- Left/Right: 16px
+- This creates consistent breathing room
+
+---
+
+## **RIGHT SIDEBAR - Inspector Panel**
+
+**Complete panel with dividers:**
+
+```
+┌───────────────────────────────┐
+│         INSPECTOR             │
+├───────────────────────────────┤
+│ Filename:   VID_9023.MOV      │
+│ Resolution: 1920x1080         │
+│ Framerate:  30 fps            │
+│ Duration:   00:57             │
+├───────────────────────────────┤ ← Thin divider
+│ Make:       Apple             │
+│ Model:      iPhone 13 Pro     │
+│ Camera:     N/A               │
+├───────────────────────────────┤ ← Thin divider
+│ GPS:        Yes               │
+│ File Size:  25 MB             │
+├───────────────────────────────┤ ← Thin divider
+│ Created:    Oct 27, 2023      │
+│ Modified:   Nov 15, 2023      │
+├───────────────────────────────┤ ← Thin divider
+│ ┌─────────┐  ┌──────────────┐│
+│ │ Similar │  │    Delete    ││
+│ └─────────┘  └──────────────┘│
+│ ┌───────────────────────────┐│
+│ │          Scan             ││
+│ └───────────────────────────┘│
+└───────────────────────────────┘
+```
+
+**Panel dimensions:**
+- Width: 280-300px
+- Height: 700-750px (TALLER to fit all sections comfortably)
+- Background: `#1a1a1a` or `#2d2d2d`
+- Padding: 20px
+
+**Field layout (label: value pairs):**
+- Display: flex or grid
+- Label width: 90px (right-aligned)
+- Value: remaining space (left-aligned)
+- Gap between label and value: 12px
+
+**Field styling:**
+```css
+Label (left side):
+- Font size: 12px
+- Color: #888888
+- Text align: right
+- Font weight: 500
+
+Value (right side):
+- Font size: 13px
+- Color: #ffffff
+- Text align: left
+- Font weight: 400
+```
+
+**Vertical spacing between fields:**
+- Margin-bottom: 10px for each field
+- This creates consistent rhythm
+
+**Divider lines (4 total):**
+```css
+border-top: 1px solid rgba(255, 255, 255, 0.1);
+OR
+border-top: 1px solid #333333;
+
+margin-top: 16px;
+margin-bottom: 16px;
+width: 100%;
+```
+
+**Divider placement:**
+1. After "Duration" field
+2. After "Camera" field
+3. After "File Size" field
+4. After "Modified" field
+
+**Button section (at bottom):**
+
+**Similar and Delete buttons (side by side):**
+```css
+Container:
+- display: flex
+- gap: 12px
+- margin-bottom: 12px
+
+Similar button:
+- flex: 1
+- background: #4CAF50 (green)
+- color: #ffffff
+- padding: 12px
+- border-radius: 4px
+- font-size: 13px
+- font-weight: 600
+- text-align: center
+- border: none
+- cursor: pointer
+- hover: #45a049 (darker green)
+
+Delete button:
+- flex: 1
+- background: #F44336 (red)
+- color: #ffffff
+- padding: 12px
+- border-radius: 4px
+- font-size: 13px
+- font-weight: 600
+- text-align: center
+- border: none
+- cursor: pointer
+- hover: #da190b (darker red)
+```
+
+**Scan button (full width below):**
+```css
+- width: 100%
+- background: #2196F3 (blue)
+- color: #ffffff
+- padding: 12px
+- border-radius: 4px
+- font-size: 13px
+- font-weight: 600
+- text-align: center
+- border: none
+- cursor: pointer
+- hover: #0b7dda (darker blue)
+```
+
+---
+
+## **OVERALL WINDOW SPECIFICATIONS**
+
+**Window dimensions:**
+- Width: 1200-1400px (to fit all three panels comfortably)
+- Height: 750-800px (TALLER to accommodate all content)
+- Resizable: Yes
+- Minimum width: 1000px
+- Minimum height: 600px
+
+**Layout structure:**
+```
+┌────────┬──────────────────────┬────────┐
+│        │                      │        │
+│  Left  │    Center Table      │ Right  │
+│ Sidebar│                      │ Panel  │
+│ 220px  │    ~700-900px        │ 300px  │
+│        │                      │        │
+└────────┴──────────────────────┴────────┘
+```
+
+**Color scheme (dark theme):**
+- Primary background: `#1a1a1a`
+- Secondary background: `#2d2d2d`
+- Border color: `#333333` or `rgba(255,255,255,0.1)`
+- Text primary: `#ffffff`
+- Text secondary: `#cccccc`
+- Text muted: `#888888`
+- Accent green: `#4CAF50`
+- Accent red: `#F44336`
+- Accent blue: `#2196F3`
+- Accent yellow: `#FFC107`
+
+**Typography:**
+- Font family: 'Segoe UI', 'Roboto', 'Arial', sans-serif
+- Base font size: 13px
+- Headers: 13-14px, weight 600
+- Labels: 12px, weight 500
+- Body: 13px, weight 400
+- Line height: 1.5
+
+**Spacing system:**
+- Extra small: 4px
+- Small: 8px
+- Medium: 12px
+- Large: 16px
+- Extra large: 20px
+- Section gap: 24px
+
+---
+
+## **RESOLUTION VALUES TO USE**
+
+**Standard resolutions (no weird numbers):**
+- **4K:** 3840x2160
+- **1080p:** 1920x1080
+- **720p:** 1280x720
+
+**For "Similar" detection:**
+- Allow slight variations in resolution (±50px width/height)
+- Allow different framerates (30fps vs 60fps)
+- Examples of "Similar":
+  - 1920x1080 vs 1920x1088 (close enough)
+  - 1280x720 at 30fps vs 1280x720 at 60fps (same resolution, different framerate)
+  - 1830x720 vs 1280x720 (heights match, widths different but close-ish)
+
+---
+## **PYTHON IMPLEMENTATION TIPS**
+
+**For PySide6 (standalone script):**
+```python
+import sys
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QFrame, QHBoxLayout
+from PySide6.QtCore import Qt
+
+# Window setup
+app = QApplication(sys.argv)
+window = QMainWindow()
+window.setGeometry(100, 100, 1300, 800)
+window.setStyleSheet("background-color: #1a1a1a;")
+
+# Create central widget and main layout
+central_widget = QWidget()
+main_layout = QHBoxLayout()
+main_layout.setSpacing(0)
+main_layout.setContentsMargins(0, 0, 0, 0)
+
+# Left frame (Controls)
+left_frame = QFrame()
+left_frame.setFixedWidth(220)
+left_frame.setStyleSheet("background-color: #2d2d2d;")
+
+# Center frame (Table)
+center_frame = QFrame()
+center_frame.setStyleSheet("background-color: #1a1a1a;")
+
+# Right frame (Inspector)
+right_frame = QFrame()
+right_frame.setFixedWidth(300)
+right_frame.setStyleSheet("background-color: #2d2d2d;")
+
+# Add frames to layout
+main_layout.addWidget(left_frame)
+main_layout.addWidget(center_frame, 1)  # stretch factor of 1 = expand
+main_layout.addWidget(right_frame)
+
+# Set layout and show
+central_widget.setLayout(main_layout)
+window.setCentralWidget(central_widget)
+window.show()
+
+sys.exit(app.exec())
+```
+
+**For PySide6 (inside a class - cleaner approach):**
+```python
+class VideoManagerApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setGeometry(100, 100, 1300, 800)
+        self.setStyleSheet("background-color: #1a1a1a;")
+        
+        # Create central widget and main layout
+        central_widget = QWidget()
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create frames
+        left_frame = self.create_left_frame()
+        center_frame = self.create_center_frame()
+        right_frame = self.create_right_frame()
+        
+        # Add to layout
+        main_layout.addWidget(left_frame)
+        main_layout.addWidget(center_frame, 1)
+        main_layout.addWidget(right_frame)
+        
+        central_widget.setLayout(main_layout)
+        self.setCentralWidget(central_widget)
+```
+
+**For PySide6 with QSplitter (resizable panels - BONUS):**
+```python
+from PySide6.QtWidgets import QSplitter
+from PySide6.QtCore import Qt
+
+# Inside __init__ or setup method
+splitter = QSplitter(Qt.Horizontal)
+splitter.addWidget(left_frame)    # 220px initial
+splitter.addWidget(center_frame)  # flexible
+splitter.addWidget(right_frame)   # 300px initial
+
+# Set initial sizes (optional)
+splitter.setSizes([220, 700, 300])
+
+# Make splitter the central widget
+self.setCentralWidget(splitter)
+```
+
+**For table with even columns:**
+```python
+# Set column widths proportionally
+table.setColumnWidth(0, 400)  # Filename (40%)
+table.setColumnWidth(1, 220)  # Resolution (22%)
+table.setColumnWidth(2, 190)  # Framerate (19%)
+table.setColumnWidth(3, 190)  # Duplicate (19%)
+```
+
+---
+
