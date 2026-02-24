@@ -51,7 +51,7 @@ Paste this in the Codex app **Run** box:
 ### Local Development
 
 ```bash
-git clone <https://github.com/RazorBackRoar/Libra.git>
+git clone <<https://github.com/RazorBackRoar/Libra.git>>
 cd Libra
 python3 -m venv .venv
 source .venv/bin/activate

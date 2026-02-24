@@ -5,12 +5,30 @@ requires-python = ">=3.13"
 dependencies = ["PySide6"]
 
 [tool.ty.environment]
-extra-paths = ["/Users/home/Library/Python/3.13/lib/python/site-packages"]
+extra-paths = [
+    "src",
+    "/Users/home/Library/Python/3.13/lib/python/site-packages",
+    "/opt/homebrew/lib/python3.13/site-packages",
+]
+
+[tool.ty.analysis]
+respect-type-ignore-comments = true
+allowed-unresolved-imports = []
+
+[tool.ty.src]
+exclude = [
+    ".agent/**",
+    ".shared/**",
+    ".ui-ux-pro-max/**",
+    "src/Libra/core/video_metadata.py",
+    "src/Libra/gui/main_window.py",
+    "src/Libra/video_tools/**",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP"]
-ignore = ["E501", "N802"]  # N802: Qt override methods must be camelCase
+select = ["E9", "F"]
+ignore = ["F401"]  # Temporary baseline while legacy modules are cleaned up

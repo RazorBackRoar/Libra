@@ -25,9 +25,11 @@ Level 2 Document: Refer to `/Users/home/Workspace/Apps/AGENTS.md` (Level 1) for 
 ## Mandatory Tooling
 
 - Python: use `python3` in the local venv (`.venv`)
-- Installer: `pip` only (no `uv`)
+- Installer: `pip` for project dependencies
+- `uv` allowed only for `uv tool install`, `uvx`, and `uv venv`
 - Tests: `pytest`
 - Type/Lint/Format: `ty`, `ruff check`, `ruff format` (workspace standards)
+- Canonical tooling policy: `/Users/home/Workspace/Apps/Docs/tooling_environment_guide.md`
 
 ## Canonical Commands
 
@@ -35,7 +37,7 @@ Level 2 Document: Refer to `/Users/home/Workspace/Apps/AGENTS.md` (Level 1) for 
 
 ```bash
 cd /Users/home/Workspace/Apps/L!bra
-python3 -m venv .venv
+uv venv .venv --python 3.13
 source .venv/bin/activate
 python3 -m pip install --no-user -U pip pytest PySide6
 ```
