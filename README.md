@@ -50,15 +50,30 @@ Paste this in the Codex app **Run** box:
 
 ### Local Development
 
+This project uses `.razorcore` for workspace build/save tooling.
+
 ```bash
 git clone <<https://github.com/RazorBackRoar/Libra.git>>
 cd Libra
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install --no-user -U pip pytest PySide6
+pip install -e ../.razorcore  # Install shared RazorBackRoar tooling
 pytest -q
 PYTHONPATH=src python3 -m Libra.main
 python3 main.py
+```
+
+---
+
+## 🏗️ Build & Release
+
+```bash
+# Build app and create DMG
+razorbuild L!bra
+
+# Save/release flow
+librapush
 ```
 
 ---

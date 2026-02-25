@@ -1,0 +1,57 @@
+# L!bra Project Agent Guide
+
+## Scope
+
+L!bra is a project in the RazorBackRoar workspace.
+This directory is the project root.
+
+---
+
+## Agent Behavior
+
+Agents should:
+
+1. Treat this directory as the project root.
+2. Read this AGENTS.md first.
+3. Then consult global Skills.
+
+Nearest AGENTS.md overrides higher levels.
+
+---
+
+## Skills
+
+Global skills live in:
+
+`~/Workspace/Skills/`
+
+Agents should consult Skills before generating:
+
+- Code
+- Configurations
+- Tooling setups
+
+---
+
+## Project Purpose
+
+L!bra contains application code and supporting media utilities.
+It is part of the shared RazorBackRoar app ecosystem.
+
+---
+
+## Ecosystem Integration
+
+- Install shared workspace tooling with:
+  `pip install -e ../.razorcore`
+- Keep compatibility with workspace commands such as:
+  `librabuild`, `librapush`, and `razorbuild L!bra`
+
+---
+
+## Rules
+
+- Keep changes minimal and targeted.
+- Avoid unnecessary duplication.
+- Prefer shared Skills and shared tooling.
+- Preserve symlinks and project structure.
