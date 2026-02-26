@@ -19,19 +19,55 @@ respect-type-ignore-comments = true
 allowed-unresolved-imports = []
 
 [tool.ty.src]
+# NOTE: video_tools/** is intentionally excluded from type-checking — it is a
+# known blind spot. Legacy module with complex ffmpeg/subprocess signatures that
+# haven't been annotated yet. Track in: https://github.com/RazorBackRoar/Libra/issues
 exclude = [
     ".agent/**",
     ".shared/**",
     ".ui-ux-pro-max/**",
     "src/Libra/core/video_metadata.py",
     "src/Libra/gui/main_window.py",
-    "src/Libra/video_tools/**",
+    "src/Libra/video_tools/**",  # TODO: annotate and remove this exclusion
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py313"
+src = ["src"]
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".agent",
+    ".shared",
+    "build",
+    "dist",
+    "*.egg-info",
+]
 
 [tool.ruff.lint]
-select = ["E9", "F"]
-ignore = ["F401"]  # Temporary baseline while legacy modules are cleaned up
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (formatter handles this)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+"__init__.py" = ["F401"]
+
+# NOTE: video_tools/** is excluded from ty type-checking (see [tool.ty.src]).
+# Ruff linting still applies to it — this is intentional.
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
