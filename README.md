@@ -3,7 +3,7 @@
 > Workspace context source: `/Users/home/Workspace/Apps/.code-analysis/` (`AGENTS.md`, `monorepo-analysis.md`, `essential-queries.md`).
 
 [![CI](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml/badge.svg)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.1.2-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-Native-brightgreen.svg)](https://support.apple.com/en-us/HT211814)
 [![PySide6](https://img.shields.io/badge/PySide6-Qt6-orange.svg)](https://doc.qt.io/qtforpython/)
@@ -53,15 +53,12 @@ Paste this in the Codex app **Run** box:
 This project uses `.razorcore` for workspace build/save tooling.
 
 ```bash
-git clone <<https://github.com/RazorBackRoar/Libra.git>>
+git clone <https://github.com/RazorBackRoar/Libra.git>
 cd Libra
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install --no-user -U pip pytest PySide6
-pip install -e ../.razorcore  # Install shared RazorBackRoar tooling
-pytest -q
-PYTHONPATH=src python3 -m Libra.main
-python3 main.py
+uv venv --python 3.13
+uv sync
+uv add --editable ../.razorcore
+uv run python -m Libra.main
 ```
 
 ---

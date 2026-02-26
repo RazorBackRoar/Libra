@@ -23,7 +23,7 @@ Nearest AGENTS.md overrides higher levels.
 
 Global skills live in:
 
-`~/Workspace/Skills/`
+`~/.skills/`
 
 Agents should consult Skills before generating:
 
@@ -42,10 +42,11 @@ It is part of the shared RazorBackRoar app ecosystem.
 
 ## Ecosystem Integration
 
-- Install shared workspace tooling with:
-  `pip install -e ../.razorcore`
+- L!bra depends on `.razorcore`. Install with:
+  `uv add --editable ../.razorcore`
 - Keep compatibility with workspace commands such as:
   `librabuild`, `librapush`, and `razorbuild L!bra`
+- Use `uv` for all environment and dependency management (`uv venv`, `uv sync`, `uv run`).
 
 ---
 
