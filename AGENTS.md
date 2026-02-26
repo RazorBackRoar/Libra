@@ -10,6 +10,17 @@ This directory is the project root.
 
 ---
 
+## 🎯 Quick Context
+
+- **Purpose:** Native macOS video workflow suite — drag-and-drop sorting, metadata-aware classification, duplicate detection, and filename sanitization pipelines
+- **Primary Tech:** PySide6, `.razorcore` (build/save tooling)
+- **Key Modules:** `video_tools/` (sorter, duplicate_finder, apple_organizer, batch_processor), `core/`, `gui/`
+- **Build Commands:** `librabuild` or `razorbuild L!bra`
+
+> **Note:** `video_tools/**` is excluded from `ty` type-checking (known blind spot — unannotated ffmpeg/subprocess signatures). Ruff linting still covers it. See `pyproject.toml` `[tool.ty.src]` for details.
+
+---
+
 ## Agent Behavior
 
 Agents should:

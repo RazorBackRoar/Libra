@@ -54,7 +54,7 @@ Paste this in the Codex app **Run** box:
 This project uses `.razorcore` for workspace build/save tooling.
 
 ```bash
-git clone <<https://github.com/RazorBackRoar/Libra.git>>
+git clone <<<https://github.com/RazorBackRoar/Libra.git>>>
 cd Libra
 uv venv --python 3.13
 uv sync
