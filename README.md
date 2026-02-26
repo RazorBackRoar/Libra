@@ -3,7 +3,8 @@
 > Workspace context source: `/Users/home/Workspace/Apps/.code-analysis/` (`AGENTS.md`, `monorepo-analysis.md`, `essential-queries.md`).
 
 [![CI](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml/badge.svg)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.9-blue.svg)](pyproject.toml)
+[![Ruff](https://github.com/RazorBackRoar/Libra/actions/workflows/ruff.yml/badge.svg)](https://github.com/RazorBackRoar/Libra/actions/workflows/ruff.yml)
+[![Version](https://img.shields.io/badge/version-0.1.12-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-Native-brightgreen.svg)](https://support.apple.com/en-us/HT211814)
 [![PySide6](https://img.shields.io/badge/PySide6-Qt6-orange.svg)](https://doc.qt.io/qtforpython/)
@@ -79,19 +80,19 @@ librapush
 
 ```bash
 # Unified launcher (choose a mode)
-PYTHONPATH=src python3 -m Libra.video_tools sorter
-PYTHONPATH=src python3 -m Libra.video_tools duplicates
-PYTHONPATH=src python3 -m Libra.video_tools apple
-PYTHONPATH=src python3 -m Libra.video_tools batch /path/to/videos
+uv run python -m Libra.video_tools sorter
+uv run python -m Libra.video_tools duplicates
+uv run python -m Libra.video_tools apple
+uv run python -m Libra.video_tools batch /path/to/videos
 ```
 
 Direct module entrypoints:
 
 ```bash
-PYTHONPATH=src python3 -m Libra.video_tools.gui.video_sorter
-PYTHONPATH=src python3 -m Libra.video_tools.gui.duplicate_finder
-PYTHONPATH=src python3 -m Libra.video_tools.gui.apple_organizer
-PYTHONPATH=src python3 -m Libra.video_tools.cli.batch_processor /path/to/videos
+uv run python -m Libra.video_tools.gui.video_sorter
+uv run python -m Libra.video_tools.gui.duplicate_finder
+uv run python -m Libra.video_tools.gui.apple_organizer
+uv run python -m Libra.video_tools.cli.batch_processor /path/to/videos
 ```
 
 ---
