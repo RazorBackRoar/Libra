@@ -29,8 +29,11 @@ jobs:
             pip install -r requirements.txt
           fi
           pip install -r requirements-tools.txt
-          pip install -e .
-          pip install pytest pytest-cov
+          pip install PySide6 pytest pytest-cov
+          if [ -d ../.razorcore ]; then
+            pip install -e ../.razorcore
+          fi
+          pip install -e . --no-deps
 
       - name: Run Ruff lint
         run: ruff check .
