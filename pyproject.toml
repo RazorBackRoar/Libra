@@ -2,7 +2,10 @@
 name = "L!bra"
 version = "0.1.3"
 requires-python = ">=3.13"
-dependencies = ["PySide6"]
+dependencies = ["PySide6", "razorcore"]
+
+[tool.uv.sources]
+razorcore = { path = "../.razorcore", editable = true }
 
 [tool.ty.environment]
 extra-paths = [
