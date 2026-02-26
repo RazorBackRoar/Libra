@@ -3,7 +3,7 @@ Level 2 Document: Refer to /Users/home/Workspace/Apps/AGENTS.md (Level 1) for gl
 # L!bra Project Agent Guide
 
 **Package:** `libra`
-**Version:** 0.1.4
+**Version:** 0.2.0
 **Context Level:** LEVEL 3 (Application-Specific)
 
 L!bra is a project in the RazorBackRoar workspace.
