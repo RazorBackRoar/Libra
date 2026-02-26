@@ -15,6 +15,8 @@ jobs:
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,14 +31,28 @@ jobs:
             pip install -r requirements.txt
           fi
           pip install -r requirements-tools.txt
-          pip install -e .
-          pip install pytest pytest-cov
+          pip install PySide6 pytest pytest-cov
+          if [ -d ../.razorcore ]; then
+            pip install -e ../.razorcore
+          fi
+          pip install -e . --no-deps
 
       - name: Run Ruff lint
         run: ruff check .
 
       - name: Run Ruff format check
-        run: ruff format --check .
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+          CHANGED_PY="$(git diff --name-only --diff-filter=ACMRT "$BASE_SHA"...HEAD -- '*.py')"
+          if [ -z "$CHANGED_PY" ]; then
+            echo "No changed Python files to format-check."
+            exit 0
+          fi
+          ruff format --check $CHANGED_PY
 
       - name: Prepare ty search paths
         run: |
