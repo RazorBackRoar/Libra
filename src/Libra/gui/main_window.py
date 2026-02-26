@@ -592,9 +592,7 @@ class MainWindow(QMainWindow):
     #  TOOL VIEWS (Indices 2-5)
     # ──────────────────────────────────────────────────────────────────────
     def _r_generic(self, lay):
-        lbl = QLabel(
-            "Use drag-and-drop or the file/folder dialogs to process your inputs."
-        )
+        lbl = QLabel("Use drag-and-drop or the file/folder dialogs to process your inputs.")
         lbl.setWordWrap(True)
         lbl.setStyleSheet(f"color: {TXT_SEC}; font-size: 13px; text-align: center; border: none;")
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1123,11 +1121,13 @@ class MainWindow(QMainWindow):
         self.scan_worker = ScanWorker(files)
         self.scan_worker.progress.connect(
             lambda c, t: (
-                self.org_progress.setMaximum(t),
-                self.org_progress.setValue(c),
+                (
+                    self.org_progress.setMaximum(t),
+                    self.org_progress.setValue(c),
+                )
+                if getattr(self, "current_mode", "") == "organize"
+                else None
             )
-            if getattr(self, "current_mode", "") == "organize"
-            else None
         )
         self.scan_worker.result.connect(self._on_result)
         self.scan_worker.done.connect(self._on_done)

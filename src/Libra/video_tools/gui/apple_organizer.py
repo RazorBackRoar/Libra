@@ -2,34 +2,46 @@
 import sys
 import os
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QCheckBox, QLabel, QFrame, QPushButton, QFileDialog, QProgressBar,
-    QTreeWidget, QTreeWidgetItem, QMessageBox
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QCheckBox,
+    QLabel,
+    QFrame,
+    QPushButton,
+    QFileDialog,
+    QProgressBar,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 
 from ..core import backend_utils
 
+
 # --- WORKER THREAD (Prevents Freezing) ---
 class ScanWorker(QThread):
     progress = Signal(int)
     finished = Signal(list)
-    
+
     def __init__(self, folder):
         super().__init__()
         self.folder = folder
-        
+
     def run(self):
         videos = []
         # Find all video files
-        valid_exts = {'.mp4', '.mov', '.avi', '.mkv', '.m4v'}
+        valid_exts = {".mp4", ".mov", ".avi", ".mkv", ".m4v"}
         all_files = []
         for root, _, files in os.walk(self.folder):
             for f in files:
                 if os.path.splitext(f)[1].lower() in valid_exts:
                     all_files.append(os.path.join(root, f))
-        
+
         total = len(all_files)
         for i, filepath in enumerate(all_files):
             # Extract metadata using our backend utility
@@ -37,12 +49,14 @@ class ScanWorker(QThread):
             if data:
                 videos.append(data)
             self.progress.emit(int((i + 1) / total * 100))
-            
+
         self.finished.emit(videos)
+
 
 # --- CUSTOM WIDGETS ---
 class GridBackgroundWidget(QWidget):
     """Draws the faint grid background."""
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("#121212"))
@@ -55,14 +69,15 @@ class GridBackgroundWidget(QWidget):
         for y in range(0, self.height(), grid_size):
             painter.drawLine(0, y, self.width(), y)
 
+
 # --- MAIN WINDOW ---
 class AppleVideoSorter(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Video Organizer - Apple Edition")
         self.resize(1100, 750)
-        self.all_video_data = [] # Stores raw data
-        
+        self.all_video_data = []  # Stores raw data
+
         # Main Layout
         container = QWidget()
         self.setCentralWidget(container)
@@ -85,7 +100,7 @@ class AppleVideoSorter(QMainWindow):
         self.chk_make = self.add_checkbox("Apple Device (Make)")
         self.chk_model = self.add_checkbox("iPhone Only (Model)")
         self.chk_gps = self.add_checkbox("Has GPS Data")
-        
+
         # Connect signals to trigger re-filtering immediately
         self.chk_make.stateChanged.connect(self.apply_filters)
         self.chk_model.stateChanged.connect(self.apply_filters)
@@ -97,9 +112,9 @@ class AppleVideoSorter(QMainWindow):
         self.add_header("EXPORT")
         self.chk_csv = self.add_checkbox("CSV Report", checked=True, accent=True)
         self.chk_txt = self.add_checkbox("TXT Report")
-        
+
         self.sidebar_layout.addStretch()
-        
+
         # Scan Button area in Sidebar
         self.btn_scan = QPushButton("Select Folder & Scan")
         self.btn_scan.setFixedHeight(50)
@@ -117,10 +132,12 @@ class AppleVideoSorter(QMainWindow):
         # =========================================
         content_area = GridBackgroundWidget()
         content_layout = QVBoxLayout(content_area)
-        
+
         # Progress Bar (Hidden by default)
         self.progress = QProgressBar()
-        self.progress.setStyleSheet("QProgressBar { height: 4px; border: none; background: #333; } QProgressBar::chunk { background: #2a82da; }")
+        self.progress.setStyleSheet(
+            "QProgressBar { height: 4px; border: none; background: #333; } QProgressBar::chunk { background: #2a82da; }"
+        )
         self.progress.setTextVisible(False)
         self.progress.hide()
         content_layout.addWidget(self.progress)
@@ -161,10 +178,10 @@ class AppleVideoSorter(QMainWindow):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
         if folder:
             self.tree.clear()
-            self.all_video_data = [] # Reset data
+            self.all_video_data = []  # Reset data
             self.progress.show()
             self.btn_scan.setEnabled(False)
-            
+
             # Start Background Thread
             self.worker = ScanWorker(folder)
             self.worker.progress.connect(self.progress.setValue)
@@ -175,47 +192,48 @@ class AppleVideoSorter(QMainWindow):
         self.all_video_data = data
         self.progress.hide()
         self.btn_scan.setEnabled(True)
-        self.apply_filters() # Show results immediately
+        self.apply_filters()  # Show results immediately
 
     def apply_filters(self):
         """The Brains: Filters data based on the Apple Checkboxes."""
         self.tree.clear()
-        
+
         filtered_count = 0
-        
+
         for vid in self.all_video_data:
             # 1. Check "Make = Apple"
             if self.chk_make.isChecked():
                 # If filter is ON, but video is NOT Apple -> Skip
-                if not vid['make'] or "apple" not in vid['make'].lower():
+                if not vid["make"] or "apple" not in vid["make"].lower():
                     continue
 
             # 2. Check "Model = iPhone"
             if self.chk_model.isChecked():
                 # If filter is ON, but video is NOT iPhone -> Skip
-                if not vid['model'] or "iphone" not in vid['model'].lower():
+                if not vid["model"] or "iphone" not in vid["model"].lower():
                     continue
 
             # 3. Check "Has GPS"
             if self.chk_gps.isChecked():
                 # If filter is ON, but video has NO GPS -> Skip
-                if not vid['has_gps']:
+                if not vid["has_gps"]:
                     continue
 
             # If we survived all checks, add to tree
             self.add_tree_item(vid)
             filtered_count += 1
-            
+
         if len(self.all_video_data) > 0 and filtered_count == 0:
-             QMessageBox.information(self, "No Matches", "No videos matched your selected filters.")
+            QMessageBox.information(self, "No Matches", "No videos matched your selected filters.")
 
     def add_tree_item(self, vid):
         item = QTreeWidgetItem(self.tree)
-        item.setText(0, vid['filename'])
-        item.setText(1, vid['make'] if vid['make'] else "--")
-        item.setText(2, vid['model'] if vid['model'] else "--")
-        item.setText(3, "✅ Yes" if vid['has_gps'] else "❌ No")
-        item.setText(4, vid['resolution'])
+        item.setText(0, vid["filename"])
+        item.setText(1, vid["make"] if vid["make"] else "--")
+        item.setText(2, vid["model"] if vid["model"] else "--")
+        item.setText(3, "✅ Yes" if vid["has_gps"] else "❌ No")
+        item.setText(4, vid["resolution"])
+
 
 def main() -> int:
     app = QApplication(sys.argv)

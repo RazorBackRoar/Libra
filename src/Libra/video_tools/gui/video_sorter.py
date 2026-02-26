@@ -2,6 +2,7 @@
 """
 video_sorter.py - Video organizer metadata GUI.
 """
+
 import sys
 import os
 import csv
@@ -9,17 +10,32 @@ from typing import List, Dict
 from pathlib import Path
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QTableWidget, QTableWidgetItem, QCheckBox,
-    QGroupBox, QTextEdit, QFileDialog, QMessageBox, QProgressBar, QHeaderView
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QTableWidget,
+    QTableWidgetItem,
+    QCheckBox,
+    QGroupBox,
+    QTextEdit,
+    QFileDialog,
+    QMessageBox,
+    QProgressBar,
+    QHeaderView,
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPalette, QColor
 
 from ..core.classifier import classify_video
 
+
 class VideoProcessorThread(QThread):
     """Background thread to prevent GUI freeze."""
+
     progress = Signal(int, int)
     log = Signal(str)
     result = Signal(dict)
@@ -33,18 +49,20 @@ class VideoProcessorThread(QThread):
     def run(self):
         total = len(self.video_files)
         for i, video_path in enumerate(self.video_files):
-            if not self.is_running: break
-            
+            if not self.is_running:
+                break
+
             self.progress.emit(i + 1, total)
             self.log.emit(f"Processing: {os.path.basename(video_path)}")
-            
+
             data = classify_video(video_path)
             self.result.emit(data)
-        
+
         self.finished.emit()
 
     def stop(self):
         self.is_running = False
+
 
 class VideoSorterWindow(QMainWindow):
     def __init__(self):
@@ -70,16 +88,16 @@ class VideoSorterWindow(QMainWindow):
         # Filters Section
         filter_group = QGroupBox("Organize By")
         filter_layout = QVBoxLayout()
-        
+
         self.check_make = QCheckBox("Filter by Make")
         self.check_model = QCheckBox("Filter by Model")
         self.check_camera = QCheckBox("Has Camera Data")
         self.check_gps = QCheckBox("Has GPS Data")
-        
+
         for chk in [self.check_make, self.check_model, self.check_camera, self.check_gps]:
             chk.stateChanged.connect(self._apply_filters)
             filter_layout.addWidget(chk)
-            
+
         filter_group.setLayout(filter_layout)
         sidebar_layout.addWidget(filter_group)
 
@@ -88,14 +106,14 @@ class VideoSorterWindow(QMainWindow):
         export_layout = QVBoxLayout()
         self.btn_csv = QPushButton("Export CSV Report")
         self.btn_txt = QPushButton("Export TXT Report")
-        self.btn_csv.clicked.connect(lambda: self._export('csv'))
-        self.btn_txt.clicked.connect(lambda: self._export('txt'))
-        
+        self.btn_csv.clicked.connect(lambda: self._export("csv"))
+        self.btn_txt.clicked.connect(lambda: self._export("txt"))
+
         export_layout.addWidget(self.btn_csv)
         export_layout.addWidget(self.btn_txt)
         export_group.setLayout(export_layout)
         sidebar_layout.addWidget(export_group)
-        
+
         sidebar_layout.addStretch()
         main_layout.addWidget(sidebar)
 
@@ -108,7 +126,7 @@ class VideoSorterWindow(QMainWindow):
         self.btn_select.setFixedHeight(40)
         self.btn_select.clicked.connect(self._select_folder)
         top_controls.addWidget(self.btn_select)
-        
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         top_controls.addWidget(self.progress_bar)
@@ -116,9 +134,9 @@ class VideoSorterWindow(QMainWindow):
 
         # Results Table
         self.table = QTableWidget(0, 8)
-        self.table.setHorizontalHeaderLabels([
-            "Filename", "Res", "Orient", "FPS", "Make", "Model", "Cam", "GPS"
-        ])
+        self.table.setHorizontalHeaderLabels(
+            ["Filename", "Res", "Orient", "FPS", "Make", "Model", "Cam", "GPS"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.setAlternatingRowColors(True)
         content_layout.addWidget(self.table)
@@ -133,25 +151,28 @@ class VideoSorterWindow(QMainWindow):
         self.setAcceptDrops(True)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls(): event.acceptProposedAction()
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            if os.path.isdir(path): self._start_scan(path)
+            if os.path.isdir(path):
+                self._start_scan(path)
 
     def _select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
-        if folder: self._start_scan(folder)
+        if folder:
+            self._start_scan(folder)
 
     def _start_scan(self, folder):
-        video_exts = {'.mp4', '.mov', '.avi', '.mkv', '.m4v'}
+        video_exts = {".mp4", ".mov", ".avi", ".mkv", ".m4v"}
         files = []
         for root, _, filenames in os.walk(folder):
             for f in filenames:
                 if Path(f).suffix.lower() in video_exts:
                     files.append(os.path.join(root, f))
-        
+
         if not files:
             self._log("No videos found.")
             return
@@ -159,9 +180,11 @@ class VideoSorterWindow(QMainWindow):
         self.all_videos = []
         self.table.setRowCount(0)
         self.progress_bar.setVisible(True)
-        
+
         self.worker = VideoProcessorThread(files)
-        self.worker.progress.connect(lambda c, t: (self.progress_bar.setMaximum(t), self.progress_bar.setValue(c)))
+        self.worker.progress.connect(
+            lambda c, t: (self.progress_bar.setMaximum(t), self.progress_bar.setValue(c))
+        )
         self.worker.log.connect(self._log)
         self.worker.result.connect(self._add_result)
         self.worker.finished.connect(lambda: self.progress_bar.setVisible(False))
@@ -175,50 +198,60 @@ class VideoSorterWindow(QMainWindow):
     def _add_row(self, data):
         row = self.table.rowCount()
         self.table.insertRow(row)
-        self.table.setItem(row, 0, QTableWidgetItem(os.path.basename(data['filepath'])))
-        self.table.setItem(row, 1, QTableWidgetItem(data['resolution']))
-        self.table.setItem(row, 2, QTableWidgetItem(data['orientation']))
-        self.table.setItem(row, 3, QTableWidgetItem(str(data['framerate_category'])))
-        self.table.setItem(row, 4, QTableWidgetItem(data['make'] or ""))
-        self.table.setItem(row, 5, QTableWidgetItem(data['model'] or ""))
-        self.table.setItem(row, 6, QTableWidgetItem("Yes" if data['has_camera'] else ""))
-        self.table.setItem(row, 7, QTableWidgetItem("Yes" if data['has_gps'] else ""))
+        self.table.setItem(row, 0, QTableWidgetItem(os.path.basename(data["filepath"])))
+        self.table.setItem(row, 1, QTableWidgetItem(data["resolution"]))
+        self.table.setItem(row, 2, QTableWidgetItem(data["orientation"]))
+        self.table.setItem(row, 3, QTableWidgetItem(str(data["framerate_category"])))
+        self.table.setItem(row, 4, QTableWidgetItem(data["make"] or ""))
+        self.table.setItem(row, 5, QTableWidgetItem(data["model"] or ""))
+        self.table.setItem(row, 6, QTableWidgetItem("Yes" if data["has_camera"] else ""))
+        self.table.setItem(row, 7, QTableWidgetItem("Yes" if data["has_gps"] else ""))
 
     def _passes_filter(self, data):
-        if self.check_make.isChecked() and not data['make']: return False
-        if self.check_model.isChecked() and not data['model']: return False
-        if self.check_camera.isChecked() and not data['has_camera']: return False
-        if self.check_gps.isChecked() and not data['has_gps']: return False
+        if self.check_make.isChecked() and not data["make"]:
+            return False
+        if self.check_model.isChecked() and not data["model"]:
+            return False
+        if self.check_camera.isChecked() and not data["has_camera"]:
+            return False
+        if self.check_gps.isChecked() and not data["has_gps"]:
+            return False
         return True
 
     def _apply_filters(self):
         self.table.setRowCount(0)
         for vid in self.all_videos:
-            if self._passes_filter(vid): self._add_row(vid)
+            if self._passes_filter(vid):
+                self._add_row(vid)
 
     def _log(self, msg):
         self.log_text.append(msg)
 
     def _export(self, fmt):
-        if not self.all_videos: return
+        if not self.all_videos:
+            return
         path, _ = QFileDialog.getSaveFileName(self, f"Export {fmt.upper()}", f"report.{fmt}")
-        if not path: return
-        
+        if not path:
+            return
+
         visible = [v for v in self.all_videos if self._passes_filter(v)]
-        
+
         try:
-            if fmt == 'csv':
-                with open(path, 'w', newline='', encoding='utf-8') as f:
+            if fmt == "csv":
+                with open(path, "w", newline="", encoding="utf-8") as f:
                     writer = csv.DictWriter(f, fieldnames=visible[0].keys())
                     writer.writeheader()
                     writer.writerows(visible)
             else:
-                with open(path, 'w', encoding='utf-8') as f:
+                with open(path, "w", encoding="utf-8") as f:
                     for v in visible:
-                        f.write(f"{os.path.basename(v['filepath'])} | {v['resolution']} | {v['make']}\n")
+                        f.write(
+                            f"{os.path.basename(v['filepath'])} | {v['resolution']} | {v['make']}\n"
+                        )
             QMessageBox.information(self, "Success", f"Exported {len(visible)} items.")
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+
 
 def set_dark_theme(app):
     app.setStyle("Fusion")
@@ -237,6 +270,7 @@ def set_dark_theme(app):
     palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
     palette.setColor(QPalette.HighlightedText, Qt.black)
     app.setPalette(palette)
+
 
 def main() -> int:
     app = QApplication(sys.argv)
