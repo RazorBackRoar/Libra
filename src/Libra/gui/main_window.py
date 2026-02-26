@@ -11,7 +11,7 @@ import os
 import re
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -237,6 +237,7 @@ class MainWindow(QMainWindow):
         self.tool_page_indexes: dict[str, int] = {}
         self.tool_drop_zones: dict[str, QFrame] = {}
         self.tool_status_labels: dict[str, QLabel] = {}
+        self.home_cards: list[ClickableFrame] = []
 
         self.setStyleSheet(f"""
             * {{ font-family: {FONT}; outline: none; }}
@@ -256,6 +257,10 @@ class MainWindow(QMainWindow):
 
         self._go_home()
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_home_card_geometry()
+
     # ──────────────────────────────────────────────────────────────────────
     #  HOME VIEW
     # ──────────────────────────────────────────────────────────────────────
@@ -268,6 +273,7 @@ class MainWindow(QMainWindow):
         # 1. Hero Banner (Mountains vibe via gradient)
         hero = QFrame()
         hero.setFixedHeight(220)
+        self.home_hero = hero
         hero.setObjectName("HeroBanner")
         hero.setStyleSheet(f"""
             #HeroBanner {{
@@ -301,15 +307,18 @@ class MainWindow(QMainWindow):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setStyleSheet("background: transparent;")
+        self.home_scroll = scroll
 
         bot_section = QWidget()
         bot_section.setStyleSheet("background: transparent;")
         bot_lay = QVBoxLayout(bot_section)
         bot_lay.setContentsMargins(48, 24, 48, 24)
         bot_lay.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.home_cards_layout = bot_lay
 
         grid = QGridLayout()
         grid.setSpacing(20)
+        self.home_grid = grid
 
         for i, card in enumerate(CARDS):
             r = i // 3
@@ -357,10 +366,12 @@ class MainWindow(QMainWindow):
 
             desc_lbl = QLabel(card["desc"])
             desc_lbl.setWordWrap(True)
+            desc_lbl.setMaximumHeight(54)
             desc_lbl.setStyleSheet(
                 f"font-size: 13px; color: {TXT_SEC}; background: transparent; border: none;"
             )
             cf_lay.addWidget(desc_lbl)
+            cf_lay.addStretch()
 
             launch_lbl = QLabel("Launch Tool →")
             launch_lbl.setStyleSheet(
@@ -369,6 +380,7 @@ class MainWindow(QMainWindow):
             cf_lay.addWidget(launch_lbl)
 
             grid.addWidget(c_frame, r, c)
+            self.home_cards.append(c_frame)
 
         bot_lay.addLayout(grid)
         bot_lay.addStretch()
@@ -376,11 +388,49 @@ class MainWindow(QMainWindow):
         lay.addWidget(scroll, 1)
 
         self.stack.addWidget(page)  # Index 0
+        QTimer.singleShot(0, self._update_home_card_geometry)
+
+    def _update_home_card_geometry(self):
+        if not self.home_cards:
+            return
+
+        hero_target = max(150, min(220, int(self.height() * 0.23)))
+        if hasattr(self, "home_hero") and self.home_hero.height() != hero_target:
+            self.home_hero.setFixedHeight(hero_target)
+
+        if not hasattr(self, "home_scroll"):
+            return
+
+        viewport = self.home_scroll.viewport()
+        vw = viewport.width()
+        vh = viewport.height()
+        if vw <= 0 or vh <= 0:
+            return
+
+        margins = self.home_cards_layout.contentsMargins()
+        h_spacing = self.home_grid.horizontalSpacing()
+        v_spacing = self.home_grid.verticalSpacing()
+        if h_spacing < 0:
+            h_spacing = 20
+        if v_spacing < 0:
+            v_spacing = 20
+
+        cols = 3
+        rows = max(1, (len(self.home_cards) + cols - 1) // cols)
+        card_w = (vw - margins.left() - margins.right() - h_spacing * (cols - 1)) // cols
+        card_h = (vh - margins.top() - margins.bottom() - v_spacing * (rows - 1)) // rows
+
+        card_w = max(240, card_w)
+        card_h = max(132, min(190, card_h))
+
+        for card in self.home_cards:
+            card.setFixedSize(card_w, card_h)
 
     def _go_home(self):
         self.stack.setCurrentIndex(0)
         self.setAcceptDrops(False)
         self.current_mode = ""
+        QTimer.singleShot(0, self._update_home_card_geometry)
 
     def _go_organize(self):
         self.current_mode = "organize"
