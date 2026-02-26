@@ -1,5 +1,8 @@
 # L!bra Project Agent Guide
 
+**Package:** `libra`
+**Version:** 0.1.9
+
 ## Scope
 
 L!bra is a project in the RazorBackRoar workspace.
