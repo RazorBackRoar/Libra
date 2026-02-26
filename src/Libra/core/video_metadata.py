@@ -47,9 +47,7 @@ class MetadataExtractor:
                 re.IGNORECASE,
             )
         )
-        has_camera_lens = bool(
-            re.search(r"LensModel\s*:.*[A-Za-z0-9]", exif_out, re.IGNORECASE)
-        )
+        has_camera_lens = bool(re.search(r"LensModel\s*:.*[A-Za-z0-9]", exif_out, re.IGNORECASE))
         is_edited = MetadataExtractor._is_edited_fps(file_path)
 
         return VideoMetadata(
@@ -129,9 +127,7 @@ class MetadataExtractor:
             if match:
                 full_device_model = match.group(1).strip()
         elif has_make_apple and has_model_iphone:
-            make_match = re.search(
-                r"^\[.*?Make\s*:\s*(.*)", exif_out, re.IGNORECASE | re.MULTILINE
-            )
+            make_match = re.search(r"^\[.*?Make\s*:\s*(.*)", exif_out, re.IGNORECASE | re.MULTILINE)
             model_match = re.search(
                 r"^\[.*?Model\s*:\s*(.*)", exif_out, re.IGNORECASE | re.MULTILINE
             )
