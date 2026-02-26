@@ -228,8 +228,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("L!bra")
-        self.setGeometry(80, 60, 1100, 850)
-        self.setMinimumSize(900, 700)
+        self.setGeometry(80, 40, 1320, 940)
+        self.setMinimumSize(1040, 760)
 
         self.all_video_data: dict[str, dict] = {}
         self.scan_worker: ScanWorker | None = None
@@ -267,7 +267,7 @@ class MainWindow(QMainWindow):
 
         # 1. Hero Banner (Mountains vibe via gradient)
         hero = QFrame()
-        hero.setFixedHeight(300)
+        hero.setFixedHeight(220)
         hero.setObjectName("HeroBanner")
         hero.setStyleSheet(f"""
             #HeroBanner {{
@@ -283,14 +283,14 @@ class MainWindow(QMainWindow):
         # but large elegant typography works universally.
         title = QLabel("L!bra")
         title.setStyleSheet(
-            f"font-size: 56px; font-weight: 800; color: {TXT_PRI}; letter-spacing: -2px; background: transparent;"
+            f"font-size: 50px; font-weight: 800; color: {TXT_PRI}; letter-spacing: -2px; background: transparent;"
         )
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         h_lay.addWidget(title)
 
         sub = QLabel("Professional Video Organization & Modification")
         sub.setStyleSheet(
-            f"font-size: 16px; font-weight: 600; color: {ACCENT}; letter-spacing: 1px; background: transparent;"
+            f"font-size: 15px; font-weight: 600; color: {ACCENT}; letter-spacing: 1px; background: transparent;"
         )
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         h_lay.addWidget(sub)
@@ -305,11 +305,11 @@ class MainWindow(QMainWindow):
         bot_section = QWidget()
         bot_section.setStyleSheet("background: transparent;")
         bot_lay = QVBoxLayout(bot_section)
-        bot_lay.setContentsMargins(60, 40, 60, 40)
+        bot_lay.setContentsMargins(48, 24, 48, 24)
         bot_lay.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         grid = QGridLayout()
-        grid.setSpacing(24)
+        grid.setSpacing(20)
 
         for i, card in enumerate(CARDS):
             r = i // 3
@@ -331,8 +331,8 @@ class MainWindow(QMainWindow):
             c_frame.clicked.connect(lambda cd=card: self._on_tool_click(cd))
 
             cf_lay = QVBoxLayout(c_frame)
-            cf_lay.setContentsMargins(24, 24, 24, 24)
-            cf_lay.setSpacing(12)
+            cf_lay.setContentsMargins(20, 20, 20, 20)
+            cf_lay.setSpacing(10)
 
             top_hl = QHBoxLayout()
             icon_lbl_l = QLabel(card["icon"])
@@ -364,7 +364,7 @@ class MainWindow(QMainWindow):
 
             launch_lbl = QLabel("Launch Tool →")
             launch_lbl.setStyleSheet(
-                f"font-size: 11px; font-weight: 700; color: {ACCENT}; background: transparent; border: none; margin-top: 8px;"
+                f"font-size: 11px; font-weight: 700; color: {ACCENT}; background: transparent; border: none; margin-top: 4px;"
             )
             cf_lay.addWidget(launch_lbl)
 

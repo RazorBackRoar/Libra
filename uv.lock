@@ -67,7 +67,7 @@ wheels = [
 
 [[package]]
 name = "razorcore"
-version = "1.123.0"
+version = "1.128.0"
 source = { editable = "../.razorcore" }
 dependencies = [
     { name = "pyside6" },
