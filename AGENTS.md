@@ -1,6 +1,10 @@
+Level 2 Document: Refer to /Users/home/Workspace/Apps/AGENTS.md (Level 1) for global SSOT standards.
+
 # L!bra Project Agent Guide
 
-## Scope
+**Package:** `libra`
+**Version:** 0.1.4
+**Context Level:** LEVEL 3 (Application-Specific)
 
 L!bra is a project in the RazorBackRoar workspace.
 This directory is the project root.
@@ -23,7 +27,7 @@ Nearest AGENTS.md overrides higher levels.
 
 Global skills live in:
 
-`~/.skills/`
+`~/Workspace/Skills/`
 
 Agents should consult Skills before generating:
 
