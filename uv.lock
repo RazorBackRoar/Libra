@@ -4,7 +4,7 @@ requires-python = ">=3.13"
 
 [[package]]
 name = "libra"
-version = "0.1.4"
+version = "0.1.5"
 source = { virtual = "." }
 dependencies = [
     { name = "pyside6" },
@@ -67,7 +67,7 @@ wheels = [
 
 [[package]]
 name = "razorcore"
-version = "1.131.0"
+version = "1.139.0"
 source = { editable = "../.razorcore" }
 dependencies = [
     { name = "pyside6" },
