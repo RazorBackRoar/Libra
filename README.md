@@ -3,7 +3,7 @@
 > Workspace context source: `/Users/home/Workspace/Apps/.code-analysis/` (`AGENTS.md`, `monorepo-analysis.md`, `essential-queries.md`).
 
 [![CI](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml/badge.svg)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.2-blue.svg)](pyproject.toml)
+[![Version](https://img.shields.io/badge/version-0.1.9-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-Native-brightgreen.svg)](https://support.apple.com/en-us/HT211814)
 [![PySide6](https://img.shields.io/badge/PySide6-Qt6-orange.svg)](https://doc.qt.io/qtforpython/)
@@ -53,7 +53,7 @@ Paste this in the Codex app **Run** box:
 This project uses `.razorcore` for workspace build/save tooling.
 
 ```bash
-git clone <<<<<<<<https://github.com/RazorBackRoar/Libra.git>>>>>>>>
+git clone <https://github.com/RazorBackRoar/Libra.git>
 cd Libra
 uv venv --python 3.13
 uv sync
