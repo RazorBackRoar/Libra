@@ -1,0 +1,8 @@
+# Security-sensitive ownership map (updated 2026-02-27)
+# Add at least one additional human owner for each sensitive path.
+
+src/Libra/core/organizer.py @RazorBackRoar
+src/Libra/core/duplicate_finder.py @RazorBackRoar
+src/Libra/video_tools/** @RazorBackRoar
+
+* @RazorBackRoar
