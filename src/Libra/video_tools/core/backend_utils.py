@@ -22,7 +22,9 @@ def get_video_details(filepath):
         data = json.loads(result.stdout)
 
         # Video Stream Info
-        stream = next((s for s in data.get("streams", []) if s["codec_type"] == "video"), None)
+        stream = next(
+            (s for s in data.get("streams", []) if s["codec_type"] == "video"), None
+        )
         if not stream:
             return None
 
@@ -35,12 +37,17 @@ def get_video_details(filepath):
         tags_lower = {k.lower(): v for k, v in tags.items()}
 
         # Extract specific Apple data
-        make = tags_lower.get("make") or tags_lower.get("com.apple.quicktime.make") or ""
-        model = tags_lower.get("model") or tags_lower.get("com.apple.quicktime.model") or ""
+        make = (
+            tags_lower.get("make") or tags_lower.get("com.apple.quicktime.make") or ""
+        )
+        model = (
+            tags_lower.get("model") or tags_lower.get("com.apple.quicktime.model") or ""
+        )
 
         # GPS Detection (Look for coordinates or location keys)
         has_gps = any(
-            k in str(tags).lower() for k in ["location", "gps", "coordinates", "latitude"]
+            k in str(tags).lower()
+            for k in ["location", "gps", "coordinates", "latitude"]
         )
 
         return {
