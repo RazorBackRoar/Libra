@@ -99,7 +99,7 @@ class BackendUtils:
                 for chunk in iter(lambda: f.read(chunk_size), b""):
                     hash_md5.update(chunk)
             return hash_md5.hexdigest()
-        except:
+        except Exception:
             return None
 
     @staticmethod
@@ -110,7 +110,7 @@ class BackendUtils:
         try:
             vh = VideoHash(path=filepath)
             return str(vh)
-        except:
+        except Exception:
             return None
 
     @staticmethod
@@ -122,7 +122,7 @@ class BackendUtils:
             h1 = VideoHash(hash=hash1)
             h2 = VideoHash(hash=hash2)
             return h1 - h2
-        except:
+        except Exception:
             return 999
 
     @staticmethod
@@ -142,7 +142,9 @@ class BackendUtils:
                 filepath,
             ]
             # 15s timeout
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=15)
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, check=True, timeout=15
+            )
             data = json.loads(result.stdout)
 
             format_info = data.get("format", {})
@@ -150,11 +152,14 @@ class BackendUtils:
 
             # Find video stream
             video_stream = next(
-                (s for s in data.get("streams", []) if s.get("codec_type") == "video"), None
+                (s for s in data.get("streams", []) if s.get("codec_type") == "video"),
+                None,
             )
             if not video_stream:
                 # Fallback
-                video_stream = data.get("streams", [{}])[0] if data.get("streams") else {}
+                video_stream = (
+                    data.get("streams", [{}])[0] if data.get("streams") else {}
+                )
 
             # Calculate FPS
             fps = 0.0
@@ -166,13 +171,15 @@ class BackendUtils:
             elif fps_str:
                 try:
                     fps = float(fps_str)
-                except:
+                except ValueError:
                     pass
 
             # Extract Make/Model/GPS
             make = tags.get("make", tags.get("com.apple.quicktime.make", "")).strip()
             model = tags.get("model", tags.get("com.apple.quicktime.model", "")).strip()
-            location = tags.get("location", tags.get("com.apple.quicktime.location.ISO6709", ""))
+            location = tags.get(
+                "location", tags.get("com.apple.quicktime.location.ISO6709", "")
+            )
 
             has_gps = True if location else False
             # Check other common GPS keys
@@ -248,7 +255,7 @@ class CacheManager:
                     data = json.load(f)
                     if data.get("version") == CACHE_VERSION:
                         return data.get("files", {})
-            except:
+            except Exception:
                 pass
         return {}
 
@@ -276,7 +283,7 @@ class CacheManager:
                         f,
                         indent=2,
                     )
-            except:
+            except Exception:
                 pass
 
 
@@ -503,7 +510,9 @@ class VideoManagerApp(QMainWindow):
             if os.path.isdir(path):
                 self.start_scan(path)
             else:
-                QMessageBox.warning(self, "Invalid Drop", "Please drop a folder, not a file.")
+                QMessageBox.warning(
+                    self, "Invalid Drop", "Please drop a folder, not a file."
+                )
 
     # --- LEFT PANEL: CONTROLS ---
     def create_left_panel(self):
@@ -599,7 +608,9 @@ class VideoManagerApp(QMainWindow):
 
         # Status Label
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("font-size: 12px; color: #888; font-style: italic;")
+        self.status_label.setStyleSheet(
+            "font-size: 12px; color: #888; font-style: italic;"
+        )
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
@@ -622,7 +633,9 @@ class VideoManagerApp(QMainWindow):
 
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Filename", "Resolution", "Framerate", "Status"])
+        self.table.setHorizontalHeaderLabels(
+            ["Filename", "Resolution", "Framerate", "Status"]
+        )
         self.table.setShowGrid(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
@@ -767,7 +780,10 @@ class VideoManagerApp(QMainWindow):
         # Start Worker
         self.scan_worker = ScanWorker(folder_path)
         self.scan_worker.progress.connect(
-            lambda c, t: (self.progress_bar.setMaximum(t), self.progress_bar.setValue(c))
+            lambda c, t: (
+                self.progress_bar.setMaximum(t),
+                self.progress_bar.setValue(c),
+            )
         )
         self.scan_worker.log.connect(lambda s: print(s))  # Optional console log
         self.scan_worker.finished.connect(self.on_scan_finished)
@@ -942,7 +958,9 @@ class VideoManagerApp(QMainWindow):
         self.inspector_labels["Duration"].setText(
             BackendUtils.format_duration(info.get("duration", 0))
         )
-        self.inspector_labels["Size"].setText(BackendUtils.format_size(info.get("size", 0)))
+        self.inspector_labels["Size"].setText(
+            BackendUtils.format_size(info.get("size", 0))
+        )
         self.inspector_labels["Codec"].setText(str(info.get("codec")))
         self.inspector_labels["Make"].setText(str(info.get("make")))
         self.inspector_labels["Model"].setText(str(info.get("model")))
@@ -951,9 +969,13 @@ class VideoManagerApp(QMainWindow):
 
         # Color status label
         if status == "Exact Duplicate":
-            self.inspector_labels["Status"].setStyleSheet("color: #ff5555; font-weight: bold;")
+            self.inspector_labels["Status"].setStyleSheet(
+                "color: #ff5555; font-weight: bold;"
+            )
         elif status == "Similar Content":
-            self.inspector_labels["Status"].setStyleSheet("color: #5599ff; font-weight: bold;")
+            self.inspector_labels["Status"].setStyleSheet(
+                "color: #5599ff; font-weight: bold;"
+            )
         else:
             self.inspector_labels["Status"].setStyleSheet("color: white;")
 
@@ -1090,7 +1112,9 @@ class VideoManagerApp(QMainWindow):
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(output, f, indent=2)
 
-                QMessageBox.information(self, "Export", "JSON Report exported successfully!")
+                QMessageBox.information(
+                    self, "Export", "JSON Report exported successfully!"
+                )
             except Exception as e:
                 QMessageBox.warning(self, "Error", str(e))
 
