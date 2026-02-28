@@ -2,7 +2,6 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -11,7 +10,7 @@ class VideoMetadata:
     height: int
     rotation: int
     fps: float
-    iphone_model: Optional[str]
+    iphone_model: str | None
     has_gps: bool
     is_edited: bool
     has_camera_lens: bool
@@ -114,7 +113,7 @@ class MetadataExtractor:
             return 0.0
 
     @staticmethod
-    def _extract_iphone_model(exif_out: str) -> Optional[str]:
+    def _extract_iphone_model(exif_out: str) -> str | None:
         has_lens_iphone = bool(re.search(r"LensModel.*iPhone", exif_out, re.IGNORECASE))
         has_make_apple = bool(re.search(r"Make.*Apple", exif_out, re.IGNORECASE))
         has_model_iphone = bool(re.search(r"Model.*iPhone", exif_out, re.IGNORECASE))

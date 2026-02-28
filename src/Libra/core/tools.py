@@ -1,7 +1,7 @@
 import subprocess
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 
 class VideoTools:

@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-import sys
 import os
+import sys
+
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
     QCheckBox,
-    QLabel,
-    QFrame,
-    QPushButton,
     QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
     QProgressBar,
+    QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
-    QMessageBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
 
 from ..core import backend_utils
 

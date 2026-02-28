@@ -16,35 +16,33 @@ REQUIREMENTS:
     FFmpeg must be installed on the system.
 """
 
-import sys
-import os
-import json
 import hashlib
+import json
+import os
 import subprocess
-from pathlib import Path
+import sys
 from collections import defaultdict
 from datetime import datetime
 
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent, QFont
 from PySide6.QtWidgets import (
     QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
     QCheckBox,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QFrame,
-    QSplitter,
-    QFileDialog,
-    QMessageBox,
-    QProgressBar,
-    QHeaderView,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QFont, QColor, QBrush, QIcon, QDragEnterEvent, QDropEvent
 
 # Check for videohash
 try:
@@ -246,7 +244,7 @@ class CacheManager:
     def _load(self):
         if os.path.exists(self.cache_path):
             try:
-                with open(self.cache_path, "r") as f:
+                with open(self.cache_path) as f:
                     data = json.load(f)
                     if data.get("version") == CACHE_VERSION:
                         return data.get("files", {})

@@ -5,8 +5,8 @@ A headless script to process videos using the classifier library.
 Based on 'Pro Tips' from the Video Duplicate Finder guide (Page 58).
 """
 
-import os
 import json
+import os
 
 from ..core.classifier import classify_video
 

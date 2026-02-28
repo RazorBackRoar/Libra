@@ -3,32 +3,30 @@
 video_sorter.py - Video organizer metadata GUI.
 """
 
-import sys
-import os
 import csv
-from typing import List, Dict
+import os
+import sys
 from pathlib import Path
 
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent, QPalette
 from PySide6.QtWidgets import (
     QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QPushButton,
-    QLabel,
-    QTableWidget,
-    QTableWidgetItem,
     QCheckBox,
-    QGroupBox,
-    QTextEdit,
     QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QMainWindow,
     QMessageBox,
     QProgressBar,
-    QHeaderView,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPalette, QColor
 
 from ..core.classifier import classify_video
 

@@ -1,7 +1,7 @@
-import subprocess
-import json
 import hashlib
+import json
 import os
+import subprocess
 
 
 # --- 1. METADATA ENGINE ---

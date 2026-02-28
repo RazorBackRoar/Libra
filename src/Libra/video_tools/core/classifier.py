@@ -10,10 +10,8 @@ Framerate Categories: 30, 60
 Orientation: W (Wide/Landscape), V (Vertical/Portrait)
 """
 
-import subprocess
 import json
-from typing import Dict, Tuple, Optional, List
-
+import subprocess
 
 # ============================================================================
 # RESOLUTION CLASSIFICATION
@@ -118,7 +116,7 @@ def classify_orientation(width: int, height: int) -> str:
 # ============================================================================
 
 
-def apply_rotation_correction(width: int, height: int, rotation: int) -> Tuple[int, int]:
+def apply_rotation_correction(width: int, height: int, rotation: int) -> tuple[int, int]:
     """
     Swap width/height if video has 90° or 270° rotation.
 
@@ -140,7 +138,7 @@ def apply_rotation_correction(width: int, height: int, rotation: int) -> Tuple[i
 # ============================================================================
 
 
-def generate_folder_structure(mode: str = "MaxVid") -> List[str]:
+def generate_folder_structure(mode: str = "MaxVid") -> list[str]:
     """
     Generate folder structure based on sorting mode.
 
@@ -245,7 +243,7 @@ def generate_filename(
 # ============================================================================
 
 
-def classify_video(file_path: str) -> Dict:
+def classify_video(file_path: str) -> dict:
     """
     Analyzes a video file and extracts metadata.
 
@@ -306,7 +304,7 @@ def classify_video(file_path: str) -> Dict:
 # ============================================================================
 
 
-def classify_video_properties(width: int, height: int, fps: float, rotation: int = 0) -> Dict:
+def classify_video_properties(width: int, height: int, fps: float, rotation: int = 0) -> dict:
     """
     Classify video properties without reading a file.
     Useful for testing or when metadata is already available.
@@ -338,7 +336,7 @@ def classify_video_properties(width: int, height: int, fps: float, rotation: int
 # ============================================================================
 
 
-def _get_video_metadata(file_path: str) -> Dict:
+def _get_video_metadata(file_path: str) -> dict:
     """Runs ffprobe to extract metadata JSON."""
     cmd = [
         "ffprobe",
