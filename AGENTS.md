@@ -1,7 +1,7 @@
 # L!bra Project Agent Guide
 
 **Package:** `libra`
-**Version:** 0.1.16
+**Version:** 0.2.0
 
 ## Scope
 

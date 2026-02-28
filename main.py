@@ -3,11 +3,15 @@
 import sys
 from pathlib import Path
 
-SRC_DIR = Path(__file__).resolve().parent / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
 
-from Libra.main import main
+def run() -> int:
+    """Load and execute the app entry point."""
+    src_dir = Path(__file__).resolve().parent / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+    from Libra.main import main as libra_main
+
+    return libra_main()
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())
