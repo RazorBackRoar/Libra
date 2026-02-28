@@ -66,7 +66,7 @@ def get_file_hash(filepath):
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
-    except:
+    except Exception:
         return None
 
 
@@ -77,7 +77,7 @@ try:
     def get_visual_hash(filepath):
         try:
             return VideoHash(path=filepath).hash_hex
-        except:
+        except Exception:
             return None
 except ImportError:
 

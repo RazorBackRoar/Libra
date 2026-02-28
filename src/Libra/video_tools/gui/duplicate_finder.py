@@ -99,7 +99,7 @@ class BackendUtils:
                 for chunk in iter(lambda: f.read(chunk_size), b""):
                     hash_md5.update(chunk)
             return hash_md5.hexdigest()
-        except:
+        except Exception:
             return None
 
     @staticmethod
@@ -110,7 +110,7 @@ class BackendUtils:
         try:
             vh = VideoHash(path=filepath)
             return str(vh)
-        except:
+        except Exception:
             return None
 
     @staticmethod
@@ -122,7 +122,7 @@ class BackendUtils:
             h1 = VideoHash(hash=hash1)
             h2 = VideoHash(hash=hash2)
             return h1 - h2
-        except:
+        except Exception:
             return 999
 
     @staticmethod
@@ -166,7 +166,7 @@ class BackendUtils:
             elif fps_str:
                 try:
                     fps = float(fps_str)
-                except:
+                except ValueError:
                     pass
 
             # Extract Make/Model/GPS
@@ -248,7 +248,7 @@ class CacheManager:
                     data = json.load(f)
                     if data.get("version") == CACHE_VERSION:
                         return data.get("files", {})
-            except:
+            except Exception:
                 pass
         return {}
 
@@ -276,7 +276,7 @@ class CacheManager:
                         f,
                         indent=2,
                     )
-            except:
+            except Exception:
                 pass
 
 
