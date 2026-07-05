@@ -237,16 +237,17 @@ const glazeAPI = {
     // ): Promise<boolean> =>
     //   ipcRenderer.invoke("shell:openExternalWithResult", url, options),
     //
-    // showItemInFolder(fullPath: string): void {
-    //   void ipcRenderer.invoke("shell:showItemInFolder", fullPath).catch(() => {});
-    // },
-    //
     // /** @deprecated Use showItemInFolder() for fire-and-forget behavior. */
     // showItemInFolderAsync: (fullPath: string): Promise<void> =>
     //   ipcRenderer.invoke("shell:showItemInFolder", fullPath),
     //
     // trashItem: (path: string): Promise<void> =>
     //   ipcRenderer.invoke("shell:trashItem", path),
+
+    // Needed by reveal:inFinder handler (L!bra)
+    showItemInFolder(fullPath: string): void {
+      void ipcRenderer.invoke("shell:showItemInFolder", fullPath).catch(() => {});
+    },
   },
 
   // -------------------------------------------------------------------------

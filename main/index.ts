@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-import { app, BrowserWindow, Menu, logger, initDevToolsButtonState } from "@glaze/core/backend";
+import { app, BrowserWindow, Menu, nativeTheme, logger, initDevToolsButtonState } from "@glaze/core/backend";
 
 import { registerHandlers } from "./handlers/index.js";
 import { getPreloadPath, getWindowUrl } from "./windows/window-paths.js";
@@ -53,8 +53,8 @@ async function createMainWindow() {
   // In production: __dirname = build/main, package.json is at ../../package.json
   const packageJsonPath = path.join(__dirname, "..", "..", "package.json");
 
-  const minWindowWidth = 390;
-  const minWindowHeight = 456;
+  const minWindowWidth = 760;
+  const minWindowHeight = 560;
   const windowWidth = 1000;
   const windowHeight = 700;
   let windowTitle = "Glaze App";
@@ -200,6 +200,9 @@ const startTime = Date.now();
 logger.info("main", "⏱️ [COLD_START] Waiting for app ready...", {
   timestamp: new Date().toISOString(),
 });
+
+// ── Force dark appearance for black/gold theme ────────────────────────────
+nativeTheme.themeSource = "dark";
 
 app.whenReady().then(async () => {
   const windowCreateStartTime = Date.now();

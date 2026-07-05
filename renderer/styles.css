@@ -8,3 +8,43 @@
 @source "./**/*.{ts,tsx}";
 @source not "./preload.ts";
 @source not "./dev/**/*";
+
+/* ── L!bra Black/Gold Theme ─────────────────────────────────────────────── */
+
+/*
+ * Dark-only theme. nativeTheme.themeSource is set to "dark" in main/index.ts.
+ * Dark seeds render as-authored; the app always runs in dark appearance.
+ */
+.dark,
+:root {
+  --bg: #0d0d0d;
+  --bg-secondary: #141414;
+  --fg: #f0ead8;
+  --theme-accent: #c9a227;
+}
+
+/* ── Gold accent helper classes ──────────────────────────────────────────── */
+
+/* Subtle gold glow used on drag-over / primary-focus elements */
+.libra-gold-glow {
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.45), 0 0 16px 0 rgba(201, 162, 39, 0.18);
+}
+
+/* Gold border used in drag-over states */
+.libra-gold-border {
+  border-color: #c9a227;
+}
+
+/* Subtle gold tinted background for drag-over zones */
+.libra-drop-bg {
+  background-color: rgba(201, 162, 39, 0.07);
+}
+
+/* Gold uppercase section label style */
+.libra-section-label {
+  color: #c9a227;
+  font-size: 0.6875rem; /* 11px */
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}

@@ -1,75 +1,96 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  Label,
-  RadioGroup,
-  RadioGroupItem,
   ScrollArea,
   Toolbar,
   ToolbarContent,
   ToolbarTitle,
   Field,
-  FieldContent,
   FieldGroup,
-  FieldLabel,
   FieldSet,
+  Input,
+  Switch,
+  Button,
+  Text,
   toast,
 } from "@glaze/core/components";
-import type { NativeThemeInfo } from "@glaze/core/ipc";
+import type { Settings } from "../main/types";
+
+const DEFAULT_EXTENSIONS = [
+  "mp4", "mov", "m4v", "avi", "mkv", "webm", "mpg", "mpeg", "wmv", "flv", "3gp", "m2ts", "mts",
+];
+
+async function getSettings(): Promise<Settings> {
+  return window.glazeAPI.glaze.ipc.invoke("settings:get", {}) as Promise<Settings>;
+}
+
+async function setSettings(patch: Partial<Settings>): Promise<Settings> {
+  return window.glazeAPI.glaze.ipc.invoke("settings:set", { patch }) as Promise<Settings>;
+}
 
 export function SettingsView() {
-  const [themeInfo, setThemeInfo] = useState<NativeThemeInfo | null>(null);
-  const [_isLoading, setIsLoading] = useState(true);
+  const [settings, setLocalSettings] = useState<Settings | null>(null);
+  const [ffmpegPath, setFfmpegPath] = useState("");
+  const [ffprobePath, setFfprobePath] = useState("");
+  const [extensionsRaw, setExtensionsRaw] = useState("");
+  const [dryRunDefault, setDryRunDefault] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Close settings window on Escape, unless an interactive element is focused or a popover is open
+  // Close settings window on Escape
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (event.defaultPrevented) return;
-
       const el = document.activeElement;
       if (
         el instanceof HTMLInputElement ||
         el instanceof HTMLTextAreaElement ||
         el instanceof HTMLSelectElement ||
         (el instanceof HTMLElement && el.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (document.querySelector("[data-radix-popper-content-wrapper]")) {
-        return;
-      }
-
+      ) return;
+      if (document.querySelector("[data-radix-popper-content-wrapper]")) return;
       event.preventDefault();
-      window.glazeAPI.glaze.ipc.invoke("window:closeSettings");
+      void window.glazeAPI.glaze.ipc.invoke("window:closeSettings", {});
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const refreshThemeInfo = async () => {
-    try {
-      const info = await window.glazeAPI.nativeTheme.getInfo();
-      setThemeInfo(info);
-    } catch (error) {
-      toast.error(`Failed to get theme info: ${error}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    refreshThemeInfo();
+    console.log("[SettingsView:load]");
+    void (async () => {
+      try {
+        const s = await getSettings();
+        setLocalSettings(s);
+        setFfmpegPath(s.ffmpegPath ?? "");
+        setFfprobePath(s.ffprobePath ?? "");
+        setExtensionsRaw((s.videoExtensions ?? DEFAULT_EXTENSIONS).join(", "));
+        setDryRunDefault(s.dryRunDefault ?? false);
+      } catch (err) {
+        toast.error("Failed to load settings", { description: String(err) });
+      }
+    })();
   }, []);
 
-  const handleThemeChange = async (value: string) => {
-    const source = value as "system" | "light" | "dark";
+  const handleSave = async () => {
+    setIsSaving(true);
+    console.log("[SettingsView:save]", { ffmpegPath, ffprobePath, dryRunDefault });
     try {
-      await window.glazeAPI.nativeTheme.setThemeSource(source);
-      await refreshThemeInfo();
-    } catch (error) {
-      toast.error(`Failed to set theme: ${error}`);
+      const extensions = extensionsRaw
+        .split(/[,\s]+/)
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+      const updated = await setSettings({
+        ffmpegPath: ffmpegPath.trim() || null,
+        ffprobePath: ffprobePath.trim() || null,
+        videoExtensions: extensions,
+        dryRunDefault,
+      });
+      setLocalSettings(updated);
+      toast.success("Settings saved");
+    } catch (err) {
+      toast.error("Failed to save settings", { description: String(err) });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -84,33 +105,78 @@ export function SettingsView() {
       }
     >
       <div className="px-4 flex flex-col gap-8 mb-8">
-        <FieldSet>
+        {/* ffmpeg paths */}
+        <FieldSet title="ffmpeg Paths">
           <FieldGroup>
-            <Field orientation="horizontal">
-              <FieldContent>
-                <FieldLabel htmlFor="theme">Theme</FieldLabel>
-              </FieldContent>
-              <RadioGroup
-                value={themeInfo?.themeSource ?? "system"}
-                onValueChange={handleThemeChange}
-                orientation="horizontal"
-              >
-                <Label>
-                  <RadioGroupItem value="system" />
-                  Auto
-                </Label>
-                <Label>
-                  <RadioGroupItem value="light" />
-                  Light
-                </Label>
-                <Label>
-                  <RadioGroupItem value="dark" />
-                  Dark
-                </Label>
-              </RadioGroup>
+            <Field label="ffmpeg" description="Leave blank to auto-detect from Homebrew or PATH.">
+              <Input
+                placeholder="/opt/homebrew/bin/ffmpeg"
+                value={ffmpegPath}
+                onChange={(e) => setFfmpegPath(e.target.value)}
+                disabled={settings === null}
+              />
+            </Field>
+            <Field label="ffprobe" description="Leave blank to auto-detect from Homebrew or PATH.">
+              <Input
+                placeholder="/opt/homebrew/bin/ffprobe"
+                value={ffprobePath}
+                onChange={(e) => setFfprobePath(e.target.value)}
+                disabled={settings === null}
+              />
             </Field>
           </FieldGroup>
         </FieldSet>
+
+        {/* Video extensions */}
+        <FieldSet title="Video Extensions">
+          <FieldGroup>
+            <Field
+              label="Extensions"
+              description="Comma-separated list of video file extensions to scan."
+            >
+              <Input
+                placeholder="mp4, mov, m4v, mkv…"
+                value={extensionsRaw}
+                onChange={(e) => setExtensionsRaw(e.target.value)}
+                disabled={settings === null}
+              />
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+
+        {/* Behavior */}
+        <FieldSet title="Behavior">
+          <FieldGroup>
+            <Field label="Dry Run by Default" description="Preview operations without making changes.">
+              <Switch
+                checked={dryRunDefault}
+                onCheckedChange={(val) => {
+                  console.log("[SettingsView:dryRunDefault]", { val });
+                  setDryRunDefault(val);
+                }}
+                disabled={settings === null}
+              />
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+
+        {/* Save button */}
+        <div>
+          <Button
+            variant="accent"
+            size="medium"
+            onClick={() => void handleSave()}
+            disabled={isSaving || settings === null}
+          >
+            {isSaving ? "Saving…" : "Save Settings"}
+          </Button>
+        </div>
+
+        {settings === null && (
+          <Text variant="small" color="tertiary">
+            Loading settings…
+          </Text>
+        )}
       </div>
     </ScrollArea>
   );

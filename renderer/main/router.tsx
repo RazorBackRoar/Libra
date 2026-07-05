@@ -8,6 +8,7 @@ import { HomeView } from "./home-view";
 import { RootView } from "./root-view";
 import { QueryClient } from "@tanstack/react-query";
 import { ErrorBoundaryView } from "@glaze/core/components";
+import { ToolDispatcher } from "./tools/tool-dispatcher";
 
 const rootRoute = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -33,7 +34,13 @@ const homeRoute = createRoute({
   },
 });
 
-const routeTree = rootRoute.addChildren([homeRoute]);
+const toolRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/tool/$toolId",
+  component: ToolDispatcher,
+});
+
+const routeTree = rootRoute.addChildren([homeRoute, toolRoute]);
 
 const queryClient = new QueryClient();
 
@@ -53,7 +60,7 @@ declare module "@tanstack/react-router" {
   }
   interface StaticDataRouteOption {
     title?: string;
-    component?: any;
+    component?: string;
   }
 }
 
