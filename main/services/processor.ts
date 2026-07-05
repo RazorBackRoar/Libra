@@ -25,7 +25,8 @@ import {
   OUTPUT_FOLDER_NAMES,
   isHousekeepingName,
   orientationCode,
-  frameRateLabel,
+  fpsToken,
+  fpsFolderToken,
   type VideoInfo,
   type SortMode,
   type ProcessReport,
@@ -68,21 +69,42 @@ function sanitizePrefix(raw: string | undefined): string {
   return out.trim();
 }
 
-/** Emoji segment in the fixed order 📱 🌍 📷 ✂️ (empty when none apply). */
+/** Emoji segment in the fixed order 📱 📷 🌍 (device / camera / GPS), empty
+ *  when none apply (spec §16). */
 function emojiSet(info: VideoInfo): string {
   let s = "";
   if (info.isApple) s += "📱";
-  if (info.hasGPS) s += "🌍";
   if (info.hasCameraInfo) s += "📷";
-  if (info.isEdited) s += "✂️";
+  if (info.hasGPS) s += "🌍";
   return s;
 }
 
-/** Name without NUMBER/extension: "[prefix] RES O FR [emojis]". */
+/** Strip a previously-applied L!bra convention suffix so re-runs never stack
+ *  metadata (e.g. "Jennifer 1080p W60 📱📷🌍 003" → "Jennifer"). */
+function stripConventionSuffix(base: string): string {
+  let b = base;
+  b = b.replace(/\s+\d{3,}(?:\s+X+)?$/i, ""); // trailing " NNN" / " NNN X…"
+  // trailing " RES O[fps]" optionally followed by the emoji token (a single run
+  // of non-space characters, e.g. "📱📷🌍").
+  b = b.replace(/\s+(?:4K|FHD|1080p|HD|720p|SD|Unknown)\s+[WV]\d*(?:\s+\S+)?$/i, "");
+  return b.trim();
+}
+
+/** Name base: the custom prefix when provided, else the original filename base
+ *  with any prior convention suffix stripped (spec §15). */
+function baseNameFor(prefix: string, info: VideoInfo): string {
+  if (prefix) return prefix;
+  const originalBase = info.name.slice(0, info.name.length - path.extname(info.name).length);
+  return sanitizePrefix(stripConventionSuffix(originalBase)) || "video";
+}
+
+/** Full name without NUMBER/extension: "{base} {RES} {O}{fps} {emojis}" (spec §15). */
 function buildBaseName(prefix: string, info: VideoInfo): string {
-  const parts: string[] = [];
-  if (prefix) parts.push(prefix);
-  parts.push(info.resolutionClass, orientationCode(info.orientation), String(frameRateLabel(info.fps)));
+  const parts: string[] = [
+    baseNameFor(prefix, info),
+    info.resolutionClass,
+    `${orientationCode(info.orientation)}${fpsToken(info.fps)}`,
+  ];
   const em = emojiSet(info);
   if (em) parts.push(em);
   return parts.join(" ");
@@ -93,9 +115,10 @@ function numberStr(n: number): string {
   return n < 1000 ? String(n).padStart(3, "0") : String(n);
 }
 
-/** Category (resolution + orientation + frame rate + emoji set) — scopes numbering. */
-function categoryKey(info: VideoInfo): string {
-  return `${info.resolutionClass}|${orientationCode(info.orientation)}|${frameRateLabel(info.fps)}|${emojiSet(info)}`;
+/** Output-group token (resolution + orientation + frame rate) used to reset
+ *  numbering in Pro Vid (spec §18). */
+function groupToken(info: VideoInfo): string {
+  return `${info.resolutionClass} ${orientationCode(info.orientation)}${fpsToken(info.fps)}`;
 }
 
 function targetDir(root: string, mode: SortMode, info: VideoInfo): string {
@@ -109,10 +132,10 @@ function targetDir(root: string, mode: SortMode, info: VideoInfo): string {
       // Flat, single-level — e.g. "4K W" (NOT nested "4K/Wide").
       return path.join(root, `${info.resolutionClass} ${orientationCode(info.orientation)}`);
     case "MaxVid":
-      // Flat, single-level — e.g. "4K W 60" (NOT 3 nested levels).
+      // Flat, single-level — e.g. "4K W 60" / "4K W 120" (NOT 3 nested levels).
       return path.join(
         root,
-        `${info.resolutionClass} ${orientationCode(info.orientation)} ${frameRateLabel(info.fps)}`,
+        `${info.resolutionClass} ${orientationCode(info.orientation)} ${fpsFolderToken(info.fps)}`,
       );
     case "SlowMotion":
       return path.join(root, info.isSlowMotion ? "Slow Motion" : "Normal Speed");
@@ -143,15 +166,22 @@ async function safeDestX(targetPath: string): Promise<string> {
   }
 }
 
-/** Highest existing NUMBER for a given base name in a directory (0 if none). */
-async function existingMaxNumber(dir: string, baseName: string, ext: string): Promise<number> {
+/**
+ * Highest existing NUMBER in a directory (0 if none), used to seed numbering on
+ * re-runs. When `groupInfix` is given (Pro Vid), only files whose name contains
+ * that output-group token are considered; otherwise (folder modes) every
+ * conventioned file in the folder counts.
+ */
+async function existingMaxNumber(dir: string, ext: string, groupInfix: string | null): Promise<number> {
   let entries: string[];
   try {
     entries = await fs.readdir(dir);
   } catch {
     return 0;
   }
-  const re = new RegExp(`^${escapeRegex(baseName)} (\\d{3,})( X+)?${escapeRegex(ext)}$`, "i");
+  const re = groupInfix
+    ? new RegExp(` ${escapeRegex(groupInfix)}(?: [^ ]+)? (\\d{3,})( X+)?${escapeRegex(ext)}$`, "i")
+    : new RegExp(` (\\d{3,})( X+)?${escapeRegex(ext)}$`, "i");
   let max = 0;
   for (const name of entries) {
     const m = re.exec(name);
@@ -257,9 +287,9 @@ export async function processFolder(opts: ProcessOptions): Promise<ProcessReport
 
   // Per-category numbering counters (seeded lazily from disk for re-runs).
   const counters = new Map<string, number>();
-  async function nextNumber(key: string, dir: string, baseName: string, ext: string): Promise<number> {
+  async function nextNumber(key: string, dir: string, ext: string, groupInfix: string | null): Promise<number> {
     if (!counters.has(key)) {
-      const seed = await existingMaxNumber(dir, baseName, ext);
+      const seed = await existingMaxNumber(dir, ext, groupInfix);
       counters.set(key, seed + 1);
     }
     const n = counters.get(key)!;
@@ -344,8 +374,13 @@ export async function processFolder(opts: ProcessOptions): Promise<ProcessReport
           const name = `${dupOf.fullBase} ${"X".repeat(dupOf.dupCount)}${ext}`;
           await performMove(info.path, path.join(dupOf.dir, name), "duplicate", abnormalNote);
         } else {
-          const key = mode === "ProVid" ? `PV|${dir}|${categoryKey(info)}` : categoryKey(info);
-          const num = await nextNumber(key, dir, baseName, ext);
+          // Numbering resets per output group (spec §18): Pro Vid → per
+          // (dir, resolution+orientation+fps); folder modes → per target folder
+          // (which already encodes resolution / +orientation / +fps).
+          const gt = groupToken(info);
+          const key = mode === "ProVid" ? `PV|${dir}|${gt}` : `${mode}|${dir}`;
+          const groupInfix = mode === "ProVid" ? gt : null;
+          const num = await nextNumber(key, dir, ext, groupInfix);
           const fullBase = `${baseName} ${numberStr(num)}`;
           const name = `${fullBase}${ext}`;
           if (hash) seenHash.set(hash, { fullBase, dupCount: 0, dir, ext });

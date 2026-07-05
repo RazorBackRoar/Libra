@@ -290,13 +290,21 @@ export async function probeFile(
     const cameraBack =
       anyTagKeyOrValueMatches(formatTags, backRe) || anyTagKeyOrValueMatches(streamTags, backRe);
 
-    // Screen recording — filename prefix, or ReplayKit/screen-recording tag values.
+    // Screen recording — best-effort filename + metadata clues (spec §13).
+    // Strong indicators: RPReplay / ReplayKit / "Screen Recording" / QuickTime
+    // Player (com.apple.QuickTimePlayerX). No clear evidence → not flagged.
+    const screenRecTags = [
+      "replaykit",
+      "screen recording",
+      "quicktime player",
+      "com.apple.quicktimeplayerx",
+    ];
     const isScreenRecording =
-      /^rpreplay/i.test(name) ||
-      anyTagValueContains(formatTags, "replaykit") ||
-      anyTagValueContains(formatTags, "screen recording") ||
-      anyTagValueContains(streamTags, "replaykit") ||
-      anyTagValueContains(streamTags, "screen recording");
+      /rpreplay|replaykit|screen recording/i.test(name) ||
+      screenRecTags.some(
+        (needle) =>
+          anyTagValueContains(formatTags, needle) || anyTagValueContains(streamTags, needle),
+      );
 
     // Slow motion — iPhone slow-mo shoots 120/240fps.
     const isSlowMotion = fps !== null && fps >= 90;

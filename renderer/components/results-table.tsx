@@ -45,11 +45,10 @@ function formatDuration(sec: number | null): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** Device concept: iPhone when Apple, else Misc Phone when camera make/model is present. */
+/** Device concept: iPhone when Apple, otherwise Other Device. */
 function deviceLabel(file: VideoInfo): string {
   if (file.isApple) return "iPhone";
-  if (file.hasCameraInfo) return "Misc Phone";
-  return "—";
+  return "Other Device";
 }
 
 /** Camera-direction concept: separate from Device, backed by cameraFront/cameraBack. */

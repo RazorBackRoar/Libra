@@ -80,14 +80,19 @@ export interface JobProgress {
   phase: string;
 }
 
+/** Stable frame-rate folder tokens (matches fpsFolderToken output). */
+const FPS_FOLDER_TOKENS = ["30", "60", "120", "Sub", "NA"] as const;
+
 /** Folder names L!bra itself creates — skipped when scanning recursively so
- *  re-runs never re-process the app's own output. */
+ *  re-runs never re-process the app's own output. Computed from the resolution
+ *  classes × orientation × frame-rate tokens plus the fixed utility folders. */
 export const OUTPUT_FOLDER_NAMES: string[] = [
-  "4K", "FHD", "1080p", "HD", "720p", "SD", "MISC", "GPS", "No GPS", "Slow Motion", "Normal Speed",
-  "4K W", "4K V", "FHD W", "FHD V", "1080p W", "1080p V", "HD W", "HD V", "720p W", "720p V", "SD W", "SD V",
-  "4K W 60", "4K W 30", "4K V 60", "4K V 30", "FHD W 60", "FHD W 30", "FHD V 60", "FHD V 30",
-  "1080p W 60", "1080p W 30", "1080p V 60", "1080p V 30", "HD W 60", "HD W 30", "HD V 60", "HD V 30",
-  "720p W 60", "720p W 30", "720p V 60", "720p V 30", "SD W 60", "SD W 30", "SD V 60", "SD V 30",
+  ...RESOLUTION_CLASSES,
+  "MISC", "GPS", "No GPS", "Slow Motion", "Normal Speed",
+  ...RESOLUTION_CLASSES.flatMap((r) => ["W", "V"].map((o) => `${r} ${o}`)),
+  ...RESOLUTION_CLASSES.flatMap((r) =>
+    ["W", "V"].flatMap((o) => FPS_FOLDER_TOKENS.map((f) => `${r} ${o} ${f}`)),
+  ),
 ];
 
 /** macOS housekeeping entries — never moved, never counted. */
@@ -196,4 +201,38 @@ export function orientationCode(o: Orientation): "W" | "V" {
 /** Frame-rate label: 60 when the source runs above 45fps, otherwise 30. */
 export function frameRateLabel(fps: number | null): 30 | 60 {
   return fps !== null && fps > 45 ? 60 : 30;
+}
+
+export type FpsBucket = "Sub" | "30" | "60" | "120" | null;
+
+/**
+ * Frame-rate bucket per spec §8:
+ *   Sub  = fps < 28.00
+ *   30   = 28.00–32.00
+ *   60   = 55.00–65.00
+ *   120  = 100.00–130.00
+ * Missing/unreadable fps, or values between named buckets, return null (so a
+ * missing fps is never counted as 120fps).
+ */
+export function fpsBucket(fps: number | null): FpsBucket {
+  if (fps === null || !isFinite(fps) || fps <= 0) return null;
+  if (fps < 28) return "Sub";
+  if (fps <= 32) return "30";
+  if (fps >= 55 && fps <= 65) return "60";
+  if (fps >= 100 && fps <= 130) return "120";
+  return null;
+}
+
+/** Frame-rate token used in generated filenames: bucket number, or the rounded
+ *  fps for Sub / out-of-bucket values, or "" when fps is unknown. */
+export function fpsToken(fps: number | null): string {
+  const b = fpsBucket(fps);
+  if (b === "30" || b === "60" || b === "120") return b;
+  return fps !== null && isFinite(fps) && fps > 0 ? String(Math.round(fps)) : "";
+}
+
+/** Stable frame-rate token used in folder names (always one of the known
+ *  tokens so the scanner skip-list stays exhaustive). */
+export function fpsFolderToken(fps: number | null): string {
+  return fpsBucket(fps) ?? "NA";
 }

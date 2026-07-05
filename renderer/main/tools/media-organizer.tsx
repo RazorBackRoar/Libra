@@ -13,6 +13,7 @@ import { ProgressBar } from "../../components/progress-bar";
 import { CancelButton } from "../../components/cancel-button";
 import { SectionLabel } from "../../components/section-label";
 import { useToolState } from "../tool-state";
+import { fpsBucket } from "../types";
 import type {
   VideoInfo,
   SortMode,
@@ -32,12 +33,7 @@ const MODE_LABELS: Record<SortMode, { title: string; subtitle: string }> = {
   SlowMotion: { title: "Slo-Mo", subtitle: "Slow Down Videos" },
 };
 
-// ── Scan Summary — 18 categories (CONTRACT.md §5), AND-combinable ──────────────
-
-/** Frame-rate bucket used for the 30fps/60fps scan-summary pills. */
-function frameRateLabel(fps: number | null): 30 | 60 {
-  return fps !== null && fps > 45 ? 60 : 30;
-}
+// ── Scan Summary — the filter system (spec §4/§5), AND-combinable ─────────────
 
 interface ScanSummaryDef {
   id: string;
@@ -45,24 +41,36 @@ interface ScanSummaryDef {
   predicate: (f: VideoInfo) => boolean;
 }
 
+/** Exact left-to-right order from the spec (§4). "Total Videos" is prepended
+ *  at render time and clears all active filters. */
 const SCAN_SUMMARY_DEFS: ScanSummaryDef[] = [
-  { id: "GPS", label: "GPS", predicate: (f) => f.hasGPS },
-  { id: "NoGPS", label: "No GPS", predicate: (f) => !f.hasGPS },
   { id: "4K", label: "4K", predicate: (f) => f.resolutionClass === "4K" },
   { id: "FHD", label: "FHD", predicate: (f) => f.resolutionClass === "FHD" },
   { id: "1080p", label: "1080p", predicate: (f) => f.resolutionClass === "1080p" },
   { id: "HD", label: "HD", predicate: (f) => f.resolutionClass === "HD" },
   { id: "720p", label: "720p", predicate: (f) => f.resolutionClass === "720p" },
   { id: "SD", label: "SD", predicate: (f) => f.resolutionClass === "SD" },
-  { id: "30fps", label: "30fps", predicate: (f) => frameRateLabel(f.fps) === 30 },
-  { id: "60fps", label: "60fps", predicate: (f) => frameRateLabel(f.fps) === 60 },
   { id: "iPhone", label: "iPhone", predicate: (f) => f.isApple },
-  { id: "MiscPhone", label: "Misc Phone", predicate: (f) => f.hasCameraInfo && !f.isApple },
-  { id: "Camera", label: "Camera", predicate: (f) => f.cameraFront || f.cameraBack },
+  { id: "SubFPS", label: "Sub FPS", predicate: (f) => fpsBucket(f.fps) === "Sub" },
+  { id: "30fps", label: "30fps", predicate: (f) => fpsBucket(f.fps) === "30" },
+  { id: "60fps", label: "60fps", predicate: (f) => fpsBucket(f.fps) === "60" },
+  { id: "120fps", label: "120fps", predicate: (f) => fpsBucket(f.fps) === "120" },
+  { id: "V", label: "V", predicate: (f) => f.orientation === "portrait" },
+  { id: "W", label: "W", predicate: (f) => f.orientation !== "portrait" },
+  { id: "GPS", label: "GPS", predicate: (f) => f.hasGPS },
+  { id: "NoGPS", label: "No GPS", predicate: (f) => !f.hasGPS },
+  { id: "OtherDevice", label: "Other Device", predicate: (f) => !f.isApple },
+  { id: "Camera", label: "Camera", predicate: (f) => f.hasCameraInfo },
+  { id: "NoCamera", label: "No Camera", predicate: (f) => !f.hasCameraInfo },
   { id: "FrontCamera", label: "Front Camera", predicate: (f) => f.cameraFront },
   { id: "BackCamera", label: "Back Camera", predicate: (f) => f.cameraBack },
-  { id: "NoCamera", label: "No Camera", predicate: (f) => !f.cameraFront && !f.cameraBack },
   { id: "ScreenRec", label: "Screen REC", predicate: (f) => f.isScreenRecording },
+];
+
+/** Opposite pairs — selecting one turns the other off (spec §7). */
+const EXCLUSIVE_GROUPS: string[][] = [
+  ["GPS", "NoGPS"],
+  ["Camera", "NoCamera"],
 ];
 
 // ── IPC helpers ───────────────────────────────────────────────────────────────
@@ -141,17 +149,17 @@ export function MediaOrganizer() {
     [updateSession],
   );
 
-  // ── Scan mutation ────────────────────────────────────────────────────────
+  // ── Scan mutation (auto-triggered on drop / mount) ────────────────────────
   const scanMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (paths: string[]) => {
       cancelledRef.current = false;
       setIsScanning(true);
       setProgress(null);
       setReport(null);
-      console.log("[media-organizer:scan:start]", { jobId, paths: session.droppedPaths });
+      console.log("[media-organizer:scan:start]", { jobId, paths });
       return invokeIpc<{ files: VideoInfo[]; cancelled: boolean }>("scan:start", {
         jobId,
-        paths: session.droppedPaths,
+        paths,
       });
     },
     onSuccess: (result) => {
@@ -175,6 +183,16 @@ export function MediaOrganizer() {
     setIsScanning(false);
     setProgress(null);
   };
+
+  // ── Auto-scan whenever the dropped paths change (drop or preload). ─────────
+  const lastScannedRef = useRef<string>("");
+  useEffect(() => {
+    const sig = session.droppedPaths.join("\n");
+    if (sig && sig !== lastScannedRef.current && !isScanning && !scanMutation.isPending) {
+      lastScannedRef.current = sig;
+      scanMutation.mutate(session.droppedPaths);
+    }
+  }, [session.droppedPaths]);
 
   // ── Process mutation (full pipeline) ──────────────────────────────────────
   const processMutation = useMutation({
@@ -268,27 +286,7 @@ export function MediaOrganizer() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   const hasFiles = session.scannedFiles.length > 0;
-  const hasPaths = session.droppedPaths.length > 0;
   const hasSelection = session.selectedPaths.size > 0;
-
-  const listActions = (
-    <>
-      <Button variant="filled" size="small" onClick={() => void handleExportCsv()} disabled={!hasFiles}>
-        <DownloadIcon className="size-4" />
-        Export CSV
-      </Button>
-      <Button
-        variant="filled"
-        size="small"
-        onClick={() => deleteMutation.mutate()}
-        disabled={!hasSelection || deleteMutation.isPending}
-        className={cn(hasSelection ? "text-support-red" : "")}
-      >
-        <Trash2Icon className="size-4" />
-        Delete Selected ({session.selectedPaths.size})
-      </Button>
-    </>
-  );
 
   return (
     <ToolPage title={modeInfo.title}>
@@ -300,20 +298,7 @@ export function MediaOrganizer() {
         </Text>
       </div>
 
-      {/* Scan controls */}
-      {hasPaths && !isScanning && (
-        <div className="flex items-center gap-3">
-          <Button variant="filled" size="large" onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending}>
-            <PlayIcon className="size-4" />
-            {hasFiles ? "Rescan" : "Scan"}
-          </Button>
-          <Text variant="small" color="tertiary">
-            {session.droppedPaths.length} path{session.droppedPaths.length !== 1 ? "s" : ""} queued
-          </Text>
-        </div>
-      )}
-
-      {/* Progress */}
+      {/* Progress (scanning or processing) */}
       {(isScanning || processMutation.isPending) && progress && (
         <div className="flex flex-col gap-3">
           <ProgressBar progress={progress} />
@@ -321,42 +306,44 @@ export function MediaOrganizer() {
         </div>
       )}
 
-      {/* Scan Summary — always visible; counts read 0 before a scan */}
-      <div className="flex flex-col gap-2 rounded-card libra-panel p-3">
-        <SectionLabel>Scan Summary</SectionLabel>
-        <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
-      </div>
-
-      {/* Results table — always visible; shows an empty state until a scan runs */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <SectionLabel>Results ({filteredFiles.length})</SectionLabel>
-          <div className="flex gap-2">{listActions}</div>
+      {/* ── Scan Summary box: filters + Rename Videos + actions + Process ── */}
+      <div className="flex flex-col gap-4 rounded-card libra-panel p-4">
+        <div className="flex flex-col gap-2">
+          <SectionLabel>Scan Summary</SectionLabel>
+          <ScanSummary
+            pills={scanSummaryPills}
+            activeIds={activeFilterIds}
+            onChange={setActiveFilterIds}
+            exclusiveGroups={EXCLUSIVE_GROUPS}
+          />
         </div>
-        <ResultsTable
-          files={filteredFiles}
-          selectedPaths={session.selectedPaths}
-          onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
-          emptyTitle="No videos scanned"
-          emptyDescription="Drop a folder or select files below to get started."
-        />
-      </div>
 
-      {/* Name Videos prefix (left) + Process button (right) — always visible */}
-      <div className="flex items-end gap-4 pt-2 border-t libra-faint-border">
-        <div className="flex flex-col gap-2 flex-1 min-w-0">
-          <SectionLabel>Name Videos</SectionLabel>
+        <div className="flex flex-col gap-1.5">
+          <SectionLabel>Rename Videos</SectionLabel>
           <Input
-            placeholder={isKeepName ? "Name Keeper never renames files" : "Optional prefix, example: Trip_2024_"}
+            placeholder={isKeepName ? "Name Keeper never renames files" : "Optional name / prefix, example: Trip_2024_"}
             value={prefix}
             onChange={(e) => setPrefix(e.target.value)}
             disabled={isKeepName}
           />
         </div>
-        <div className="flex items-center gap-4 shrink-0">
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="filled" size="small" onClick={() => void handleExportCsv()} disabled={!hasFiles}>
+            <DownloadIcon className="size-4" />
+            Export CSV
+          </Button>
+          <Button
+            variant="filled"
+            size="small"
+            onClick={() => deleteMutation.mutate()}
+            disabled={!hasSelection || deleteMutation.isPending}
+            className={cn(hasSelection ? "text-support-red" : "")}
+          >
+            <Trash2Icon className="size-4" />
+            Delete Selected ({session.selectedPaths.size})
+          </Button>
+          <div className="flex-1" />
           <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
           <Button
             variant="accent"
@@ -370,39 +357,58 @@ export function MediaOrganizer() {
         </div>
       </div>
 
-      {/* Final report */}
-      {report && (
-        <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
-          <Text variant="small-strong" color="primary">
-            {report.stopped
-              ? `Stopped early — ${report.stopped.reason}`
-              : report.dryRun
-                ? "Dry run — no files were changed."
-                : report.noVideos
-                  ? "No videos to organize; non-video files moved to MISC where present."
-                  : "Processing complete."}
-          </Text>
-          <Text variant="small" color="tertiary" truncate>
-            {report.droppedRoot}
-          </Text>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
-            <ReportStat label="organized" value={report.counts.organized} />
-            <ReportStat label="duplicates" value={report.counts.duplicates} />
-            <ReportStat label="to MISC" value={report.counts.misc} />
-            <ReportStat label="unreadable" value={report.counts.unreadable} />
-            <ReportStat label="skipped" value={report.counts.skipped} />
-            <ReportStat label="errors" value={report.counts.errors} />
-          </div>
-        </div>
-      )}
-
-      {/* Drop zone — always at the very bottom of the page */}
+      {/* ── Main workspace: the drop area doubles as the results / finished-changes window ── */}
       <DropZone
         onPaths={handlePaths}
         accept="both"
         disabled={isScanning}
-        hint={hasFiles ? "Drag videos or a folder here to add more" : "Drag videos or a folder here"}
-      />
+        className="min-h-[320px]"
+        hint={hasFiles ? "Drag more videos or a folder here" : "Drag videos or a folder here"}
+      >
+        {(hasFiles || report) ? (
+          <div className="flex flex-col gap-3">
+            {report && (
+              <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
+                <Text variant="small-strong" color="primary">
+                  {report.stopped
+                    ? `Stopped early — ${report.stopped.reason}`
+                    : report.dryRun
+                      ? "Dry run — no files were changed."
+                      : report.noVideos
+                        ? "No videos to organize; non-video files moved to MISC where present."
+                        : "Processing complete."}
+                </Text>
+                <Text variant="small" color="tertiary" truncate>
+                  {report.droppedRoot}
+                </Text>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
+                  <ReportStat label="organized" value={report.counts.organized} />
+                  <ReportStat label="duplicates" value={report.counts.duplicates} />
+                  <ReportStat label="to MISC" value={report.counts.misc} />
+                  <ReportStat label="unreadable" value={report.counts.unreadable} />
+                  <ReportStat label="skipped" value={report.counts.skipped} />
+                  <ReportStat label="errors" value={report.counts.errors} />
+                </div>
+              </div>
+            )}
+            {hasFiles && (
+              <div className="flex flex-col gap-2">
+                <SectionLabel>Results ({filteredFiles.length})</SectionLabel>
+                <ResultsTable
+                  files={filteredFiles}
+                  selectedPaths={session.selectedPaths}
+                  onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+                  emptyTitle="No videos scanned"
+                  emptyDescription="Drop a folder or select files to get started."
+                />
+              </div>
+            )}
+          </div>
+        ) : null}
+      </DropZone>
     </ToolPage>
   );
 }

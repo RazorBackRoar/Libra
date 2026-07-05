@@ -21,7 +21,9 @@ interface DropZoneProps {
 export function DropZone({ onPaths, accept = "both", disabled = false, hint, className, children }: DropZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
-  const hasContent = React.Children.count(children) > 0;
+  // toArray filters out null/false/undefined so an empty conditional child still
+  // renders the large empty drop state.
+  const hasContent = React.Children.toArray(children).length > 0;
 
   const resolvePaths = useCallback((files: FileList): string[] => {
     const paths: string[] = [];

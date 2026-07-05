@@ -8,6 +8,22 @@ export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName" | 
 /** Canonical, ordered resolution labels shown anywhere in the UI. */
 export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "FHD", "1080p", "HD", "720p", "SD"];
 
+export type FpsBucket = "Sub" | "30" | "60" | "120" | null;
+
+/**
+ * Frame-rate bucket (mirror of the backend, spec §8):
+ *   Sub = <28, 30 = 28–32, 60 = 55–65, 120 = 100–130.
+ * Missing/unreadable or between-bucket values return null.
+ */
+export function fpsBucket(fps: number | null): FpsBucket {
+  if (fps === null || !isFinite(fps) || fps <= 0) return null;
+  if (fps < 28) return "Sub";
+  if (fps <= 32) return "30";
+  if (fps >= 55 && fps <= 65) return "60";
+  if (fps >= 100 && fps <= 130) return "120";
+  return null;
+}
+
 export interface VideoInfo {
   path: string; // absolute path
   name: string; // basename incl. extension
