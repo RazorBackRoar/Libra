@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState, type ComponentType } from "react"
 import { useNavigate } from "@tanstack/react-router";
 import { ScrollArea, Text } from "@glaze/core/components";
 import { cn } from "@glaze/core/utils";
-import { FolderSyncIcon, SlidersHorizontalIcon, ChevronDownIcon } from "lucide-react";
+import { SlidersHorizontalIcon, ChevronDownIcon } from "lucide-react";
 import { useToolStateContext } from "./tool-state";
 import { MEDIA_MODES, MISC_TOOLS } from "./tools/registry";
 import type { SortMode } from "./types";
@@ -220,43 +220,37 @@ export function HomeView() {
             </Text>
           </div>
 
-          {/* Two main sections */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            <SectionBox
-              icon={FolderSyncIcon}
-              title="Video Organizer"
-              subtitle="Scan, organize, and sort videos by resolution."
-            >
-              {MEDIA_MODES.map((m) => (
-                <DropCard
-                  key={m.mode}
-                  icon={m.icon}
-                  title={m.title}
-                  description={m.description}
-                  accent
-                  onActivate={(paths) => openMediaMode(m.mode, paths)}
-                />
-              ))}
-            </SectionBox>
-
-            <SectionBox
-              icon={SlidersHorizontalIcon}
-              title="Miscellaneous Organizer"
-              subtitle="Extra utilities for timing, speed, and location."
-              collapsible
-              defaultOpen={false}
-            >
-              {MISC_TOOLS.map((t) => (
-                <DropCard
-                  key={t.id}
-                  icon={t.icon}
-                  title={t.title}
-                  description={t.description}
-                  onActivate={(paths) => openTool(t.id, paths)}
-                />
-              ))}
-            </SectionBox>
+          {/* Five mode cards — the primary mode selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {MEDIA_MODES.map((m) => (
+              <DropCard
+                key={m.mode}
+                icon={m.icon}
+                title={m.title}
+                description={m.description}
+                onActivate={(paths) => openMediaMode(m.mode, paths)}
+              />
+            ))}
           </div>
+
+          {/* Secondary utilities */}
+          <SectionBox
+            icon={SlidersHorizontalIcon}
+            title="Miscellaneous Organizer"
+            subtitle="Extra utilities for timing, speed, and location."
+            collapsible
+            defaultOpen={false}
+          >
+            {MISC_TOOLS.map((t) => (
+              <DropCard
+                key={t.id}
+                icon={t.icon}
+                title={t.title}
+                description={t.description}
+                onActivate={(paths) => openTool(t.id, paths)}
+              />
+            ))}
+          </SectionBox>
         </div>
       </ScrollArea>
     </div>

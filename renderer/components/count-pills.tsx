@@ -10,6 +10,8 @@ export interface CountPill {
 
 interface CountPillsProps {
   pills: CountPill[];
+  /** Column count for the grid. Defaults to 4. */
+  cols?: 2 | 4;
   className?: string;
 }
 
@@ -17,9 +19,15 @@ interface CountPillsProps {
  * Scan-summary counts. Every count bubble uses one uniform neutral color; the
  * label carries the gold accent so the summary reads clean and evenly spaced.
  */
-export function CountPills({ pills, className }: CountPillsProps) {
+export function CountPills({ pills, cols = 4, className }: CountPillsProps) {
   return (
-    <div className={cn("grid grid-cols-4 gap-x-4 gap-y-3", className)}>
+    <div
+      className={cn(
+        "grid gap-x-4 gap-y-3",
+        cols === 2 ? "grid-cols-2" : "grid-cols-4",
+        className,
+      )}
+    >
       {pills.map((pill) => (
         <div key={pill.label} className="flex items-center gap-2">
           <Badge color="secondary" size="medium">

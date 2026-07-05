@@ -9,7 +9,6 @@ import { DropZone } from "../../components/drop-zone";
 import { VideoList } from "../../components/video-list";
 import { CountPills, type CountPill } from "../../components/count-pills";
 import { FilterPills, type FilterPillDef } from "../../components/filter-pills";
-import { SortSelect } from "../../components/sort-select";
 import { DryRunToggle } from "../../components/dry-run-toggle";
 import { ProgressBar } from "../../components/progress-bar";
 import { CancelButton } from "../../components/cancel-button";
@@ -19,9 +18,8 @@ import type {
   VideoInfo,
   SortMode,
   JobProgress,
-  FileOpResult,
   DeleteSummary,
-  Settings,
+  ProcessReport,
 } from "../types";
 
 // ── Filter definitions ────────────────────────────────────────────────────────
@@ -34,7 +32,16 @@ const FILTER_DEFS: FilterPillDef[] = [
   { id: "SD", label: "SD" },
   { id: "GPS", label: "GPS" },
   { id: "iPhone", label: "iPhone" },
+  { id: "Camera", label: "Camera" },
 ];
+
+const MODE_LABELS: Record<SortMode, string> = {
+  ProVid: "Pro Vid — Prefix Rename",
+  VidRes: "Vid Res — Resolution Sort",
+  ProMax: "Pro Max — Resolution + Orientation",
+  MaxVid: "Max Vid — Full Sort",
+  KeepName: "Name Keeper — Keep Names",
+};
 
 // ── IPC helpers ───────────────────────────────────────────────────────────────
 
@@ -42,50 +49,46 @@ async function invokeIpc<T>(channel: string, params: unknown): Promise<T> {
   return window.glazeAPI.glaze.ipc.invoke(channel, params) as Promise<T>;
 }
 
-// ── Video Organizer component ─────────────────────────────────────────────────
+function ReportStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Text variant="small-strong" color="primary" className="tabular-nums">
+        {value}
+      </Text>
+      <Text variant="small" color="secondary">
+        {label}
+      </Text>
+    </div>
+  );
+}
+
+// ── Processing screen ──────────────────────────────────────────────────────────
 
 export function MediaOrganizer() {
   const toolId = "media-organizer";
   const { session, updateSession } = useToolState(toolId);
   const jobId = useId();
 
-  // ── Local state ──────────────────────────────────────────────────────────
+  // Mode is chosen on the mode-selection screen; default to Max Vid.
   const presetMode = session.options.mode as SortMode | undefined;
-  const [sortMode, setSortMode] = useState<SortMode>(presetMode ?? "ProVid");
+  const mode: SortMode = presetMode ?? "MaxVid";
+  const isKeepName = mode === "KeepName";
+
   const [prefix, setPrefix] = useState("");
-  const [dryRun, setDryRun] = useState(true);
+  const [dryRun, setDryRun] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, boolean>>({});
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [outputFolder, setOutputFolder] = useState<string>("");
-  const [lastRun, setLastRun] = useState<{ moved: number; failed: number; dryRun: boolean; destination: string } | null>(null);
+  const [report, setReport] = useState<ProcessReport | null>(null);
 
   const cancelledRef = useRef(false);
 
-  // ── Load persisted output folder ─────────────────────────────────────────
-  useEffect(() => {
-    invokeIpc<Settings>("settings:get", {})
-      .then((s) => setOutputFolder(s.outputFolder))
-      .catch((err) => console.log("[MediaOrganizer:settings:error]", { err }));
-  }, []);
-
-  // ── Apply a preset sort mode selected on the home screen ─────────────────
-  useEffect(() => {
-    if (presetMode) setSortMode(presetMode);
-  }, [presetMode]);
-
   // ── Subscribe to job:progress notifications ──────────────────────────────
   useEffect(() => {
-    const unsub = window.glazeAPI.glaze.ipc.onNotification(
-      "job:progress",
-      (payload: unknown) => {
-        const p = payload as JobProgress;
-        if (p.jobId === jobId) {
-          setProgress(p);
-          console.log("[MediaOrganizer:progress]", p);
-        }
-      },
-    );
+    const unsub = window.glazeAPI.glaze.ipc.onNotification("job:progress", (payload: unknown) => {
+      const p = payload as JobProgress;
+      if (p.jobId === jobId) setProgress(p);
+    });
     return () => {
       if (typeof unsub === "function") unsub();
     };
@@ -103,29 +106,31 @@ export function MediaOrganizer() {
         if (activeFilters["SD"] && f.resolutionClass !== "SD") return false;
         if (activeFilters["GPS"] && !f.hasGPS) return false;
         if (activeFilters["iPhone"] && !f.isApple) return false;
+        if (activeFilters["Camera"] && !f.hasCameraInfo) return false;
         return true;
       })
     : session.scannedFiles;
 
-  // ── Count pills — useful video metadata only ─────────────────────────────
+  // ── Count pills — 9 stats, filled left-to-right then top-to-bottom ────────
   const files = session.scannedFiles;
   const countPills: CountPill[] = [
-    { label: "Files", count: files.length },
-    { label: "GPS", count: files.filter((f) => f.hasGPS).length },
+    { label: "Videos", count: files.length },
     { label: "iPhone", count: files.filter((f) => f.isApple).length },
+    { label: "GPS", count: files.filter((f) => f.hasGPS).length },
+    { label: "Camera", count: files.filter((f) => f.hasCameraInfo).length },
     { label: "4K", count: files.filter((f) => f.resolutionClass === "4K").length },
-    { label: "1080p", count: files.filter((f) => f.resolutionClass === "1080p").length },
-    { label: "720p", count: files.filter((f) => f.resolutionClass === "720p").length },
     { label: "HD", count: files.filter((f) => f.resolutionClass === "HD").length },
+    { label: "1080p", count: files.filter((f) => f.resolutionClass === "1080p").length },
     { label: "SD", count: files.filter((f) => f.resolutionClass === "SD").length },
+    { label: "720p", count: files.filter((f) => f.resolutionClass === "720p").length },
   ];
 
   // ── Handle paths from drop / dialog ─────────────────────────────────────
   const handlePaths = useCallback(
     (paths: string[]) => {
-      console.log("[MediaOrganizer:paths]", { count: paths.length });
       updateSession({ droppedPaths: paths, scannedFiles: [] });
       setProgress(null);
+      setReport(null);
     },
     [updateSession],
   );
@@ -136,23 +141,20 @@ export function MediaOrganizer() {
       cancelledRef.current = false;
       setIsScanning(true);
       setProgress(null);
-      console.log("[MediaOrganizer:scan:start]", { jobId, paths: session.droppedPaths });
-      const result = await invokeIpc<{ files: VideoInfo[]; cancelled: boolean }>(
-        "scan:start",
-        { jobId, paths: session.droppedPaths },
-      );
-      return result;
+      setReport(null);
+      return invokeIpc<{ files: VideoInfo[]; cancelled: boolean }>("scan:start", {
+        jobId,
+        paths: session.droppedPaths,
+      });
     },
     onSuccess: (result) => {
       setIsScanning(false);
       setProgress(null);
       updateSession({ scannedFiles: result.files, selectedPaths: new Set() });
-      console.log("[MediaOrganizer:scan:done]", { count: result.files.length, cancelled: result.cancelled });
     },
     onError: (err) => {
       setIsScanning(false);
       setProgress(null);
-      console.log("[MediaOrganizer:scan:error]", { err });
       toast.error("Scan failed", { description: String(err) });
     },
   });
@@ -160,55 +162,44 @@ export function MediaOrganizer() {
   // ── Cancel ───────────────────────────────────────────────────────────────
   const handleCancel = async () => {
     cancelledRef.current = true;
-    console.log("[MediaOrganizer:cancel]", { jobId });
     await invokeIpc("job:cancel", { jobId });
     setIsScanning(false);
     setProgress(null);
   };
 
-  // ── Sort apply mutation ──────────────────────────────────────────────────
-  // ProVid renames in place; every other mode moves into the output folder.
-  const sortsInPlace = sortMode === "ProVid";
-
-  const sortMutation = useMutation({
+  // ── Process mutation (full pipeline) ──────────────────────────────────────
+  const processMutation = useMutation({
     mutationFn: async () => {
-      console.log("[MediaOrganizer:sort:start]", { mode: sortMode, dryRun, prefix, destRoot: sortsInPlace ? null : outputFolder });
-      const result = await invokeIpc<{ results: FileOpResult[] }>("sort:apply", {
-        mode: sortMode,
-        files: filteredFiles,
-        prefix: prefix || undefined,
+      const organizeFiles = filteredFiles.filter((f) => f.error === null);
+      const unreadablePaths = session.scannedFiles.filter((f) => f.error !== null).map((f) => f.path);
+      return invokeIpc<ProcessReport>("process:run", {
+        jobId,
+        mode,
+        files: organizeFiles,
+        unreadablePaths,
+        droppedPaths: session.droppedPaths,
+        prefix: isKeepName ? undefined : prefix || undefined,
         dryRun,
-        destRoot: sortsInPlace ? undefined : outputFolder || undefined,
       });
-      return result;
     },
-    onSuccess: ({ results }) => {
-      const suffixed = results.filter((r) => r.to && / \(\d+\)\./.test(r.to));
-      if (suffixed.length > 0) {
-        toast.info(`${suffixed.length} file${suffixed.length > 1 ? "s" : ""} auto-suffixed (1), (2)… to avoid overwriting.`);
-      }
-      const errors = results.filter((r) => r.status === "error");
-      const moved = results.filter((r) => r.status === "ok" || r.status === "dryrun").length;
-      setLastRun({
-        moved,
-        failed: errors.length,
-        dryRun,
-        destination: sortsInPlace ? "their original folders" : outputFolder,
-      });
-      if (errors.length > 0) {
-        toast.error(`${errors.length} operation${errors.length > 1 ? "s" : ""} failed — see error rows.`);
-      } else if (dryRun) {
-        toast.success("Dry run complete", { description: `${results.length} operations previewed.` });
+    onSuccess: (rep) => {
+      setReport(rep);
+      setProgress(null);
+      if (rep.stopped) {
+        toast.error("Run stopped early", { description: rep.stopped.reason });
+      } else if (rep.counts.errors > 0) {
+        toast.error(`${rep.counts.errors} operation${rep.counts.errors > 1 ? "s" : ""} failed — see report.`);
+      } else if (rep.dryRun) {
+        toast.success("Dry run complete", { description: "Preview only — no files changed." });
       } else {
-        toast.success("Videos organized", {
-          description: sortsInPlace ? `${moved} files renamed in place.` : `${moved} files moved to ${outputFolder}.`,
+        toast.success("Processing complete", {
+          description: `${rep.counts.organized} organized · ${rep.counts.misc + rep.counts.unreadable} moved to MISC.`,
         });
       }
-      console.log("[MediaOrganizer:sort:done]", { count: results.length, errors: errors.length });
     },
     onError: (err) => {
-      console.log("[MediaOrganizer:sort:error]", { err });
-      toast.error("Sort failed", { description: String(err) });
+      setProgress(null);
+      toast.error("Processing failed", { description: String(err) });
     },
   });
 
@@ -216,43 +207,30 @@ export function MediaOrganizer() {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       const paths = [...session.selectedPaths];
-      console.log("[MediaOrganizer:delete:start]", { count: paths.length, dryRun });
-      const result = await invokeIpc<DeleteSummary>("files:delete", { paths, dryRun });
-      return result;
+      return invokeIpc<DeleteSummary>("files:delete", { paths, dryRun });
     },
     onSuccess: (summary) => {
       if (dryRun) {
-        toast.success("Dry run: delete preview", {
-          description: `Would delete ${summary.deleted} files.`,
-        });
+        toast.success("Dry run: delete preview", { description: `Would delete ${summary.deleted} files.` });
       } else {
         const msg =
           summary.failed > 0
             ? `${summary.deleted} deleted, ${summary.failed} failed`
             : `${summary.deleted} file${summary.deleted !== 1 ? "s" : ""} deleted`;
         toast.success(msg);
-        // Remove deleted files from scan results
-        const deletedPaths = new Set(
-          summary.results.filter((r) => r.status === "ok").map((r) => r.path),
-        );
+        const deletedPaths = new Set(summary.results.filter((r) => r.status === "ok").map((r) => r.path));
         const remaining = session.scannedFiles.filter((f) => !deletedPaths.has(f.path));
         updateSession({ scannedFiles: remaining, selectedPaths: new Set() });
-        console.log("[MediaOrganizer:delete:done]", {
-          deleted: summary.deleted,
-          failed: summary.failed,
-        });
       }
     },
     onError: (err) => {
-      console.log("[MediaOrganizer:delete:error]", { err });
       toast.error("Delete failed", { description: String(err) });
     },
   });
 
   // ── CSV export ───────────────────────────────────────────────────────────
   const handleExportCsv = async () => {
-    console.log("[MediaOrganizer:csv:start]", { count: filteredFiles.length });
-    const headers = ["Name", "Path", "Resolution", "Size (bytes)", "Codec", "FPS", "Duration (s)", "GPS", "iPhone", "Error"];
+    const headers = ["Name", "Path", "Resolution", "Size (bytes)", "Codec", "FPS", "Duration (s)", "GPS", "iPhone", "Camera", "Edited", "Error"];
     const rows: string[][] = [
       headers,
       ...filteredFiles.map((f) => [
@@ -265,29 +243,16 @@ export function MediaOrganizer() {
         f.durationSec !== null ? String(f.durationSec) : "",
         f.hasGPS ? "Yes" : "No",
         f.isApple ? "Yes" : "No",
+        f.hasCameraInfo ? "Yes" : "No",
+        f.isEdited ? "Yes" : "No",
         f.error ?? "",
       ]),
     ];
     try {
-      await invokeIpc("csv:export", { rows, suggestedName: "libra-organizer-export.csv" });
-      console.log("[MediaOrganizer:csv:done]");
+      await invokeIpc("csv:export", { rows, suggestedName: "libra-export.csv" });
     } catch (err) {
-      console.log("[MediaOrganizer:csv:error]", { err });
       toast.error("Export failed", { description: String(err) });
     }
-  };
-
-  // ── Change output folder ─────────────────────────────────────────────────
-  const handleChangeOutputFolder = async () => {
-    const res = await window.glazeAPI.dialog.showOpenDialog({
-      properties: ["openDirectory", "createDirectory"],
-      title: "Choose output folder",
-    });
-    if (res.canceled || res.filePaths.length === 0) return;
-    const folder = res.filePaths[0];
-    setOutputFolder(folder);
-    await invokeIpc<Settings>("settings:set", { patch: { outputFolder: folder } });
-    console.log("[MediaOrganizer:outputFolder]", { folder });
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -295,15 +260,11 @@ export function MediaOrganizer() {
   const hasFiles = session.scannedFiles.length > 0;
   const hasPaths = session.droppedPaths.length > 0;
   const hasSelection = session.selectedPaths.size > 0;
+  const scannedEmpty = scanMutation.isSuccess && !isScanning && hasPaths && !hasFiles;
 
   const listActions = (
     <>
-      <Button
-        variant="filled"
-        size="small"
-        onClick={() => void handleExportCsv()}
-        disabled={!hasFiles}
-      >
+      <Button variant="filled" size="small" onClick={() => void handleExportCsv()} disabled={!hasFiles}>
         <DownloadIcon className="size-4" />
         Export CSV
       </Button>
@@ -334,6 +295,11 @@ export function MediaOrganizer() {
         <Text variant="regular" color="secondary">
           Filter, organize, review, and inspect rich video metadata.
         </Text>
+        <span className="mt-1 rounded-full border border-separator bg-well px-3 py-0.5">
+          <Text variant="small-strong" color="accent">
+            {MODE_LABELS[mode]}
+          </Text>
+        </span>
       </div>
 
       {/* Drop zone — also the scanned-video list area once files exist */}
@@ -346,7 +312,9 @@ export function MediaOrganizer() {
         {hasFiles ? (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
-              <Text variant="small" color="secondary">{listCount}</Text>
+              <Text variant="small" color="secondary">
+                {listCount}
+              </Text>
               <div className="flex gap-2">{listActions}</div>
             </div>
             <VideoList
@@ -361,12 +329,7 @@ export function MediaOrganizer() {
       {/* Scan controls */}
       {hasPaths && !isScanning && (
         <div className="flex items-center gap-3">
-          <Button
-            variant="accent"
-            size="large"
-            onClick={() => scanMutation.mutate()}
-            disabled={scanMutation.isPending}
-          >
+          <Button variant="filled" size="large" onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending}>
             <PlayIcon className="size-4" />
             {hasFiles ? "Rescan" : "Scan"}
           </Button>
@@ -376,107 +339,113 @@ export function MediaOrganizer() {
         </div>
       )}
 
-      {/* Progress during scan */}
-      {isScanning && progress && (
+      {/* Progress */}
+      {(isScanning || processMutation.isPending) && progress && (
         <div className="flex flex-col gap-3">
           <ProgressBar progress={progress} />
-          <CancelButton onCancel={() => void handleCancel()} />
+          {isScanning && <CancelButton onCancel={() => void handleCancel()} />}
         </div>
       )}
 
-      {/* Scan summary */}
-      <div className="flex flex-col gap-2">
-        <SectionLabel>Scan Summary</SectionLabel>
-        <CountPills pills={countPills} />
-      </div>
+      {/* Empty-result state */}
+      {scannedEmpty && (
+        <div className="rounded-card border border-separator bg-well px-4 py-6 text-center">
+          <Text variant="regular" color="secondary">
+            No recognized videos found in the dropped folder.
+          </Text>
+        </div>
+      )}
 
-      {/* Sort mode + prefix */}
-      <div className="flex flex-col gap-3">
-        <SectionLabel>Sort Mode</SectionLabel>
-        <SortSelect value={sortMode} onValueChange={setSortMode} />
-        <Input
-          placeholder="Optional prefix (e.g. Trip_2024_)"
-          value={prefix}
-          onChange={(e) => setPrefix(e.target.value)}
-        />
-      </div>
+      {/* Scan Summary (left) + controls (right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[248px_1fr] gap-6 items-start">
+        {/* Scan Summary sidebar */}
+        <aside className="flex flex-col gap-3">
+          <Text variant="large-strong" color="primary">
+            Scan Summary
+          </Text>
+          <CountPills pills={countPills} cols={2} className="gap-y-2.5" />
+        </aside>
 
-      {/* Destination — where processed files will go */}
-      <div className="flex flex-col gap-2">
-        <SectionLabel>Destination</SectionLabel>
-        <div className="flex items-center gap-3 rounded-card border border-separator bg-well px-4 py-3">
-          <FolderOpenIcon className="size-5 shrink-0 text-accent" />
-          <div className="flex flex-col min-w-0 flex-1">
-            {sortsInPlace ? (
-              <>
-                <Text variant="small-strong" color="primary">Renamed in place</Text>
-                <Text variant="small" color="secondary" truncate>
-                  Files stay in their original folders — only names change.
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text variant="small-strong" color="primary">Sorted into this folder</Text>
-                <Text variant="small" color="secondary" truncate>
-                  {outputFolder || "Resolving default output folder…"}
-                </Text>
-              </>
-            )}
+        {/* Controls */}
+        <div className="flex flex-col gap-5">
+          {/* Name Videos */}
+          <div className="flex flex-col gap-2">
+            <SectionLabel>Name Videos</SectionLabel>
+            <Input
+              placeholder={isKeepName ? "Name Keeper never renames files" : "Optional prefix (e.g. Trip_2024_)"}
+              value={prefix}
+              onChange={(e) => setPrefix(e.target.value)}
+              disabled={isKeepName}
+            />
+            <Text variant="small" color="tertiary">
+              {isKeepName
+                ? "This mode keeps original filenames — the prefix is ignored."
+                : "Optional. Leave blank for no prefix."}
+            </Text>
           </div>
-          {!sortsInPlace && (
-            <Button variant="filled" size="small" onClick={() => void handleChangeOutputFolder()}>
-              Change…
-            </Button>
-          )}
+
+          {/* Filters */}
+          <div className="flex flex-col gap-2">
+            <SectionLabel>Filter</SectionLabel>
+            <FilterPills
+              filters={FILTER_DEFS}
+              active={activeFilters}
+              onToggle={(id, val) => setActiveFilters((prev) => ({ ...prev, [id]: val }))}
+            />
+          </div>
+
+          {/* Destination — always the dropped folder */}
+          <div className="flex flex-col gap-2">
+            <SectionLabel>Destination</SectionLabel>
+            <div className="flex items-center gap-3 rounded-card border border-separator bg-well px-4 py-3">
+              <FolderOpenIcon className="size-5 shrink-0 text-secondary" />
+              <div className="flex flex-col min-w-0 flex-1">
+                <Text variant="small-strong" color="primary">
+                  The dropped folder
+                </Text>
+                <Text variant="small" color="secondary" truncate>
+                  {report?.droppedRoot ?? "Files are organized inside the folder you drop — nothing leaves it."}
+                </Text>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-2">
-        <SectionLabel>Filter</SectionLabel>
-        <FilterPills
-          filters={FILTER_DEFS}
-          active={activeFilters}
-          onToggle={(id, val) => {
-            console.log("[MediaOrganizer:filter]", { id, val });
-            setActiveFilters((prev) => ({ ...prev, [id]: val }));
-          }}
-        />
-      </div>
-
-      {/* Bottom action bar */}
-      <div className="flex items-center gap-4 pt-2 border-t border-separator">
+      {/* Process bar */}
+      <div className="flex items-center justify-between gap-4 pt-3 border-t border-separator">
+        <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
         <Button
           variant="accent"
           size="large"
-          onClick={() => sortMutation.mutate()}
-          disabled={!hasFiles || sortMutation.isPending}
+          onClick={() => processMutation.mutate()}
+          disabled={!hasFiles || processMutation.isPending}
         >
           <PlayIcon className="size-4" />
-          {sortMutation.isPending ? "Applying…" : "Apply Sort"}
+          {processMutation.isPending ? "Processing…" : "Process"}
         </Button>
-
-        <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
-
-        {sortMutation.isPending && (
-          <Text variant="small" color="tertiary">
-            Processing…
-          </Text>
-        )}
       </div>
 
-      {/* Post-processing result summary — restates the destination */}
-      {lastRun && (
-        <div className="flex flex-col gap-1 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
+      {/* Final report */}
+      {report && (
+        <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
           <Text variant="small-strong" color="primary">
-            {lastRun.dryRun
-              ? `Dry run — ${lastRun.moved} operation${lastRun.moved !== 1 ? "s" : ""} previewed, no files changed.`
-              : `${lastRun.moved} file${lastRun.moved !== 1 ? "s" : ""} organized${lastRun.failed > 0 ? `, ${lastRun.failed} failed` : ""}.`}
+            {report.stopped
+              ? `Stopped early — ${report.stopped.reason}`
+              : report.dryRun
+                ? "Dry run — no files were changed."
+                : report.noVideos
+                  ? "No videos to organize; non-video files moved to MISC where present."
+                  : "Processing complete."}
           </Text>
-          <Text variant="small" color="secondary" truncate>
-            {lastRun.dryRun ? "Would be placed in: " : "Location: "}
-            {lastRun.destination}
-          </Text>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
+            <ReportStat label="organized" value={report.counts.organized} />
+            <ReportStat label="duplicates" value={report.counts.duplicates} />
+            <ReportStat label="to MISC" value={report.counts.misc} />
+            <ReportStat label="unreadable" value={report.counts.unreadable} />
+            <ReportStat label="skipped" value={report.counts.skipped} />
+            <ReportStat label="errors" value={report.counts.errors} />
+          </div>
         </div>
       )}
     </ToolPage>

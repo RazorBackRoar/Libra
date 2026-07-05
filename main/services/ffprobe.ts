@@ -24,7 +24,8 @@ interface FfprobeStream {
   height?: number;
   r_frame_rate?: string;       // e.g. "30000/1001"
   avg_frame_rate?: string;
-  rotation?: number | string;  // side_data may have this
+  rotation?: number | string;  // some builds expose this directly on the stream
+  side_data_list?: { rotation?: number }[]; // newer ffprobe display-matrix rotation
   tags?: Record<string, string>;
 }
 
@@ -40,6 +41,28 @@ interface FfprobeOutput {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Resolve the raw rotate value from the tag, side-data, or stream field. */
+function readRotate(
+  stream: FfprobeStream | undefined,
+  streamTags: Record<string, string> | undefined,
+): number | null {
+  const tag = streamTags?.["rotate"];
+  if (tag !== undefined) {
+    const n = parseInt(tag, 10);
+    if (isFinite(n)) return n;
+  }
+  const sideRotation = stream?.side_data_list?.find(
+    (d) => typeof d.rotation === "number",
+  )?.rotation;
+  if (typeof sideRotation === "number" && isFinite(sideRotation)) return sideRotation;
+  if (typeof stream?.rotation === "number" && isFinite(stream.rotation)) return stream.rotation;
+  if (typeof stream?.rotation === "string") {
+    const n = parseInt(stream.rotation, 10);
+    if (isFinite(n)) return n;
+  }
+  return null;
+}
 
 function parseFps(rational: string | undefined): number | null {
   if (!rational) return null;
@@ -119,9 +142,13 @@ export async function probeFile(
     make: null,
     model: null,
     isApple: false,
+    hasCameraInfo: false,
+    isEdited: false,
     hasGPS: false,
     gps: null,
     creationTime: null,
+    rotate: null,
+    rotateAbnormal: false,
     error: null,
   };
 
@@ -157,17 +184,27 @@ export async function probeFile(
     const formatTags = format?.tags;
     const streamTags = videoStream?.tags;
 
-    // Dimensions — account for rotation
+    // Dimensions — account for rotation (Section 4).
     let width = videoStream?.width ?? null;
     let height = videoStream?.height ?? null;
-    const rotation =
-      typeof videoStream?.rotation === "number"
-        ? videoStream.rotation
-        : typeof videoStream?.rotation === "string"
-          ? parseInt(videoStream.rotation, 10)
-          : 0;
-    if (rotation === 90 || rotation === -90 || rotation === 270) {
-      [width, height] = [height, width];
+
+    // Raw rotate value: prefer the `rotate` tag, then side-data rotation, then
+    // any stream-level rotation. null when no rotation metadata exists.
+    const rawRotate = readRotate(videoStream, streamTags);
+    let rotate: number | null = null;
+    let rotateAbnormal = false;
+    if (rawRotate !== null) {
+      const norm = ((rawRotate % 360) + 360) % 360; // fold into 0..359
+      if (norm === 90 || norm === 270) {
+        rotate = norm;
+        [width, height] = [height, width];
+      } else if (norm === 0 || norm === 180) {
+        rotate = norm;
+      } else {
+        // Corrupted / non-standard rotate metadata → treat as 0, but flag it.
+        rotate = rawRotate;
+        rotateAbnormal = true;
+      }
     }
 
     // FPS: prefer r_frame_rate, fall back to avg_frame_rate
@@ -202,6 +239,17 @@ export async function probeFile(
     const isApple =
       make === "Apple" || /iphone|ipad/i.test(model ?? "");
 
+    // 📷 — any device/camera info present. Co-exists with 📱 for iPhone clips.
+    const hasCameraInfo = make !== null || model !== null;
+
+    // ✂️ — appears edited/trimmed: editing apps (Photos/iMovie/etc.) stamp a
+    // quicktime.software tag on export.
+    const editSoftware =
+      formatTags?.["com.apple.quicktime.software"] ??
+      streamTags?.["com.apple.quicktime.software"] ??
+      null;
+    const isEdited = editSoftware !== null;
+
     const creationTime = extractCreationTime(formatTags, streamTags);
 
     const resolutionClass = classifyResolution(width, height);
@@ -220,9 +268,13 @@ export async function probeFile(
       make,
       model,
       isApple,
+      hasCameraInfo,
+      isEdited,
       hasGPS: gps !== null,
       gps,
       creationTime,
+      rotate,
+      rotateAbnormal,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

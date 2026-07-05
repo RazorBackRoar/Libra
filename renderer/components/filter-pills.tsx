@@ -15,17 +15,17 @@ interface FilterPillsProps {
 
 export function FilterPills({ filters, active, onToggle, className }: FilterPillsProps) {
   return (
-    <div className={cn("flex flex-wrap gap-2", className)}>
+    <div className={cn("flex flex-wrap gap-2.5", className)}>
       {filters.map((f) => (
         <ToggleButton
           key={f.id}
           pressed={active[f.id] ?? false}
           onPressedChange={(pressed) => onToggle(f.id, pressed)}
           variant="filled"
-          size="small"
+          size="medium"
           radius="full"
         >
-          <Text variant="small-strong">{f.label}</Text>
+          <Text variant="regular">{f.label}</Text>
         </ToggleButton>
       ))}
     </div>

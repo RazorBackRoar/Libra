@@ -25,10 +25,51 @@ export interface VideoInfo {
   make: string | null; // metadata make (e.g. "Apple")
   model: string | null; // metadata model (e.g. "iPhone 14 Pro")
   isApple: boolean; // make === "Apple" || /iphone|ipad/i.test(model)
+  hasCameraInfo: boolean; // 📷 — make/model camera info present
+  isEdited: boolean; // ✂️ — appears edited/trimmed
   hasGPS: boolean;
   gps: { lat: number; lon: number } | null;
   creationTime: string | null; // ISO 8601
+  rotate: number | null; // display rotation applied (0/90/180/270) or raw abnormal value
+  rotateAbnormal: boolean; // non-standard rotate metadata, treated as 0
   error: string | null; // non-null => probe failed; UI renders an error row
+}
+
+export type ProcessItemKind = "organized" | "duplicate" | "misc" | "unreadable";
+
+export interface ProcessResultItem {
+  from: string;
+  to: string | null;
+  status: "ok" | "dryrun" | "skipped" | "error";
+  kind: ProcessItemKind;
+  note: string | null;
+}
+
+export interface ProcessReport {
+  mode: SortMode;
+  dryRun: boolean;
+  droppedRoot: string;
+  items: ProcessResultItem[];
+  counts: {
+    organized: number;
+    duplicates: number;
+    misc: number;
+    unreadable: number;
+    skipped: number;
+    errors: number;
+  };
+  stopped: { reason: string } | null;
+  noVideos: boolean;
+}
+
+export interface ProcessRunParams {
+  jobId: string;
+  mode: SortMode;
+  files: VideoInfo[]; // filtered videos to organize (error === null)
+  unreadablePaths: string[]; // video-ext files that failed to probe → MISC
+  droppedPaths: string[]; // original dropped paths → dropped-folder root
+  prefix?: string;
+  dryRun: boolean;
 }
 
 export interface FileOpResult {
@@ -81,6 +122,7 @@ export interface ScanStartParams {
 export interface ScanResult {
   files: VideoInfo[];
   cancelled: boolean;
+  skippedSymlinks: string[];
 }
 
 

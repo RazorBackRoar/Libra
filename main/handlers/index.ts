@@ -19,6 +19,7 @@ import { settingsStore } from "../services/settings-store.js";
 import { registerJob, cancelJob, cleanupJob } from "../services/jobs.js";
 import { scan } from "../services/scanner.js";
 import { applySort, applyRename, applyDelete, applyMove } from "../services/file-ops.js";
+import { processFolder } from "../services/processor.js";
 import { createSloMo, applyTimeAdjust } from "../services/ffmpeg-ops.js";
 import { type VideoInfo, type SortMode } from "../services/types.js";
 
@@ -47,6 +48,16 @@ interface SortApplyParams {
 
 interface RenameApplyParams {
   files: VideoInfo[];
+  prefix?: string;
+  dryRun: boolean;
+}
+
+interface ProcessRunParams {
+  jobId: string;
+  mode: SortMode;
+  files: VideoInfo[];
+  unreadablePaths: string[];
+  droppedPaths: string[];
   prefix?: string;
   dryRun: boolean;
 }
@@ -240,6 +251,42 @@ export function registerHandlers(): void {
     });
     console.log("[sort:apply] done", { resultCount: results.length });
     return { results };
+  });
+
+  // ── process:run ───────────────────────────────────────────────────────────────
+
+  ipcMain.handle("process:run", async (_event, params: unknown) => {
+    const p = params as ProcessRunParams;
+    const jobId = assertString(p?.jobId, "jobId");
+    const mode = p?.mode as SortMode;
+    if (!["ProVid", "VidRes", "ProMax", "MaxVid", "KeepName"].includes(mode)) {
+      throw new Error(`Invalid mode: ${String(mode)}`);
+    }
+    const droppedPaths = assertStringArray(p?.droppedPaths, "droppedPaths");
+    const unreadablePaths = Array.isArray(p?.unreadablePaths) ? assertStringArray(p.unreadablePaths, "unreadablePaths") : [];
+    const dryRun = assertBoolean(p?.dryRun, "dryRun");
+    const files = Array.isArray(p?.files) ? (p.files as VideoInfo[]) : [];
+    const settings = await settingsStore.get();
+    console.log("[process:run]", { jobId, mode, fileCount: files.length, unreadable: unreadablePaths.length, dryRun });
+
+    const { cancelFlag } = registerJob(jobId);
+    try {
+      const report = await processFolder({
+        jobId,
+        mode,
+        files,
+        unreadablePaths,
+        droppedPaths,
+        prefix: p.prefix,
+        dryRun,
+        extensions: settings.videoExtensions,
+        cancelFlag,
+      });
+      console.log("[process:run] done", { jobId, counts: report.counts, stopped: report.stopped });
+      return report;
+    } finally {
+      cleanupJob(jobId);
+    }
   });
 
   // ── rename:apply ────────────────────────────────────────────────────────────
