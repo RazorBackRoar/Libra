@@ -60,11 +60,11 @@ const SCAN_SUMMARY_DEFS: ScanSummaryDef[] = [
   { id: "GPS", label: "GPS", predicate: (f) => f.hasGPS },
   { id: "NoGPS", label: "No GPS", predicate: (f) => !f.hasGPS },
   { id: "OtherDevice", label: "Other Device", predicate: (f) => !f.isApple },
+  { id: "ScreenRec", label: "Screen REC", predicate: (f) => f.isScreenRecording },
   { id: "Camera", label: "Camera", predicate: (f) => f.hasCameraInfo },
   { id: "NoCamera", label: "No Camera", predicate: (f) => !f.hasCameraInfo },
   { id: "FrontCamera", label: "Front Camera", predicate: (f) => f.cameraFront },
   { id: "BackCamera", label: "Back Camera", predicate: (f) => f.cameraBack },
-  { id: "ScreenRec", label: "Screen REC", predicate: (f) => f.isScreenRecording },
 ];
 
 /** Opposite pairs — selecting one turns the other off (spec §7). */
@@ -318,16 +318,6 @@ export function MediaOrganizer() {
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <SectionLabel>Rename Videos</SectionLabel>
-          <Input
-            placeholder={isKeepName ? "Name Keeper never renames files" : "Optional name / prefix, example: Trip_2024_"}
-            value={prefix}
-            onChange={(e) => setPrefix(e.target.value)}
-            disabled={isKeepName}
-          />
-        </div>
-
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="filled" size="small" onClick={() => void handleExportCsv()} disabled={!hasFiles}>
             <DownloadIcon className="size-4" />
@@ -343,7 +333,13 @@ export function MediaOrganizer() {
             <Trash2Icon className="size-4" />
             Delete Selected ({session.selectedPaths.size})
           </Button>
-          <div className="flex-1" />
+          <Input
+            className="flex-1 min-w-[160px]"
+            placeholder={isKeepName ? "Renaming disabled" : "Rename Videos"}
+            value={prefix}
+            onChange={(e) => setPrefix(e.target.value)}
+            disabled={isKeepName}
+          />
           <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
           <Button
             variant="accent"
