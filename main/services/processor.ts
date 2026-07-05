@@ -25,7 +25,6 @@ import {
   OUTPUT_FOLDER_NAMES,
   isHousekeepingName,
   orientationCode,
-  orientationFolder,
   frameRateLabel,
   type VideoInfo,
   type SortMode,
@@ -107,9 +106,16 @@ function targetDir(root: string, mode: SortMode, info: VideoInfo): string {
     case "KeepName":
       return path.join(root, info.resolutionClass);
     case "ProMax":
-      return path.join(root, info.resolutionClass, orientationFolder(info.orientation));
+      // Flat, single-level — e.g. "4K W" (NOT nested "4K/Wide").
+      return path.join(root, `${info.resolutionClass} ${orientationCode(info.orientation)}`);
     case "MaxVid":
-      return path.join(root, info.resolutionClass, orientationFolder(info.orientation), `${frameRateLabel(info.fps)}fps`);
+      // Flat, single-level — e.g. "4K W 60" (NOT 3 nested levels).
+      return path.join(
+        root,
+        `${info.resolutionClass} ${orientationCode(info.orientation)} ${frameRateLabel(info.fps)}`,
+      );
+    case "SlowMotion":
+      return path.join(root, info.isSlowMotion ? "Slow Motion" : "Normal Speed");
   }
 }
 

@@ -1,113 +1,93 @@
-# L!bra — Shared IPC Contract & Data Types
+# L!bra — "Final Development Spec" Contract (2026-07-05)
 
-This is the single source of truth shared by the backend (`main/`) and frontend (`renderer/`) workstreams. Types cross the bridge as JSON, so both sides must define **structurally identical** interfaces (backend in `main/services/types.ts`, frontend in `renderer/main/types.ts`). Do not change a shape without updating this file.
+Single source of truth for this task. Both workstreams read this file first. Types cross the
+bridge as JSON — keep `main/services/types.ts` and `renderer/main/types.ts` structurally
+identical. Do not change a shape without updating this file.
 
-Frontend calls: `window.glazeAPI.glaze.ipc.invoke("channel", params)` (single object arg).
+Frontend calls: `window.glazeAPI.glaze.ipc.invoke("channel", params)`.
 Backend handles: `ipcMain.handle("channel", async (_event, params) => …)`.
-Progress notifications: backend emits to the renderer; frontend subscribes via `window.glazeAPI.glaze.ipc.onNotification("job:progress", cb)`. Backend must verify the exact SDK send/broadcast API in the SDK API Reference so it pairs with preload's `onNotification` (e.g. `new WebContents("main").send("job:progress", payload)` or an `ipcMain` broadcast helper).
 
-## Shared types
+## 1. Resolution classification (replaces current 5-tier system with 6 tiers)
 
 ```ts
-export type ResolutionClass = "4K" | "1080p" | "720p" | "SD" | "Unknown";
-export type Orientation = "landscape" | "portrait" | "square" | "unknown";
-export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName";
-
-export interface VideoInfo {
-  path: string;            // absolute path
-  name: string;            // basename incl. extension
-  dir: string;             // parent directory
-  ext: string;             // lowercase, no dot, e.g. "mp4"
-  sizeBytes: number;
-  width: number | null;
-  height: number | null;
-  resolutionClass: ResolutionClass;
-  orientation: Orientation;
-  fps: number | null;
-  durationSec: number | null;
-  codec: string | null;    // e.g. "h264", "hevc"
-  container: string | null;
-  make: string | null;     // metadata make (e.g. "Apple")
-  model: string | null;    // metadata model (e.g. "iPhone 14 Pro")
-  isApple: boolean;        // make === "Apple" || /iphone|ipad/i.test(model)
-  hasGPS: boolean;
-  gps: { lat: number; lon: number } | null;
-  creationTime: string | null; // ISO 8601
-  md5: string | null;      // filled only by duplicate detection, else null
-  error: string | null;    // non-null => probe failed; UI renders an error row
-}
-
-export interface FileOpResult {
-  from: string;
-  to: string | null;
-  status: "ok" | "skipped" | "error" | "dryrun";
-  error: string | null;
-}
-
-export interface DeleteSummary {
-  deleted: number;
-  failed: number;
-  results: { path: string; status: "ok" | "error"; error: string | null }[];
-}
-
-export interface DuplicateGroup { hash: string; files: VideoInfo[]; }
-
-export interface Settings {
-  ffmpegPath: string | null;
-  ffprobePath: string | null;
-  videoExtensions: string[]; // default below
-  dryRunDefault: boolean;
-  lastFolders: Record<string, string>; // toolId -> last folder
-}
-
-export interface JobProgress {
-  jobId: string;
-  done: number;
-  total: number;
-  phase: string; // e.g. "scanning", "hashing", "encoding"
-}
+export type ResolutionClass = "4K" | "FHD" | "1080p" | "HD" | "720p" | "SD" | "Unknown";
+export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "FHD", "1080p", "HD", "720p", "SD"];
 ```
 
-Default `videoExtensions`: `["mp4","mov","m4v","avi","mkv","webm","mpg","mpeg","wmv","flv","3gp","m2ts","mts"]`.
+Classify using `long = max(width, height)` (dimensions already rotation-corrected). First match wins, in this order:
+1. `long >= 3840` → `"4K"`
+2. `long` within ±2 of 1920 → `"1080p"` (exact-ish 1920×1080)
+3. `long` within ±2 of 1280 → `"720p"` (exact-ish 1280×720)
+4. `long > 1920` (and < 3840) → `"FHD"` (between 1080p and 4K)
+5. `long > 720` → `"HD"` (between 720p and 1080p — covers everything else above 720)
+6. else → `"SD"`
 
-Resolution classing (by max dimension, i.e. long edge): ≥3840→"4K"; ≥1920→"1080p"; ≥1280→"720p"; >0→"SD"; else "Unknown".
+Orientation unchanged (`landscape`/`portrait`/`square` from width vs height; `orientationCode` → `"W"`/`"V"` reused everywhere). **Delete `orientationFolder` ("Wide"/"Vertical")** — no longer used; folder names now use the single-letter `orientationCode` (see §3).
 
-## Channels
+## 2. New VideoInfo fields
 
-| Channel | Request | Response |
-| --- | --- | --- |
-| `deps:check` | `{}` | `{ ffmpeg: boolean; ffprobe: boolean; ffmpegPath: string \| null; ffprobePath: string \| null }` |
-| `deps:install` | `{}` | `{ success: boolean; error?: string }` — runs `brew install ffmpeg` (installs ffprobe too); long timeout (10 min) |
-| `scan:start` | `{ jobId: string; paths: string[]; extensions?: string[] }` | `{ files: VideoInfo[]; cancelled: boolean }` — recursively walks dirs, filters by ext, probes with bounded concurrency; emits `job:progress` |
-| `job:cancel` | `{ jobId: string }` | `{ cancelled: boolean }` |
-| `hash:duplicates` | `{ jobId: string; paths?: string[]; files?: VideoInfo[]; extensions?: string[] }` | `{ groups: DuplicateGroup[]; cancelled: boolean }` — exact MD5; groups only include hashes with ≥2 files; emits `job:progress` |
-| `sort:apply` | `{ mode: SortMode; files: VideoInfo[]; prefix?: string; dryRun: boolean; destRoot?: string }` | `{ results: FileOpResult[] }` |
-| `rename:apply` | `{ files: VideoInfo[]; prefix?: string; dryRun: boolean }` | `{ results: FileOpResult[] }` |
-| `files:delete` | `{ paths: string[]; dryRun: boolean }` | `DeleteSummary` |
-| `files:move` | `{ moves: { from: string; toDir: string }[]; dryRun: boolean }` | `{ results: FileOpResult[] }` — moves each file into `toDir` (created if missing) with collision auto-suffix, never overwrite; used by GPS Sorter (frontend sets `toDir = <file.dir>/GPS` or `/No-GPS`) and any bucket-move tool |
-| `slomo:create` | `{ jobId: string; files: string[]; factor: number; dryRun: boolean }` | `{ results: FileOpResult[]; cancelled: boolean }` — ffmpeg `setpts=PTS/factor`... i.e. slower for factor<1; drops audio (`-an`); dated output copies; emits `job:progress` |
-| `timeadjust:apply` | `{ jobId: string; files: string[]; startISO: string; stepSeconds: number; mode: "copies" \| "inplace"; dryRun: boolean }` | `{ results: FileOpResult[]; cancelled: boolean }` — assigns sequential timestamps `stepSeconds` apart from `startISO`; sets metadata `creation_time` (ffmpeg) + fs mtime; emits `job:progress` |
-| `csv:export` | `{ rows: string[][]; suggestedName?: string }` | `{ saved: boolean; path: string \| null }` — backend shows save dialog and writes CSV |
-| `reveal:inFinder` | `{ path: string }` | `{ ok: boolean }` — `shell.showItemInFolder`/`openPath`; enable the needed shell API in preload |
-| `settings:get` | `{}` | `Settings` |
-| `settings:set` | `{ patch: Partial<Settings> }` | `Settings` (merged + persisted) |
+Add to the existing `VideoInfo` interface (in both type files):
 
-Notification (backend → renderer): `job:progress` with payload `JobProgress`.
+```ts
+cameraFront: boolean;        // best-effort: any tag value/key matches /front.?camera/i
+cameraBack: boolean;         // best-effort: any tag value/key matches /back.?camera/i
+isScreenRecording: boolean;  // filename starts with "rpreplay" (case-insensitive), OR any tag
+                              // value contains "replaykit" or "screen recording"
+isSlowMotion: boolean;       // fps !== null && fps >= 90 (iPhone slow-mo shoots 120/240fps)
+thumbnailUrl: string | null; // always null from scan:start — populated lazily, see §4
+```
 
-## Sort semantics (folders created under each file's own directory unless `destRoot` given)
-- **ProVid** — rename in place (same folder), apply `prefix`; no subfolders.
-- **VidRes** — move into `<resolutionClass>/`.
-- **ProMax** — move into `<resolutionClass>/<orientation>/`.
-- **MaxVid** — move into `<resolutionClass>/<orientation>/<fps>fps/`.
-- **KeepName** — same folders as VidRes but never alter the filename.
-All moves use collision auto-suffix `(1),(2)…`, never overwrite; `dryRun` returns intended `to` paths with status `"dryrun"`.
+`hasCameraInfo` (make/model present) is UNCHANGED and still backs the "Device" concept:
+- Device = `"iPhone"` when `isApple`, else `"Misc Phone"` when `hasCameraInfo`, else none.
+Camera front/back/none is a SEPARATE concept from Device, backed by the two new fields:
+- `Camera` (has direction info) = `cameraFront || cameraBack`; `Front Camera` = `cameraFront`;
+  `Back Camera` = `cameraBack` (a clip can be both); `No Camera` = neither.
 
-## Re-encode detection (client-side, no channel)
-Derive from scan results: a file is a re-encode candidate if `codec` not in `["h264","hevc"]` OR `ext` not `"mp4"`/`"mov"`. Reason string explains which.
+## 3. SortMode + folder naming (flat single-level names, NOT nested)
 
-## Backend notes
-- `execFile` only (never `exec`); explicit `maxBuffer` (≥10MB for ffprobe JSON) + `timeout`.
-- Resolve ffmpeg/ffprobe path order: Settings override → `which` → common Homebrew paths (`/opt/homebrew/bin`, `/usr/local/bin`).
-- All long ops honor `job:cancel` (track child processes / cancel flag in a job registry keyed by `jobId`).
-- Settings persisted as JSON under `app.getPath("userData")`.
-</content>
+```ts
+export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName" | "SlowMotion";
+```
+
+`targetDir(root, mode, info)` in `main/services/processor.ts`:
+- `ProVid` → `info.dir` (rename in place, unchanged)
+- `VidRes` / `KeepName` → `path.join(root, info.resolutionClass)` e.g. `"FHD"`
+- `ProMax` → `path.join(root, \`${info.resolutionClass} ${orientationCode(info.orientation)}\`)` e.g. `"4K W"` (flat — NOT nested `4K/Wide`)
+- `MaxVid` → `path.join(root, \`${info.resolutionClass} ${orientationCode(info.orientation)} ${frameRateLabel(info.fps)}\`)` e.g. `"4K W 60"` (flat, 1 level — NOT 3 nested levels)
+- `SlowMotion` (new) → `path.join(root, info.isSlowMotion ? "Slow Motion" : "Normal Speed")`
+
+`OUTPUT_FOLDER_NAMES` (skip-list for recursive scan/process, both type files) must become:
+```
+4K, FHD, 1080p, HD, 720p, SD, MISC, GPS, No GPS, Slow Motion, Normal Speed,
+4K W, 4K V, FHD W, FHD V, 1080p W, 1080p V, HD W, HD V, 720p W, 720p V, SD W, SD V,
+4K W 60, 4K W 30, 4K V 60, 4K V 30, FHD W 60, FHD W 30, FHD V 60, FHD V 30,
+1080p W 60, 1080p W 30, 1080p V 60, 1080p V 30, HD W 60, HD W 30, HD V 60, HD V 30,
+720p W 60, 720p W 30, 720p V 60, 720p V 30, SD W 60, SD W 30, SD V 60, SD V 30
+```
+GPS Sorter keeps moving files directly via `files:move` into `"GPS"` / `"No GPS"` (already the case, just verify the folder names match this list — currently uses `"No-GPS"` with a hyphen, **rename to `"No GPS"`** with a space to match the skip-list and the spec).
+
+## 4. Thumbnails — new IPC channel
+
+```
+Channel: "thumbnail:get"
+Request: { path: string }
+Response: { url: string | null }   // null if generation failed (e.g. corrupt file)
+```
+Backend: generate via ffmpeg (`-ss 1 -frames:v 1 -vf scale=160:-1`) into a cache file at
+`app.getPath("userData")/thumbnails/<sha1(path+mtimeMs+size)>.jpg`, reuse if already cached.
+Serve cached files through a registered custom protocol (invoke the `glaze-protocol-large-files`
+skill for the exact registration pattern) — do NOT return base64 over IPC. Frontend requests a
+thumbnail per visible row lazily (on row mount), caches the returned URL in component state
+keyed by path, and shows a neutral placeholder icon until it resolves or fails.
+
+## 5. Scan summary categories (18 total) — all independently toggleable and combinable (AND logic)
+
+`Total Videos` (clears all filters), `GPS`, `No GPS`, `4K`, `FHD`, `1080p`, `HD`, `720p`, `SD`,
+`30fps`, `60fps`, `iPhone`, `Misc Phone`, `Camera`, `Front Camera`, `Back Camera`, `No Camera`,
+`Screen REC`. Predicates: resolution → `resolutionClass`; GPS/No GPS → `hasGPS`; fps buckets →
+`frameRateLabel(fps) === 30/60`; iPhone → `isApple`; Misc Phone → `hasCameraInfo && !isApple`;
+Camera/Front/Back/No Camera → §2; Screen REC → `isScreenRecording`.
+
+## 6. Existing channels — no shape change other than the new VideoInfo fields flowing through
+`scan:start`, `process:run` (mode may now be `"SlowMotion"`), `files:move`, `job:cancel`,
+`csv:export`, `slomo:create`/`timeadjust:apply` (unrelated, unchanged).

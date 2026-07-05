@@ -21,6 +21,7 @@ import { scan } from "../services/scanner.js";
 import { applySort, applyRename, applyDelete, applyMove } from "../services/file-ops.js";
 import { processFolder } from "../services/processor.js";
 import { createSloMo, applyTimeAdjust } from "../services/ffmpeg-ops.js";
+import { getThumbnailPath } from "../services/thumbnails.js";
 import { type VideoInfo, type SortMode } from "../services/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -94,6 +95,10 @@ interface CsvExportParams {
 }
 
 interface RevealInFinderParams {
+  path: string;
+}
+
+interface ThumbnailGetParams {
   path: string;
 }
 
@@ -259,7 +264,7 @@ export function registerHandlers(): void {
     const p = params as ProcessRunParams;
     const jobId = assertString(p?.jobId, "jobId");
     const mode = p?.mode as SortMode;
-    if (!["ProVid", "VidRes", "ProMax", "MaxVid", "KeepName"].includes(mode)) {
+    if (!["ProVid", "VidRes", "ProMax", "MaxVid", "KeepName", "SlowMotion"].includes(mode)) {
       throw new Error(`Invalid mode: ${String(mode)}`);
     }
     const droppedPaths = assertStringArray(p?.droppedPaths, "droppedPaths");
@@ -431,6 +436,29 @@ export function registerHandlers(): void {
       const msg = e instanceof Error ? e.message : String(e);
       console.log("[reveal:inFinder] error", { path: filePath, error: msg });
       return { ok: false };
+    }
+  });
+
+  // ── thumbnail:get ─────────────────────────────────────────────────────────────
+
+  ipcMain.handle("thumbnail:get", async (_event, params: unknown) => {
+    const p = params as ThumbnailGetParams;
+    const filePath = assertString(p?.path, "path");
+    console.log("[thumbnail:get]", { path: filePath });
+    try {
+      const ffmpegPath = await getFfmpegPath();
+      const cachePath = await getThumbnailPath(filePath, ffmpegPath);
+      if (!cachePath) {
+        console.log("[thumbnail:get] failed", { path: filePath });
+        return { url: null };
+      }
+      const url = `glaze-thumb://thumb?file=${encodeURIComponent(path.basename(cachePath))}`;
+      console.log("[thumbnail:get] done", { path: filePath, url });
+      return { url };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log("[thumbnail:get] error", { path: filePath, error: msg });
+      return { url: null };
     }
   });
 

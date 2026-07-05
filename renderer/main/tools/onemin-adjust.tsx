@@ -16,7 +16,7 @@ import { PlayIcon, CalendarIcon } from "lucide-react";
 import { ToolPage } from "../../components/tool-page";
 import { DropZone } from "../../components/drop-zone";
 import { ResultsTable, type SortKey, type SortDir } from "../../components/results-table";
-import { CountPills, type CountPill } from "../../components/count-pills";
+import { ScanSummary, type ScanSummaryPill } from "../../components/scan-summary";
 import { DryRunToggle } from "../../components/dry-run-toggle";
 import { ProgressBar } from "../../components/progress-bar";
 import { CancelButton } from "../../components/cancel-button";
@@ -45,6 +45,7 @@ export function OneminAdjust() {
   const [dryRun, setDryRun] = useState(true);
   const [useCustomStart, setUseCustomStart] = useState(false);
   const [customStartValue, setCustomStartValue] = useState("");
+  const [activeFilterIds, setActiveFilterIds] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [progress, setProgress] = useState<JobProgress | null>(null);
@@ -91,6 +92,7 @@ export function OneminAdjust() {
       setIsScanning(false);
       setProgress(null);
       updateSession({ scannedFiles: result.files, selectedPaths: new Set() });
+      setActiveFilterIds(new Set());
       console.log("[onemin-adjust:scan:done]", { count: result.files.length });
     },
     onError: (err) => {
@@ -160,26 +162,27 @@ export function OneminAdjust() {
   const hasPaths = session.droppedPaths.length > 0;
   const isRunning = applyMutation.isPending;
 
-  const countPills: CountPill[] = [
-    { label: "Files", count: session.scannedFiles.length, color: "primary" },
+  const files = session.scannedFiles;
+  const scanSummaryPills: ScanSummaryPill[] = [
+    { id: "total", label: "Total Videos", count: files.length },
   ];
 
+  // Only the "Total Videos" pill exists here — no additional predicates to combine.
+  const filteredFiles = files;
+
   const displayFiles = opResults.length > 0
-    ? session.scannedFiles.filter((f) => opResults.some((r) => r.from === f.path))
-    : session.scannedFiles;
+    ? filteredFiles.filter((f) => opResults.some((r) => r.from === f.path))
+    : filteredFiles;
 
   return (
-    <ToolPage title="Time Sequencer" category="convert">
-      <Text variant="regular" color="secondary">
-        Assign sequential timestamps 60 seconds apart, starting from a custom or current time. Choose to create dated copies or update files in place.
-      </Text>
-
-      <DropZone
-        onPaths={handlePaths}
-        accept="both"
-        disabled={isScanning || isRunning}
-        hint="Drag videos or a folder here"
-      />
+    <ToolPage title="One Minute Adjuster">
+      {/* Centered title + subtitle */}
+      <div className="flex flex-col items-center text-center gap-1.5 pt-1 pb-1">
+        <h1 className="libra-page-title">One Minute Adjuster</h1>
+        <Text variant="regular" color="secondary">
+          Sequential Timestamps, 60 Seconds Apart
+        </Text>
+      </div>
 
       {hasPaths && !isScanning && !scanMutation.isPending && (
         <div className="flex items-center gap-3">
@@ -209,7 +212,7 @@ export function OneminAdjust() {
         <>
           <div className="flex flex-col gap-2">
             <SectionLabel>Scan Summary</SectionLabel>
-            <CountPills pills={countPills} />
+            <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
           </div>
 
           <div className="flex flex-col gap-4">
@@ -253,7 +256,7 @@ export function OneminAdjust() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <SectionLabel>Files ({session.scannedFiles.length})</SectionLabel>
+            <SectionLabel>Files ({filteredFiles.length})</SectionLabel>
             <ResultsTable
               files={displayFiles}
               selectedPaths={session.selectedPaths}
@@ -282,6 +285,14 @@ export function OneminAdjust() {
           </div>
         </>
       )}
+
+      {/* Drop zone — always at the very bottom of the page */}
+      <DropZone
+        onPaths={handlePaths}
+        accept="both"
+        disabled={isScanning || isRunning}
+        hint="Drag videos or a folder here"
+      />
     </ToolPage>
   );
 }

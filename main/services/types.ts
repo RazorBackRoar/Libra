@@ -3,12 +3,12 @@
  * Keep structurally identical to renderer/main/types.ts.
  */
 
-export type ResolutionClass = "4K" | "1080p" | "720p" | "HD" | "SD" | "Unknown";
+export type ResolutionClass = "4K" | "FHD" | "1080p" | "HD" | "720p" | "SD" | "Unknown";
 
 /** Canonical, ordered list of resolution labels shown anywhere in the app. */
-export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "1080p", "720p", "HD", "SD"];
+export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "FHD", "1080p", "HD", "720p", "SD"];
 export type Orientation = "landscape" | "portrait" | "square" | "unknown";
-export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName";
+export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName" | "SlowMotion";
 
 export interface VideoInfo {
   path: string;
@@ -28,6 +28,14 @@ export interface VideoInfo {
   model: string | null;
   isApple: boolean;
   hasCameraInfo: boolean;
+  /** Best-effort: any tag value/key matches /front.?camera/i. */
+  cameraFront: boolean;
+  /** Best-effort: any tag value/key matches /back.?camera/i. */
+  cameraBack: boolean;
+  /** Filename starts with "rpreplay" (case-insensitive), or any tag value contains "replaykit"/"screen recording". */
+  isScreenRecording: boolean;
+  /** fps !== null && fps >= 90 (iPhone slow-mo shoots 120/240fps). */
+  isSlowMotion: boolean;
   isEdited: boolean;
   hasGPS: boolean;
   gps: { lat: number; lon: number } | null;
@@ -36,6 +44,8 @@ export interface VideoInfo {
   rotate: number | null;
   /** True when the rotate metadata was a non-standard value (treated as 0). */
   rotateAbnormal: boolean;
+  /** Always null from scan:start — populated lazily via thumbnail:get. */
+  thumbnailUrl: string | null;
   error: string | null;
 }
 
@@ -72,7 +82,13 @@ export interface JobProgress {
 
 /** Folder names L!bra itself creates — skipped when scanning recursively so
  *  re-runs never re-process the app's own output. */
-export const OUTPUT_FOLDER_NAMES: string[] = ["4K", "1080p", "720p", "HD", "SD", "MISC"];
+export const OUTPUT_FOLDER_NAMES: string[] = [
+  "4K", "FHD", "1080p", "HD", "720p", "SD", "MISC", "GPS", "No GPS", "Slow Motion", "Normal Speed",
+  "4K W", "4K V", "FHD W", "FHD V", "1080p W", "1080p V", "HD W", "HD V", "720p W", "720p V", "SD W", "SD V",
+  "4K W 60", "4K W 30", "4K V 60", "4K V 30", "FHD W 60", "FHD W 30", "FHD V 60", "FHD V 30",
+  "1080p W 60", "1080p W 30", "1080p V 60", "1080p V 30", "HD W 60", "HD W 30", "HD V 60", "HD V 30",
+  "720p W 60", "720p W 30", "720p V 60", "720p V 30", "SD W 60", "SD W 30", "SD V 60", "SD V 30",
+];
 
 /** macOS housekeeping entries — never moved, never counted. */
 export function isHousekeepingName(name: string): boolean {
@@ -130,10 +146,9 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 /**
- * Classify resolution from detected width/height.
- * Order matters — each video stops at the first matching rule:
- *   4K → 1080p → 720p → HD → SD
- * Works for both landscape and portrait (rules test "either side").
+ * Classify resolution from detected width/height (already rotation-corrected).
+ * Uses long = max(width, height). Order matters — first match wins:
+ *   4K → 1080p (~1920) → 720p (~1280) → FHD (>1080p, <4K) → HD (>720p) → SD
  */
 export function classifyResolution(
   width: number | null,
@@ -144,26 +159,22 @@ export function classifyResolution(
   }
   const long = Math.max(width, height);
 
-  // Order matters — first match wins. Each check looks at either side so
-  // orientation never changes the result (dimensions are rotation-corrected).
+  // 4K — long side >= 3840.
+  if (long >= 3840) return "4K";
 
-  // 4K — width or height >= 2160.
-  if (width >= 2160 || height >= 2160) return "4K";
+  // 1080p — long side within ±2 of 1920 (exact-ish 1920x1080).
+  if (Math.abs(long - 1920) <= 2) return "1080p";
 
-  // 1080p — either side exactly 1920 or 1080.
-  if (width === 1920 || height === 1920 || width === 1080 || height === 1080) {
-    return "1080p";
-  }
+  // 720p — long side within ±2 of 1280 (exact-ish 1280x720).
+  if (Math.abs(long - 1280) <= 2) return "720p";
 
-  // 720p — either side exactly 1280 or 720.
-  if (width === 1280 || height === 1280 || width === 720 || height === 720) {
-    return "720p";
-  }
+  // FHD — strictly between 1080p and 4K.
+  if (long > 1920 && long < 3840) return "FHD";
 
-  // HD — longer side >= 720.
-  if (long >= 720) return "HD";
+  // HD — everything else above 720p.
+  if (long > 720) return "HD";
 
-  // SD — longer side < 720.
+  // SD — long side <= 720.
   return "SD";
 }
 
@@ -180,11 +191,6 @@ export function classifyOrientation(
 /** Filename orientation code: V for vertical, W otherwise (square counts as wide). */
 export function orientationCode(o: Orientation): "W" | "V" {
   return o === "portrait" ? "V" : "W";
-}
-
-/** Folder-name orientation label used by Pro Max / Max Vid. */
-export function orientationFolder(o: Orientation): "Wide" | "Vertical" {
-  return o === "portrait" ? "Vertical" : "Wide";
 }
 
 /** Frame-rate label: 60 when the source runs above 45fps, otherwise 30. */

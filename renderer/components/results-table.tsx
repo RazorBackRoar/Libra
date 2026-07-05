@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Table,
   TableHeader,
@@ -10,7 +10,7 @@ import {
   EmptyState,
   Text,
 } from "@glaze/core/components";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon, ImageIcon } from "lucide-react";
 import { cn } from "@glaze/core/utils";
 import type { VideoInfo } from "../main/types";
 
@@ -30,6 +30,8 @@ interface ResultsTableProps {
   actions?: React.ReactNode;
 }
 
+const TOTAL_COLUMNS = 13;
+
 function formatSize(bytes: number): string {
   if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
   if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
@@ -41,6 +43,21 @@ function formatDuration(sec: number | null): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Device concept: iPhone when Apple, else Misc Phone when camera make/model is present. */
+function deviceLabel(file: VideoInfo): string {
+  if (file.isApple) return "iPhone";
+  if (file.hasCameraInfo) return "Misc Phone";
+  return "—";
+}
+
+/** Camera-direction concept: separate from Device, backed by cameraFront/cameraBack. */
+function cameraTypeLabel(file: VideoInfo): string {
+  if (file.cameraFront && file.cameraBack) return "Front & Back";
+  if (file.cameraBack) return "Back Camera";
+  if (file.cameraFront) return "Front Camera";
+  return "No Camera";
 }
 
 function compare(a: VideoInfo, b: VideoInfo, key: SortKey, dir: SortDir): number {
@@ -61,6 +78,56 @@ function compare(a: VideoInfo, b: VideoInfo, key: SortKey, dir: SortDir): number
   return dir === "asc" ? result : -result;
 }
 
+/**
+ * Thumbnail cell: lazy-fetches a thumbnail for `path` via the `thumbnail:get`
+ * IPC channel on mount, reporting the resolved URL (or `null` on failure) up
+ * to the shared cache in `ResultsTable`. Shows a neutral placeholder until
+ * the fetch resolves or fails.
+ */
+function ThumbnailCell({
+  path,
+  cachedUrl,
+  onResolved,
+}: {
+  path: string;
+  cachedUrl: string | null | undefined;
+  onResolved: (path: string, url: string | null) => void;
+}) {
+  useEffect(() => {
+    if (cachedUrl !== undefined) return; // already fetched (resolved or failed)
+    let cancelled = false;
+    console.log("[ResultsTable:thumbnail:get]", { path });
+    window.glazeAPI.glaze.ipc
+      .invoke<{ url: string | null }>("thumbnail:get", { path })
+      .then((res) => {
+        if (!cancelled) onResolved(path, res.url);
+      })
+      .catch((err) => {
+        console.log("[ResultsTable:thumbnail:error]", { path, err });
+        if (!cancelled) onResolved(path, null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [path, cachedUrl, onResolved]);
+
+  if (cachedUrl) {
+    return (
+      <img
+        src={cachedUrl}
+        alt=""
+        className="size-10 rounded-md object-cover bg-well shrink-0"
+      />
+    );
+  }
+
+  return (
+    <div className="size-10 rounded-md bg-well flex items-center justify-center shrink-0">
+      <ImageIcon className="size-4 text-tertiary" />
+    </div>
+  );
+}
+
 export function ResultsTable({
   files,
   selectedPaths,
@@ -73,6 +140,11 @@ export function ResultsTable({
   actions,
 }: ResultsTableProps) {
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string | null | undefined>>({});
+
+  const handleThumbResolved = useCallback((path: string, url: string | null) => {
+    setThumbUrls((prev) => ({ ...prev, [path]: url }));
+  }, []);
 
   const sorted = [...files].sort((a, b) => compare(a, b, sortKey, sortDir));
 
@@ -139,6 +211,7 @@ export function ResultsTable({
       <Table>
         <TableHeader sticky>
           <TableRow>
+            <TableHead className="w-12">Thumb</TableHead>
             <TableHead className="w-8">
               <input
                 type="checkbox"
@@ -154,6 +227,10 @@ export function ResultsTable({
             <SortableHead col="codec" label="Codec" />
             <SortableHead col="fps" label="FPS" />
             <TableHead>Duration</TableHead>
+            <TableHead>GPS</TableHead>
+            <TableHead>Device</TableHead>
+            <TableHead>Camera Type</TableHead>
+            <TableHead>Screen REC</TableHead>
             <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
@@ -170,6 +247,13 @@ export function ResultsTable({
                   onClick={() => toggleSelect(file.path)}
                   className={cn("cursor-pointer", isSelected && "bg-accent/10")}
                 >
+                  <TableCell>
+                    <ThumbnailCell
+                      path={file.path}
+                      cachedUrl={thumbUrls[file.path]}
+                      onResolved={handleThumbResolved}
+                    />
+                  </TableCell>
                   <TableCell>
                     <input
                       type="checkbox"
@@ -203,6 +287,18 @@ export function ResultsTable({
                     <Text variant="small" color="secondary">{formatDuration(file.durationSec)}</Text>
                   </TableCell>
                   <TableCell>
+                    <Text variant="small" color="secondary">{file.hasGPS ? "Yes" : "No"}</Text>
+                  </TableCell>
+                  <TableCell>
+                    <Text variant="small" color="secondary">{deviceLabel(file)}</Text>
+                  </TableCell>
+                  <TableCell>
+                    <Text variant="small" color="secondary">{cameraTypeLabel(file)}</Text>
+                  </TableCell>
+                  <TableCell>
+                    <Text variant="small" color="secondary">{file.isScreenRecording ? "Yes" : "No"}</Text>
+                  </TableCell>
+                  <TableCell>
                     {hasError ? (
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleError(file.path); }}
@@ -222,7 +318,7 @@ export function ResultsTable({
                 </TableRow>
                 {hasError && isExpanded && (
                   <TableRow key={`${file.path}-error`}>
-                    <TableCell colSpan={8} className="bg-well py-2 px-4">
+                    <TableCell colSpan={TOTAL_COLUMNS} className="bg-well py-2 px-4">
                       <Text variant="small" color="red">{file.error}</Text>
                     </TableCell>
                   </TableRow>

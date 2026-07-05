@@ -3,7 +3,6 @@ import { getToolById } from "./registry";
 import { ToolPage } from "../../components/tool-page";
 import { MediaOrganizer } from "./media-organizer";
 import { OneminAdjust } from "./onemin-adjust";
-import { SlomoCreator } from "./slomo-creator";
 import { GpsSorter } from "./gps-sorter";
 import { Text } from "@glaze/core/components";
 
@@ -31,8 +30,6 @@ export function ToolDispatcher() {
       return <MediaOrganizer />;
     case "onemin-adjust":
       return <OneminAdjust />;
-    case "slomo-creator":
-      return <SlomoCreator />;
     case "gps-sorter":
       return <GpsSorter />;
     default:

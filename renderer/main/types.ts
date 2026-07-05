@@ -1,12 +1,12 @@
 // Shared types mirroring the IPC contract in project-plans/CONTRACT.md.
 // These match structurally what the backend emits over JSON.
 
-export type ResolutionClass = "4K" | "1080p" | "720p" | "HD" | "SD" | "Unknown";
+export type ResolutionClass = "4K" | "FHD" | "1080p" | "HD" | "720p" | "SD" | "Unknown";
 export type Orientation = "landscape" | "portrait" | "square" | "unknown";
-export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName";
+export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName" | "SlowMotion";
 
 /** Canonical, ordered resolution labels shown anywhere in the UI. */
-export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "1080p", "720p", "HD", "SD"];
+export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "FHD", "1080p", "HD", "720p", "SD"];
 
 export interface VideoInfo {
   path: string; // absolute path
@@ -26,12 +26,17 @@ export interface VideoInfo {
   model: string | null; // metadata model (e.g. "iPhone 14 Pro")
   isApple: boolean; // make === "Apple" || /iphone|ipad/i.test(model)
   hasCameraInfo: boolean; // 📷 — make/model camera info present
+  cameraFront: boolean; // best-effort: any tag value/key matches /front.?camera/i
+  cameraBack: boolean; // best-effort: any tag value/key matches /back.?camera/i
+  isScreenRecording: boolean; // filename starts with "rpreplay", or tag contains "replaykit"/"screen recording"
+  isSlowMotion: boolean; // fps !== null && fps >= 90
   isEdited: boolean; // ✂️ — appears edited/trimmed
   hasGPS: boolean;
   gps: { lat: number; lon: number } | null;
   creationTime: string | null; // ISO 8601
   rotate: number | null; // display rotation applied (0/90/180/270) or raw abnormal value
   rotateAbnormal: boolean; // non-standard rotate metadata, treated as 0
+  thumbnailUrl: string | null; // always null from scan:start — populated lazily via thumbnail:get
   error: string | null; // non-null => probe failed; UI renders an error row
 }
 
@@ -195,6 +200,14 @@ export interface RevealInFinderParams {
 
 export interface RevealInFinderResult {
   ok: boolean;
+}
+
+export interface ThumbnailGetParams {
+  path: string;
+}
+
+export interface ThumbnailGetResult {
+  url: string | null;
 }
 
 export interface JobCancelParams {

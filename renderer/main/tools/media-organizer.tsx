@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button, Input, Text, toast } from "@glaze/core/components";
-import { PlayIcon, DownloadIcon, Trash2Icon, FolderOpenIcon } from "lucide-react";
+import { PlayIcon, DownloadIcon, Trash2Icon } from "lucide-react";
 import { cn } from "@glaze/core/utils";
 
 import { ToolPage } from "../../components/tool-page";
 import { DropZone } from "../../components/drop-zone";
-import { VideoList } from "../../components/video-list";
-import { CountPills, type CountPill } from "../../components/count-pills";
-import { FilterPills, type FilterPillDef } from "../../components/filter-pills";
+import { ResultsTable, type SortKey, type SortDir } from "../../components/results-table";
+import { ScanSummary, type ScanSummaryPill } from "../../components/scan-summary";
 import { DryRunToggle } from "../../components/dry-run-toggle";
 import { ProgressBar } from "../../components/progress-bar";
 import { CancelButton } from "../../components/cancel-button";
@@ -22,26 +21,49 @@ import type {
   ProcessReport,
 } from "../types";
 
-// ── Filter definitions ────────────────────────────────────────────────────────
+// ── Title / subtitle per mode (shown centered at the top of the page) ──────────
 
-const FILTER_DEFS: FilterPillDef[] = [
-  { id: "4K", label: "4K" },
-  { id: "1080p", label: "1080p" },
-  { id: "720p", label: "720p" },
-  { id: "HD", label: "HD" },
-  { id: "SD", label: "SD" },
-  { id: "GPS", label: "GPS" },
-  { id: "iPhone", label: "iPhone" },
-  { id: "Camera", label: "Camera" },
-];
-
-const MODE_LABELS: Record<SortMode, string> = {
-  ProVid: "Pro Vid — Prefix Rename",
-  VidRes: "Vid Res — Resolution Sort",
-  ProMax: "Pro Max — Resolution + Orientation",
-  MaxVid: "Max Vid — Full Sort",
-  KeepName: "Name Keeper — Keep Names",
+const MODE_LABELS: Record<SortMode, { title: string; subtitle: string }> = {
+  ProVid: { title: "Pro Vid", subtitle: "Prefix Rename Videos" },
+  VidRes: { title: "Vid Res", subtitle: "Sort by Resolution" },
+  ProMax: { title: "Pro Max", subtitle: "Resolution + Orientation" },
+  MaxVid: { title: "Max Vid", subtitle: "Resolution + Orientation + FPS" },
+  KeepName: { title: "Name Keeper", subtitle: "Sort by Resolution, Keep Names" },
+  SlowMotion: { title: "Slow Motion", subtitle: "Detect and Sort Slow-Motion Clips" },
 };
+
+// ── Scan Summary — 18 categories (CONTRACT.md §5), AND-combinable ──────────────
+
+/** Frame-rate bucket used for the 30fps/60fps scan-summary pills. */
+function frameRateLabel(fps: number | null): 30 | 60 {
+  return fps !== null && fps > 45 ? 60 : 30;
+}
+
+interface ScanSummaryDef {
+  id: string;
+  label: string;
+  predicate: (f: VideoInfo) => boolean;
+}
+
+const SCAN_SUMMARY_DEFS: ScanSummaryDef[] = [
+  { id: "GPS", label: "GPS", predicate: (f) => f.hasGPS },
+  { id: "NoGPS", label: "No GPS", predicate: (f) => !f.hasGPS },
+  { id: "4K", label: "4K", predicate: (f) => f.resolutionClass === "4K" },
+  { id: "FHD", label: "FHD", predicate: (f) => f.resolutionClass === "FHD" },
+  { id: "1080p", label: "1080p", predicate: (f) => f.resolutionClass === "1080p" },
+  { id: "HD", label: "HD", predicate: (f) => f.resolutionClass === "HD" },
+  { id: "720p", label: "720p", predicate: (f) => f.resolutionClass === "720p" },
+  { id: "SD", label: "SD", predicate: (f) => f.resolutionClass === "SD" },
+  { id: "30fps", label: "30fps", predicate: (f) => frameRateLabel(f.fps) === 30 },
+  { id: "60fps", label: "60fps", predicate: (f) => frameRateLabel(f.fps) === 60 },
+  { id: "iPhone", label: "iPhone", predicate: (f) => f.isApple },
+  { id: "MiscPhone", label: "Misc Phone", predicate: (f) => f.hasCameraInfo && !f.isApple },
+  { id: "Camera", label: "Camera", predicate: (f) => f.cameraFront || f.cameraBack },
+  { id: "FrontCamera", label: "Front Camera", predicate: (f) => f.cameraFront },
+  { id: "BackCamera", label: "Back Camera", predicate: (f) => f.cameraBack },
+  { id: "NoCamera", label: "No Camera", predicate: (f) => !f.cameraFront && !f.cameraBack },
+  { id: "ScreenRec", label: "Screen REC", predicate: (f) => f.isScreenRecording },
+];
 
 // ── IPC helpers ───────────────────────────────────────────────────────────────
 
@@ -73,10 +95,13 @@ export function MediaOrganizer() {
   const presetMode = session.options.mode as SortMode | undefined;
   const mode: SortMode = presetMode ?? "MaxVid";
   const isKeepName = mode === "KeepName";
+  const modeInfo = MODE_LABELS[mode];
 
   const [prefix, setPrefix] = useState("");
   const [dryRun, setDryRun] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<Record<string, boolean>>({});
+  const [activeFilterIds, setActiveFilterIds] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [report, setReport] = useState<ProcessReport | null>(null);
@@ -94,40 +119,21 @@ export function MediaOrganizer() {
     };
   }, [jobId]);
 
-  // ── Derived: filtered file list ──────────────────────────────────────────
-  const anyFilterActive = Object.values(activeFilters).some(Boolean);
-
-  const filteredFiles = anyFilterActive
-    ? session.scannedFiles.filter((f) => {
-        if (activeFilters["4K"] && f.resolutionClass !== "4K") return false;
-        if (activeFilters["1080p"] && f.resolutionClass !== "1080p") return false;
-        if (activeFilters["720p"] && f.resolutionClass !== "720p") return false;
-        if (activeFilters["HD"] && f.resolutionClass !== "HD") return false;
-        if (activeFilters["SD"] && f.resolutionClass !== "SD") return false;
-        if (activeFilters["GPS"] && !f.hasGPS) return false;
-        if (activeFilters["iPhone"] && !f.isApple) return false;
-        if (activeFilters["Camera"] && !f.hasCameraInfo) return false;
-        return true;
-      })
-    : session.scannedFiles;
-
-  // ── Count pills — 9 stats, filled left-to-right then top-to-bottom ────────
+  // ── Derived: scan summary pills + AND-filtered file list ──────────────────
   const files = session.scannedFiles;
-  const countPills: CountPill[] = [
-    { label: "Videos", count: files.length },
-    { label: "iPhone", count: files.filter((f) => f.isApple).length },
-    { label: "GPS", count: files.filter((f) => f.hasGPS).length },
-    { label: "Camera", count: files.filter((f) => f.hasCameraInfo).length },
-    { label: "4K", count: files.filter((f) => f.resolutionClass === "4K").length },
-    { label: "HD", count: files.filter((f) => f.resolutionClass === "HD").length },
-    { label: "1080p", count: files.filter((f) => f.resolutionClass === "1080p").length },
-    { label: "SD", count: files.filter((f) => f.resolutionClass === "SD").length },
-    { label: "720p", count: files.filter((f) => f.resolutionClass === "720p").length },
+
+  const scanSummaryPills: ScanSummaryPill[] = [
+    { id: "total", label: "Total Videos", count: files.length },
+    ...SCAN_SUMMARY_DEFS.map((d) => ({ id: d.id, label: d.label, count: files.filter(d.predicate).length })),
   ];
+
+  const activeDefs = SCAN_SUMMARY_DEFS.filter((d) => activeFilterIds.has(d.id));
+  const filteredFiles = activeDefs.length > 0 ? files.filter((f) => activeDefs.every((d) => d.predicate(f))) : files;
 
   // ── Handle paths from drop / dialog ─────────────────────────────────────
   const handlePaths = useCallback(
     (paths: string[]) => {
+      console.log("[media-organizer:paths]", { count: paths.length });
       updateSession({ droppedPaths: paths, scannedFiles: [] });
       setProgress(null);
       setReport(null);
@@ -142,6 +148,7 @@ export function MediaOrganizer() {
       setIsScanning(true);
       setProgress(null);
       setReport(null);
+      console.log("[media-organizer:scan:start]", { jobId, paths: session.droppedPaths });
       return invokeIpc<{ files: VideoInfo[]; cancelled: boolean }>("scan:start", {
         jobId,
         paths: session.droppedPaths,
@@ -151,6 +158,8 @@ export function MediaOrganizer() {
       setIsScanning(false);
       setProgress(null);
       updateSession({ scannedFiles: result.files, selectedPaths: new Set() });
+      setActiveFilterIds(new Set());
+      console.log("[media-organizer:scan:done]", { count: result.files.length });
     },
     onError: (err) => {
       setIsScanning(false);
@@ -172,6 +181,7 @@ export function MediaOrganizer() {
     mutationFn: async () => {
       const organizeFiles = filteredFiles.filter((f) => f.error === null);
       const unreadablePaths = session.scannedFiles.filter((f) => f.error !== null).map((f) => f.path);
+      console.log("[media-organizer:process:run]", { jobId, mode, count: organizeFiles.length, dryRun });
       return invokeIpc<ProcessReport>("process:run", {
         jobId,
         mode,
@@ -281,50 +291,15 @@ export function MediaOrganizer() {
     </>
   );
 
-  const listCount = hasFiles
-    ? anyFilterActive
-      ? `${filteredFiles.length} of ${session.scannedFiles.length} videos`
-      : `${session.scannedFiles.length} videos`
-    : "";
-
   return (
-    <ToolPage title="">
-      {/* Centered branded header */}
-      <div className="flex flex-col items-center text-center gap-2 pt-1 pb-1">
-        <h1 className="libra-title">L!bra</h1>
+    <ToolPage title={modeInfo.title}>
+      {/* Centered mode title + subtitle (never the "L!bra" hero — that's home-only) */}
+      <div className="flex flex-col items-center text-center gap-1.5 pt-1 pb-1">
+        <h1 className="libra-page-title">{modeInfo.title}</h1>
         <Text variant="regular" color="secondary">
-          Filter, organize, review, and inspect rich video metadata.
+          {modeInfo.subtitle}
         </Text>
-        <span className="mt-1 rounded-full border border-separator bg-well px-3 py-0.5">
-          <Text variant="small-strong" color="accent">
-            {MODE_LABELS[mode]}
-          </Text>
-        </span>
       </div>
-
-      {/* Drop zone — also the scanned-video list area once files exist */}
-      <DropZone
-        onPaths={handlePaths}
-        accept="both"
-        disabled={isScanning}
-        hint={hasFiles ? "Drag videos or a folder here to add more" : "Drag videos or a folder here"}
-      >
-        {hasFiles ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <Text variant="small" color="secondary">
-                {listCount}
-              </Text>
-              <div className="flex gap-2">{listActions}</div>
-            </div>
-            <VideoList
-              files={filteredFiles}
-              selectedPaths={session.selectedPaths}
-              onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
-            />
-          </div>
-        ) : null}
-      </DropZone>
 
       {/* Scan controls */}
       {hasPaths && !isScanning && (
@@ -356,98 +331,92 @@ export function MediaOrganizer() {
         </div>
       )}
 
-      {/* Scan Summary (left) + controls (right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[248px_1fr] gap-6 items-start">
-        {/* Scan Summary sidebar */}
-        <aside className="flex flex-col gap-3">
-          <Text variant="large-strong" color="primary">
-            Scan Summary
-          </Text>
-          <CountPills pills={countPills} cols={2} className="gap-y-2.5" />
-        </aside>
-
-        {/* Controls */}
-        <div className="flex flex-col gap-5">
-          {/* Name Videos */}
+      {hasFiles && (
+        <>
+          {/* Scan Summary */}
           <div className="flex flex-col gap-2">
-            <SectionLabel>Name Videos</SectionLabel>
-            <Input
-              placeholder={isKeepName ? "Name Keeper never renames files" : "Optional prefix (e.g. Trip_2024_)"}
-              value={prefix}
-              onChange={(e) => setPrefix(e.target.value)}
-              disabled={isKeepName}
-            />
-            <Text variant="small" color="tertiary">
-              {isKeepName
-                ? "This mode keeps original filenames — the prefix is ignored."
-                : "Optional. Leave blank for no prefix."}
-            </Text>
+            <SectionLabel>Scan Summary</SectionLabel>
+            <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
           </div>
 
-          {/* Filters */}
+          {/* Results table */}
           <div className="flex flex-col gap-2">
-            <SectionLabel>Filter</SectionLabel>
-            <FilterPills
-              filters={FILTER_DEFS}
-              active={activeFilters}
-              onToggle={(id, val) => setActiveFilters((prev) => ({ ...prev, [id]: val }))}
+            <div className="flex items-center justify-between gap-3">
+              <SectionLabel>Files ({filteredFiles.length})</SectionLabel>
+              <div className="flex gap-2">{listActions}</div>
+            </div>
+            <ResultsTable
+              files={filteredFiles}
+              selectedPaths={session.selectedPaths}
+              onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+              emptyTitle="No videos scanned"
+              emptyDescription="Drop a folder or select files to get started."
             />
           </div>
 
-          {/* Destination — always the dropped folder */}
-          <div className="flex flex-col gap-2">
-            <SectionLabel>Destination</SectionLabel>
-            <div className="flex items-center gap-3 rounded-card border border-separator bg-well px-4 py-3">
-              <FolderOpenIcon className="size-5 shrink-0 text-secondary" />
-              <div className="flex flex-col min-w-0 flex-1">
-                <Text variant="small-strong" color="primary">
-                  The dropped folder
-                </Text>
-                <Text variant="small" color="secondary" truncate>
-                  {report?.droppedRoot ?? "Files are organized inside the folder you drop — nothing leaves it."}
-                </Text>
-              </div>
+          {/* Name Videos prefix (left) + Process button (right), just above the drop zone */}
+          <div className="flex items-end gap-4 pt-2 border-t border-separator">
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
+              <SectionLabel>Name Videos</SectionLabel>
+              <Input
+                placeholder={isKeepName ? "Name Keeper never renames files" : "Optional prefix (e.g. Trip_2024_)"}
+                value={prefix}
+                onChange={(e) => setPrefix(e.target.value)}
+                disabled={isKeepName}
+              />
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
+              <Button
+                variant="accent"
+                size="large"
+                onClick={() => processMutation.mutate()}
+                disabled={!hasFiles || processMutation.isPending}
+              >
+                <PlayIcon className="size-4" />
+                {processMutation.isPending ? "Processing…" : "Process"}
+              </Button>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Process bar */}
-      <div className="flex items-center justify-between gap-4 pt-3 border-t border-separator">
-        <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
-        <Button
-          variant="accent"
-          size="large"
-          onClick={() => processMutation.mutate()}
-          disabled={!hasFiles || processMutation.isPending}
-        >
-          <PlayIcon className="size-4" />
-          {processMutation.isPending ? "Processing…" : "Process"}
-        </Button>
-      </div>
-
-      {/* Final report */}
-      {report && (
-        <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
-          <Text variant="small-strong" color="primary">
-            {report.stopped
-              ? `Stopped early — ${report.stopped.reason}`
-              : report.dryRun
-                ? "Dry run — no files were changed."
-                : report.noVideos
-                  ? "No videos to organize; non-video files moved to MISC where present."
-                  : "Processing complete."}
-          </Text>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
-            <ReportStat label="organized" value={report.counts.organized} />
-            <ReportStat label="duplicates" value={report.counts.duplicates} />
-            <ReportStat label="to MISC" value={report.counts.misc} />
-            <ReportStat label="unreadable" value={report.counts.unreadable} />
-            <ReportStat label="skipped" value={report.counts.skipped} />
-            <ReportStat label="errors" value={report.counts.errors} />
-          </div>
-        </div>
+          {/* Final report */}
+          {report && (
+            <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
+              <Text variant="small-strong" color="primary">
+                {report.stopped
+                  ? `Stopped early — ${report.stopped.reason}`
+                  : report.dryRun
+                    ? "Dry run — no files were changed."
+                    : report.noVideos
+                      ? "No videos to organize; non-video files moved to MISC where present."
+                      : "Processing complete."}
+              </Text>
+              <Text variant="small" color="tertiary" truncate>
+                {report.droppedRoot}
+              </Text>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
+                <ReportStat label="organized" value={report.counts.organized} />
+                <ReportStat label="duplicates" value={report.counts.duplicates} />
+                <ReportStat label="to MISC" value={report.counts.misc} />
+                <ReportStat label="unreadable" value={report.counts.unreadable} />
+                <ReportStat label="skipped" value={report.counts.skipped} />
+                <ReportStat label="errors" value={report.counts.errors} />
+              </div>
+            </div>
+          )}
+        </>
       )}
+
+      {/* Drop zone — always at the very bottom of the page */}
+      <DropZone
+        onPaths={handlePaths}
+        accept="both"
+        disabled={isScanning}
+        hint={hasFiles ? "Drag videos or a folder here to add more" : "Drag videos or a folder here"}
+      />
     </ToolPage>
   );
 }

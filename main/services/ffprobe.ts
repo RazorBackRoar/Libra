@@ -97,6 +97,28 @@ function extractGps(
   return null;
 }
 
+/** True if any tag key or value matches `re`. */
+function anyTagKeyOrValueMatches(
+  tags: Record<string, string> | undefined,
+  re: RegExp,
+): boolean {
+  if (!tags) return false;
+  for (const [k, v] of Object.entries(tags)) {
+    if (re.test(k) || re.test(v)) return true;
+  }
+  return false;
+}
+
+/** True if any tag value contains `needle` (case-insensitive). */
+function anyTagValueContains(
+  tags: Record<string, string> | undefined,
+  needle: string,
+): boolean {
+  if (!tags) return false;
+  const lower = needle.toLowerCase();
+  return Object.values(tags).some((v) => v.toLowerCase().includes(lower));
+}
+
 function extractCreationTime(
   formatTags: Record<string, string> | undefined,
   streamTags: Record<string, string> | undefined,
@@ -143,12 +165,17 @@ export async function probeFile(
     model: null,
     isApple: false,
     hasCameraInfo: false,
+    cameraFront: false,
+    cameraBack: false,
+    isScreenRecording: false,
+    isSlowMotion: false,
     isEdited: false,
     hasGPS: false,
     gps: null,
     creationTime: null,
     rotate: null,
     rotateAbnormal: false,
+    thumbnailUrl: null,
     error: null,
   };
 
@@ -255,6 +282,35 @@ export async function probeFile(
     const resolutionClass = classifyResolution(width, height);
     const orientation = classifyOrientation(width, height);
 
+    // Camera front/back — best-effort tag scan (separate concept from Device/hasCameraInfo).
+    const frontRe = /front.?camera/i;
+    const backRe = /back.?camera/i;
+    const cameraFront =
+      anyTagKeyOrValueMatches(formatTags, frontRe) || anyTagKeyOrValueMatches(streamTags, frontRe);
+    const cameraBack =
+      anyTagKeyOrValueMatches(formatTags, backRe) || anyTagKeyOrValueMatches(streamTags, backRe);
+
+    // Screen recording — filename prefix, or ReplayKit/screen-recording tag values.
+    const isScreenRecording =
+      /^rpreplay/i.test(name) ||
+      anyTagValueContains(formatTags, "replaykit") ||
+      anyTagValueContains(formatTags, "screen recording") ||
+      anyTagValueContains(streamTags, "replaykit") ||
+      anyTagValueContains(streamTags, "screen recording");
+
+    // Slow motion — iPhone slow-mo shoots 120/240fps.
+    const isSlowMotion = fps !== null && fps >= 90;
+
+    if (cameraFront || cameraBack || isScreenRecording || isSlowMotion) {
+      console.log("[ffprobe] detection flags", {
+        filePath,
+        cameraFront,
+        cameraBack,
+        isScreenRecording,
+        isSlowMotion,
+      });
+    }
+
     return {
       ...base,
       width,
@@ -269,12 +325,17 @@ export async function probeFile(
       model,
       isApple,
       hasCameraInfo,
+      cameraFront,
+      cameraBack,
+      isScreenRecording,
+      isSlowMotion,
       isEdited,
       hasGPS: gps !== null,
       gps,
       creationTime,
       rotate,
       rotateAbnormal,
+      thumbnailUrl: null,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -6,7 +6,7 @@ import { PlayIcon } from "lucide-react";
 import { ToolPage } from "../../components/tool-page";
 import { DropZone } from "../../components/drop-zone";
 import { ResultsTable, type SortKey, type SortDir } from "../../components/results-table";
-import { CountPills, type CountPill } from "../../components/count-pills";
+import { ScanSummary, type ScanSummaryPill } from "../../components/scan-summary";
 import { DryRunToggle } from "../../components/dry-run-toggle";
 import { ProgressBar } from "../../components/progress-bar";
 import { CancelButton } from "../../components/cancel-button";
@@ -24,6 +24,7 @@ export function GpsSorter() {
   const jobId = useId();
 
   const [dryRun, setDryRun] = useState(true);
+  const [activeFilterIds, setActiveFilterIds] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [progress, setProgress] = useState<JobProgress | null>(null);
@@ -70,6 +71,7 @@ export function GpsSorter() {
       setIsScanning(false);
       setProgress(null);
       updateSession({ scannedFiles: result.files, selectedPaths: new Set() });
+      setActiveFilterIds(new Set());
       console.log("[gps-sorter:scan:done]", { count: result.files.length });
     },
     onError: (err) => {
@@ -94,7 +96,7 @@ export function GpsSorter() {
         .filter((f) => f.error === null)
         .map((f) => ({
           from: f.path,
-          toDir: `${f.dir}/${f.hasGPS ? "GPS" : "No-GPS"}`,
+          toDir: `${f.dir}/${f.hasGPS ? "GPS" : "No GPS"}`,
         }));
       console.log("[gps-sorter:files:move]", { count: moves.length, dryRun });
       const result = await invokeIpc<{ results: FileOpResult[] }>("files:move", {
@@ -114,7 +116,7 @@ export function GpsSorter() {
         const gpsCount = session.scannedFiles.filter((f) => f.hasGPS && f.error === null).length;
         const noGpsCount = session.scannedFiles.filter((f) => !f.hasGPS && f.error === null).length;
         toast.success("Sort complete", {
-          description: `${gpsCount} → GPS, ${noGpsCount} → No-GPS.`,
+          description: `${gpsCount} → GPS, ${noGpsCount} → No GPS.`,
         });
       }
       console.log("[gps-sorter:sort:done]", { count: results.length, errors: errors.length });
@@ -128,31 +130,36 @@ export function GpsSorter() {
   const hasFiles = session.scannedFiles.length > 0;
   const hasPaths = session.droppedPaths.length > 0;
 
-  const gpsCount = session.scannedFiles.filter((f) => f.hasGPS).length;
-  const noGpsCount = session.scannedFiles.filter((f) => !f.hasGPS).length;
+  const files = session.scannedFiles;
+  const gpsCount = files.filter((f) => f.hasGPS).length;
+  const noGpsCount = files.filter((f) => !f.hasGPS).length;
 
-  const countPills: CountPill[] = [
-    { label: "Total", count: session.scannedFiles.length, color: "primary" },
-    { label: "GPS", count: gpsCount, color: "green" },
-    { label: "No GPS", count: noGpsCount, color: "secondary" },
+  const scanSummaryPills: ScanSummaryPill[] = [
+    { id: "total", label: "Total Videos", count: files.length },
+    { id: "GPS", label: "GPS", count: gpsCount },
+    { id: "NoGPS", label: "No GPS", count: noGpsCount },
   ];
 
+  const activeDefs = [
+    activeFilterIds.has("GPS") ? (f: VideoInfo) => f.hasGPS : null,
+    activeFilterIds.has("NoGPS") ? (f: VideoInfo) => !f.hasGPS : null,
+  ].filter((p): p is (f: VideoInfo) => boolean => p !== null);
+
+  const filteredFiles = activeDefs.length > 0 ? files.filter((f) => activeDefs.every((p) => p(f))) : files;
+
   const displayFiles = opResults.length > 0
-    ? session.scannedFiles.filter((f) => opResults.some((r) => r.from === f.path))
-    : session.scannedFiles;
+    ? filteredFiles.filter((f) => opResults.some((r) => r.from === f.path))
+    : filteredFiles;
 
   return (
-    <ToolPage title="GPS Sorter" category="organize">
-      <Text variant="regular" color="secondary">
-        Sort videos into GPS and No-GPS subfolders based on embedded location metadata.
-      </Text>
-
-      <DropZone
-        onPaths={handlePaths}
-        accept="both"
-        disabled={isScanning}
-        hint="Drag videos or a folder here"
-      />
+    <ToolPage title="GPS Sorter">
+      {/* Centered title + subtitle */}
+      <div className="flex flex-col items-center text-center gap-1.5 pt-1 pb-1">
+        <h1 className="libra-page-title">GPS Sorter</h1>
+        <Text variant="regular" color="secondary">
+          Sort by Location Metadata
+        </Text>
+      </div>
 
       {hasPaths && !isScanning && !scanMutation.isPending && (
         <div className="flex items-center gap-3">
@@ -182,11 +189,11 @@ export function GpsSorter() {
         <>
           <div className="flex flex-col gap-2">
             <SectionLabel>Scan Summary</SectionLabel>
-            <CountPills pills={countPills} />
+            <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
           </div>
 
           <div className="flex flex-col gap-2">
-            <SectionLabel>Files ({session.scannedFiles.length})</SectionLabel>
+            <SectionLabel>Files ({filteredFiles.length})</SectionLabel>
             <ResultsTable
               files={displayFiles}
               selectedPaths={session.selectedPaths}
@@ -213,6 +220,14 @@ export function GpsSorter() {
           </div>
         </>
       )}
+
+      {/* Drop zone — always at the very bottom of the page */}
+      <DropZone
+        onPaths={handlePaths}
+        accept="both"
+        disabled={isScanning}
+        hint="Drag videos or a folder here"
+      />
     </ToolPage>
   );
 }

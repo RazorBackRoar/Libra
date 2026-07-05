@@ -73,6 +73,23 @@
   text-transform: uppercase;
 }
 
+/* Smaller gold gradient title for tool/mode detail pages (home hero stays .libra-title) */
+.libra-page-title {
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #fdf6da 0%, #ecd287 42%, #c9a227 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Thin gold divider between the home page's mode grid and utility cards */
+.libra-gold-divider {
+  border-color: rgba(201, 162, 39, 0.35);
+}
+
 /* ── Premium section boxes & cards ───────────────────────────────────────── */
 
 /* Main section container ("Media Organizer" / "Misc Organizer") */

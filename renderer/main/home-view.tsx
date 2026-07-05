@@ -2,9 +2,8 @@ import React, { useCallback, useRef, useState, type ComponentType } from "react"
 import { useNavigate } from "@tanstack/react-router";
 import { ScrollArea, Text } from "@glaze/core/components";
 import { cn } from "@glaze/core/utils";
-import { SlidersHorizontalIcon, ChevronDownIcon } from "lucide-react";
 import { useToolStateContext } from "./tool-state";
-import { MEDIA_MODES, MISC_TOOLS } from "./tools/registry";
+import { MEDIA_MODES, UTILITY_TOOLS } from "./tools/registry";
 import type { SortMode } from "./types";
 
 type IconType = ComponentType<{ className?: string }>;
@@ -98,66 +97,6 @@ function DropCard({ icon: Icon, title, description, onActivate, accent = false }
   );
 }
 
-// ── Section box (optionally collapsible) ────────────────────────────────────────
-
-function SectionBox({
-  icon: Icon,
-  title,
-  subtitle,
-  collapsible = false,
-  defaultOpen = true,
-  children,
-}: {
-  icon: IconType;
-  title: string;
-  subtitle: string;
-  collapsible?: boolean;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  const expanded = collapsible ? open : true;
-
-  const header = (
-    <div className="flex items-center gap-3">
-      <div className="libra-gold-chip size-10 rounded-control flex items-center justify-center shrink-0">
-        <Icon className="size-5" />
-      </div>
-      <div className="flex flex-col min-w-0 flex-1">
-        <Text variant="large-strong" color="primary">
-          {title}
-        </Text>
-        <Text variant="small" color="secondary" truncate>
-          {subtitle}
-        </Text>
-      </div>
-      {collapsible && (
-        <ChevronDownIcon
-          className={cn("size-5 shrink-0 text-accent transition-transform", expanded ? "rotate-180" : "rotate-0")}
-        />
-      )}
-    </div>
-  );
-
-  return (
-    <section className="libra-box rounded-panel p-5 flex flex-col gap-4 self-start">
-      {collapsible ? (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={expanded}
-          className="text-left cursor-pointer rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          {header}
-        </button>
-      ) : (
-        header
-      )}
-      {expanded && <div className="flex flex-col gap-2.5">{children}</div>}
-    </section>
-  );
-}
-
 // ── Home view ─────────────────────────────────────────────────────────────────
 
 export function HomeView() {
@@ -220,7 +159,7 @@ export function HomeView() {
             </Text>
           </div>
 
-          {/* Five mode cards — the primary mode selection */}
+          {/* Six mode cards — the primary mode selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {MEDIA_MODES.map((m) => (
               <DropCard
@@ -233,15 +172,12 @@ export function HomeView() {
             ))}
           </div>
 
-          {/* Secondary utilities */}
-          <SectionBox
-            icon={SlidersHorizontalIcon}
-            title="Miscellaneous Organizer"
-            subtitle="Extra utilities for timing, speed, and location."
-            collapsible
-            defaultOpen={false}
-          >
-            {MISC_TOOLS.map((t) => (
+          {/* Thin gold divider between mode grid and utility cards */}
+          <div className="border-t libra-gold-divider" />
+
+          {/* Utility cards — no wrapping box or heading */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {UTILITY_TOOLS.map((t) => (
               <DropCard
                 key={t.id}
                 icon={t.icon}
@@ -250,7 +186,7 @@ export function HomeView() {
                 onActivate={(paths) => openTool(t.id, paths)}
               />
             ))}
-          </SectionBox>
+          </div>
         </div>
       </ScrollArea>
     </div>
