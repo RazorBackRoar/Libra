@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ScrollArea, Toolbar, ToolbarContent, ToolbarTitle, ToolbarActions, ToolbarBackButton } from "@glaze/core/components";
+import { ScrollArea, Toolbar, ToolbarContent, ToolbarActions, ToolbarBackButton } from "@glaze/core/components";
 import { cn } from "@glaze/core/utils";
 import { SectionLabel } from "./section-label";
 
@@ -27,9 +27,8 @@ export function ToolPage({ title, category, actions, children, className }: Tool
       toolbar={
         <Toolbar>
           <ToolbarBackButton label="Home" onClick={handleBack} />
-          <ToolbarContent>
-            <ToolbarTitle>{title}</ToolbarTitle>
-          </ToolbarContent>
+          {/* No toolbar title — each tool page shows its own centered gold title */}
+          <ToolbarContent />
           {(actions || category) && (
             <ToolbarActions>
               {category && <SectionLabel>{category}</SectionLabel>}

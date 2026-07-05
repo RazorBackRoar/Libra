@@ -122,7 +122,7 @@ export function DropZone({ onPaths, accept = "both", disabled = false, hint, cla
           : hasContent
             ? "border-solid libra-faint-border"
             : "border-dashed libra-faint-border",
-        hasContent ? "p-4" : "flex flex-col items-center justify-center gap-4 p-10",
+        hasContent ? "p-4" : "flex flex-col items-center justify-center gap-3 p-6",
         disabled && "opacity-50 pointer-events-none",
         className,
       )}
@@ -149,7 +149,7 @@ export function DropZone({ onPaths, accept = "both", disabled = false, hint, cla
         </div>
       ) : (
         <>
-          <UploadCloudIcon className="size-10 text-tertiary" />
+          <UploadCloudIcon className="size-7 text-tertiary" />
           <Text variant="regular" color="secondary">
             {hint ?? "Drag videos or folders here"}
           </Text>

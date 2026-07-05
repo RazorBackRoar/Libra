@@ -270,7 +270,6 @@ export function MediaOrganizer() {
   const hasFiles = session.scannedFiles.length > 0;
   const hasPaths = session.droppedPaths.length > 0;
   const hasSelection = session.selectedPaths.size > 0;
-  const scannedEmpty = scanMutation.isSuccess && !isScanning && hasPaths && !hasFiles;
 
   const listActions = (
     <>
@@ -322,92 +321,79 @@ export function MediaOrganizer() {
         </div>
       )}
 
-      {/* Empty-result state */}
-      {scannedEmpty && (
-        <div className="rounded-card border libra-faint-border libra-panel px-4 py-6 text-center">
-          <Text variant="regular" color="secondary">
-            No recognized videos found in the dropped folder.
-          </Text>
+      {/* Scan Summary — always visible; counts read 0 before a scan */}
+      <div className="flex flex-col gap-2 rounded-card libra-panel p-3">
+        <SectionLabel>Scan Summary</SectionLabel>
+        <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
+      </div>
+
+      {/* Results table — always visible; shows an empty state until a scan runs */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <SectionLabel>Results ({filteredFiles.length})</SectionLabel>
+          <div className="flex gap-2">{listActions}</div>
         </div>
-      )}
+        <ResultsTable
+          files={filteredFiles}
+          selectedPaths={session.selectedPaths}
+          onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+          emptyTitle="No videos scanned"
+          emptyDescription="Drop a folder or select files below to get started."
+        />
+      </div>
 
-      {hasFiles && (
-        <>
-          {/* Scan Summary */}
-          <div className="flex flex-col gap-2 rounded-card libra-panel p-3">
-            <SectionLabel>Scan Summary</SectionLabel>
-            <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
+      {/* Name Videos prefix (left) + Process button (right) — always visible */}
+      <div className="flex items-end gap-4 pt-2 border-t libra-faint-border">
+        <div className="flex flex-col gap-2 flex-1 min-w-0">
+          <SectionLabel>Name Videos</SectionLabel>
+          <Input
+            placeholder={isKeepName ? "Name Keeper never renames files" : "Optional prefix, example: Trip_2024_"}
+            value={prefix}
+            onChange={(e) => setPrefix(e.target.value)}
+            disabled={isKeepName}
+          />
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
+          <Button
+            variant="accent"
+            size="large"
+            onClick={() => processMutation.mutate()}
+            disabled={!hasFiles || processMutation.isPending}
+          >
+            <PlayIcon className="size-4" />
+            {processMutation.isPending ? "Processing…" : "Process"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Final report */}
+      {report && (
+        <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
+          <Text variant="small-strong" color="primary">
+            {report.stopped
+              ? `Stopped early — ${report.stopped.reason}`
+              : report.dryRun
+                ? "Dry run — no files were changed."
+                : report.noVideos
+                  ? "No videos to organize; non-video files moved to MISC where present."
+                  : "Processing complete."}
+          </Text>
+          <Text variant="small" color="tertiary" truncate>
+            {report.droppedRoot}
+          </Text>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
+            <ReportStat label="organized" value={report.counts.organized} />
+            <ReportStat label="duplicates" value={report.counts.duplicates} />
+            <ReportStat label="to MISC" value={report.counts.misc} />
+            <ReportStat label="unreadable" value={report.counts.unreadable} />
+            <ReportStat label="skipped" value={report.counts.skipped} />
+            <ReportStat label="errors" value={report.counts.errors} />
           </div>
-
-          {/* Results table */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <SectionLabel>Files ({filteredFiles.length})</SectionLabel>
-              <div className="flex gap-2">{listActions}</div>
-            </div>
-            <ResultsTable
-              files={filteredFiles}
-              selectedPaths={session.selectedPaths}
-              onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
-              sortKey={sortKey}
-              sortDir={sortDir}
-              onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
-              emptyTitle="No videos scanned"
-              emptyDescription="Drop a folder or select files to get started."
-            />
-          </div>
-
-          {/* Name Videos prefix (left) + Process button (right), just above the drop zone */}
-          <div className="flex items-end gap-4 pt-2 border-t libra-faint-border">
-            <div className="flex flex-col gap-2 flex-1 min-w-0">
-              <SectionLabel>Name Videos</SectionLabel>
-              <Input
-                placeholder={isKeepName ? "Name Keeper never renames files" : "Optional prefix (e.g. Trip_2024_)"}
-                value={prefix}
-                onChange={(e) => setPrefix(e.target.value)}
-                disabled={isKeepName}
-              />
-            </div>
-            <div className="flex items-center gap-4 shrink-0">
-              <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
-              <Button
-                variant="accent"
-                size="large"
-                onClick={() => processMutation.mutate()}
-                disabled={!hasFiles || processMutation.isPending}
-              >
-                <PlayIcon className="size-4" />
-                {processMutation.isPending ? "Processing…" : "Process"}
-              </Button>
-            </div>
-          </div>
-
-          {/* Final report */}
-          {report && (
-            <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
-              <Text variant="small-strong" color="primary">
-                {report.stopped
-                  ? `Stopped early — ${report.stopped.reason}`
-                  : report.dryRun
-                    ? "Dry run — no files were changed."
-                    : report.noVideos
-                      ? "No videos to organize; non-video files moved to MISC where present."
-                      : "Processing complete."}
-              </Text>
-              <Text variant="small" color="tertiary" truncate>
-                {report.droppedRoot}
-              </Text>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
-                <ReportStat label="organized" value={report.counts.organized} />
-                <ReportStat label="duplicates" value={report.counts.duplicates} />
-                <ReportStat label="to MISC" value={report.counts.misc} />
-                <ReportStat label="unreadable" value={report.counts.unreadable} />
-                <ReportStat label="skipped" value={report.counts.skipped} />
-                <ReportStat label="errors" value={report.counts.errors} />
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
       {/* Drop zone — always at the very bottom of the page */}
