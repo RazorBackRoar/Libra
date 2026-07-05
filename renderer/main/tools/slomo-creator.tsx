@@ -169,7 +169,7 @@ export function SlomoCreator() {
   const hasFiles = fileList.length > 0;
 
   return (
-    <ToolPage title="Slo-Mo Creator" category="convert">
+    <ToolPage title="Slo-Mo" category="convert">
       <Text variant="regular" color="secondary">
         Create slow-motion dated copies using ffmpeg. Drag files below to reorder them before processing.
       </Text>

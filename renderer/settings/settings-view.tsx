@@ -33,6 +33,7 @@ export function SettingsView() {
   const [ffprobePath, setFfprobePath] = useState("");
   const [extensionsRaw, setExtensionsRaw] = useState("");
   const [dryRunDefault, setDryRunDefault] = useState(false);
+  const [outputFolder, setOutputFolder] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   // Close settings window on Escape
@@ -65,11 +66,21 @@ export function SettingsView() {
         setFfprobePath(s.ffprobePath ?? "");
         setExtensionsRaw((s.videoExtensions ?? DEFAULT_EXTENSIONS).join(", "));
         setDryRunDefault(s.dryRunDefault ?? false);
+        setOutputFolder(s.outputFolder ?? "");
       } catch (err) {
         toast.error("Failed to load settings", { description: String(err) });
       }
     })();
   }, []);
+
+  const handleChooseFolder = async () => {
+    const res = await window.glazeAPI.dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"],
+      title: "Choose output folder",
+    });
+    if (res.canceled || res.filePaths.length === 0) return;
+    setOutputFolder(res.filePaths[0]);
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -84,6 +95,7 @@ export function SettingsView() {
         ffprobePath: ffprobePath.trim() || null,
         videoExtensions: extensions,
         dryRunDefault,
+        outputFolder: outputFolder.trim(),
       });
       setLocalSettings(updated);
       toast.success("Settings saved");
@@ -140,6 +152,33 @@ export function SettingsView() {
                 onChange={(e) => setExtensionsRaw(e.target.value)}
                 disabled={settings === null}
               />
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+
+        {/* Output folder */}
+        <FieldSet title="Output Folder">
+          <FieldGroup>
+            <Field
+              label="Sorted files go to"
+              description="Media Organizer moves sorted videos here. Defaults to Desktop / L!bra Organized."
+            >
+              <Input
+                placeholder="~/Desktop/L!bra Organized"
+                value={outputFolder}
+                onChange={(e) => setOutputFolder(e.target.value)}
+                disabled={settings === null}
+              />
+            </Field>
+            <Field>
+              <Button
+                variant="filled"
+                size="small"
+                onClick={() => void handleChooseFolder()}
+                disabled={settings === null}
+              >
+                Choose Folder…
+              </Button>
             </Field>
           </FieldGroup>
         </FieldSet>

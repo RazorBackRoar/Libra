@@ -18,7 +18,6 @@ import { resolveBinaryPath } from "../services/cli-utils.js";
 import { settingsStore } from "../services/settings-store.js";
 import { registerJob, cancelJob, cleanupJob } from "../services/jobs.js";
 import { scan } from "../services/scanner.js";
-import { findDuplicates, findDuplicatesFromPaths } from "../services/hashing.js";
 import { applySort, applyRename, applyDelete, applyMove } from "../services/file-ops.js";
 import { createSloMo, applyTimeAdjust } from "../services/ffmpeg-ops.js";
 import { type VideoInfo, type SortMode } from "../services/types.js";
@@ -36,13 +35,6 @@ interface ScanStartParams {
 
 interface JobCancelParams {
   jobId: string;
-}
-
-interface HashDuplicatesParams {
-  jobId: string;
-  paths?: string[];
-  files?: VideoInfo[];
-  extensions?: string[];
 }
 
 interface SortApplyParams {
@@ -227,47 +219,6 @@ export function registerHandlers(): void {
     console.log("[job:cancel]", { jobId });
     const cancelled = cancelJob(jobId);
     return { cancelled };
-  });
-
-  // ── hash:duplicates ─────────────────────────────────────────────────────────
-
-  ipcMain.handle("hash:duplicates", async (_event, params: unknown) => {
-    const p = params as HashDuplicatesParams;
-    const jobId = assertString(p?.jobId, "jobId");
-    console.log("[hash:duplicates]", { jobId });
-
-    const ffprobePath = await getFfprobePath();
-    const settings = await settingsStore.get();
-    const extensions = Array.isArray(p?.extensions) ? (p.extensions as string[]) : settings.videoExtensions;
-    const { cancelFlag } = registerJob(jobId);
-
-    try {
-      let result;
-      if (Array.isArray(p?.files) && (p.files as unknown[]).length > 0) {
-        // VideoInfo[] provided
-        result = await findDuplicates({
-          jobId,
-          files: p.files as VideoInfo[],
-          ffprobePath,
-          cancelFlag,
-        });
-      } else if (Array.isArray(p?.paths) && (p.paths as unknown[]).length > 0) {
-        // raw paths provided
-        result = await findDuplicatesFromPaths({
-          jobId,
-          paths: p.paths as string[],
-          extensions,
-          ffprobePath,
-          cancelFlag,
-        });
-      } else {
-        throw new Error("hash:duplicates requires either files or paths");
-      }
-      console.log("[hash:duplicates] done", { jobId, groups: result.groups.length, cancelled: result.cancelled });
-      return result;
-    } finally {
-      cleanupJob(jobId);
-    }
   });
 
   // ── sort:apply ──────────────────────────────────────────────────────────────

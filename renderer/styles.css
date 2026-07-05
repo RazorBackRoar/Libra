@@ -48,3 +48,77 @@
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
+
+/* ── Premium hero / branding ─────────────────────────────────────────────── */
+
+/* Large gold→white gradient app title */
+.libra-title {
+  font-size: 3rem;
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #fdf6da 0%, #ecd287 42%, #c9a227 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Gold uppercase subtitle under the title */
+.libra-subtitle {
+  color: #d9b94a;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ── Premium section boxes & cards ───────────────────────────────────────── */
+
+/* Main section container ("Media Organizer" / "Misc Organizer") */
+.libra-box {
+  background:
+    radial-gradient(130% 90% at 50% 0%, rgba(201, 162, 39, 0.08) 0%, rgba(201, 162, 39, 0) 58%),
+    linear-gradient(180deg, #1b1b1b 0%, #101010 100%);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Gold icon chip */
+.libra-gold-chip {
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.28), rgba(201, 162, 39, 0.08));
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  color: #f0d98a;
+}
+
+/* Tool / mode card inside a box */
+.libra-mode-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 100%),
+    #161616;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.libra-mode-card:hover {
+  border-color: rgba(201, 162, 39, 0.6);
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.28), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.libra-mode-card:focus-visible {
+  outline: none;
+  border-color: rgba(201, 162, 39, 0.7);
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.5);
+}
+
+/* Accented mode card — primary organizer buttons get a warmer gold tint */
+.libra-mode-card-accent {
+  background:
+    linear-gradient(180deg, rgba(201, 162, 39, 0.1) 0%, rgba(201, 162, 39, 0.02) 100%),
+    #171512;
+  border-color: rgba(201, 162, 39, 0.32);
+}
+.libra-mode-card-accent:hover {
+  border-color: rgba(201, 162, 39, 0.75);
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.4), 0 6px 20px rgba(0, 0, 0, 0.5);
+}

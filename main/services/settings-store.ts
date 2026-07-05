@@ -20,6 +20,10 @@ class SettingsStore {
     return this.filePath;
   }
 
+  private defaultOutputFolder(): string {
+    return path.join(app.getPath("desktop"), "L!bra Organized");
+  }
+
   async load(): Promise<Settings> {
     if (this.cache !== null) return this.cache;
     try {
@@ -28,6 +32,10 @@ class SettingsStore {
       this.cache = { ...DEFAULT_SETTINGS, ...(JSON.parse(data) as Partial<Settings>) };
     } catch {
       this.cache = { ...DEFAULT_SETTINGS };
+    }
+    // Resolve a concrete default output folder when unset.
+    if (!this.cache.outputFolder) {
+      this.cache.outputFolder = this.defaultOutputFolder();
     }
     return this.cache;
   }

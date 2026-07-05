@@ -10,11 +10,18 @@ interface DropZoneProps {
   disabled?: boolean;
   hint?: string;
   className?: string;
+  /**
+   * When provided, the panel switches to its populated state: a compact header
+   * (drop hint + import buttons) sits above the children (e.g. the scanned
+   * video list). The whole panel stays a live drop target.
+   */
+  children?: React.ReactNode;
 }
 
-export function DropZone({ onPaths, accept = "both", disabled = false, hint, className }: DropZoneProps) {
+export function DropZone({ onPaths, accept = "both", disabled = false, hint, className, children }: DropZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
+  const hasContent = React.Children.count(children) > 0;
 
   const resolvePaths = useCallback((files: FileList): string[] => {
     const paths: string[] = [];
@@ -86,6 +93,22 @@ export function DropZone({ onPaths, accept = "both", disabled = false, hint, cla
     }
   };
 
+  const importButtons = (size: "small" | "medium") => (
+    <div className="flex gap-2">
+      {(accept === "folders" || accept === "both") && (
+        <Button variant="accent" size={size} onClick={() => void handleOpenFolder()}>
+          <FolderOpenIcon className="size-4" />
+          Open Folder…
+        </Button>
+      )}
+      {(accept === "files" || accept === "both") && (
+        <Button variant="filled" size={size} onClick={() => void handleSelectFiles()}>
+          Select Files
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div
       onDragEnter={handleDragEnter}
@@ -93,40 +116,44 @@ export function DropZone({ onPaths, accept = "both", disabled = false, hint, cla
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className={cn(
-        "flex flex-col items-center justify-center gap-4 rounded-card border-2 border-dashed p-10 transition-all duration-150",
+        "rounded-card border-2 transition-all duration-150",
         isDragOver
-          ? "libra-gold-border libra-gold-glow libra-drop-bg"
-          : "border-separator",
+          ? "libra-gold-border libra-gold-glow libra-drop-bg border-solid"
+          : hasContent
+            ? "border-solid border-separator"
+            : "border-dashed border-separator",
+        hasContent ? "p-4" : "flex flex-col items-center justify-center gap-4 p-10",
         disabled && "opacity-50 pointer-events-none",
         className,
       )}
     >
       {isDragOver ? (
-        <>
+        <div className="flex flex-col items-center justify-center gap-4 py-8">
           <UploadCloudIcon className="size-10 text-accent" />
           <Text variant="large-strong" color="accent">
             Drop files here
           </Text>
-        </>
+        </div>
+      ) : hasContent ? (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <UploadCloudIcon className="size-4 shrink-0 text-tertiary" />
+              <Text variant="small" color="tertiary" truncate>
+                {hint ?? "Drag videos or a folder here to add more"}
+              </Text>
+            </div>
+            {importButtons("small")}
+          </div>
+          {children}
+        </div>
       ) : (
         <>
           <UploadCloudIcon className="size-10 text-tertiary" />
           <Text variant="regular" color="secondary">
             {hint ?? "Drag videos or folders here"}
           </Text>
-          <div className="flex gap-3">
-            {(accept === "folders" || accept === "both") && (
-              <Button variant="accent" size="medium" onClick={() => void handleOpenFolder()}>
-                <FolderOpenIcon className="size-4" />
-                Open Folder…
-              </Button>
-            )}
-            {(accept === "files" || accept === "both") && (
-              <Button variant="filled" size="medium" onClick={() => void handleSelectFiles()}>
-                Select Files
-              </Button>
-            )}
-          </div>
+          {importButtons("medium")}
         </>
       )}
     </div>

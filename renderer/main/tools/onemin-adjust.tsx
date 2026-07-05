@@ -169,7 +169,7 @@ export function OneminAdjust() {
     : session.scannedFiles;
 
   return (
-    <ToolPage title="1MinVid Adjust" category="convert">
+    <ToolPage title="Time Sequencer" category="convert">
       <Text variant="regular" color="secondary">
         Assign sequential timestamps 60 seconds apart, starting from a custom or current time. Choose to create dated copies or update files in place.
       </Text>

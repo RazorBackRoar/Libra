@@ -14,11 +14,11 @@ interface SortSelectProps {
 }
 
 const SORT_MODES: { value: SortMode; label: string; sublabel: string }[] = [
-  { value: "ProVid", label: "ProVid", sublabel: "Rename in place with prefix" },
-  { value: "VidRes", label: "VidRes", sublabel: "Sort into resolution folders" },
-  { value: "ProMax", label: "ProMax", sublabel: "Resolution + orientation subfolders" },
-  { value: "MaxVid", label: "MaxVid", sublabel: "Resolution + orientation + FPS subfolders" },
-  { value: "KeepName", label: "KeepName", sublabel: "Sort into folders, keep filename" },
+  { value: "ProVid", label: "Pro Vid", sublabel: "Rename in place with prefix" },
+  { value: "VidRes", label: "Vid Res", sublabel: "Sort into resolution folders (4K, 1080p, 720p, HD, SD)" },
+  { value: "ProMax", label: "Pro Max", sublabel: "Resolution + orientation subfolders" },
+  { value: "MaxVid", label: "Max Vid", sublabel: "Resolution + orientation + FPS subfolders" },
+  { value: "KeepName", label: "Name Keeper", sublabel: "Sort into folders, keep original filename" },
 ];
 
 export function SortSelect({ value, onValueChange, className }: SortSelectProps) {

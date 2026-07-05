@@ -6,19 +6,13 @@ import {
   LayersIcon,
   MaximizeIcon,
   BookmarkIcon,
-  ScanIcon,
   ClockIcon,
   FastForwardIcon,
-  CopyIcon,
   MapPinIcon,
-  CodeIcon,
 } from "lucide-react";
+import type { SortMode } from "../types";
 
-export type ToolCategory =
-  | "organize"
-  | "rename"
-  | "analyze"
-  | "convert";
+export type ToolCategory = "organize" | "rename" | "analyze" | "convert";
 
 export interface ToolDefinition {
   id: string;
@@ -28,92 +22,58 @@ export interface ToolDefinition {
   category: ToolCategory;
 }
 
-export const TOOL_REGISTRY: ToolDefinition[] = [
-  {
-    id: "main-organizer",
-    title: "Main Organizer",
-    description: "Filter, organize, review duplicates, and inspect rich video metadata.",
-    icon: FolderSyncIcon,
-    category: "organize",
-  },
-  {
-    id: "provid-renamer",
-    title: "ProVid Renamer",
-    description: "Rename videos in place with a custom prefix, keeping folder structure.",
-    icon: TagIcon,
-    category: "rename",
-  },
-  {
-    id: "vidres",
-    title: "VidRes",
-    description: "Sort videos into resolution folders (4K, 1080p, 720p, SD).",
-    icon: MonitorIcon,
-    category: "organize",
-  },
-  {
-    id: "promax",
-    title: "ProMax",
-    description: "Sort into resolution + orientation subfolders.",
-    icon: LayersIcon,
-    category: "organize",
-  },
-  {
-    id: "maxvid",
-    title: "MaxVid",
-    description: "Sort into resolution + orientation + FPS subfolders.",
-    icon: MaximizeIcon,
-    category: "organize",
-  },
-  {
-    id: "keepname",
-    title: "KeepName",
-    description: "Sort into resolution folders without altering filenames.",
-    icon: BookmarkIcon,
-    category: "organize",
-  },
-  {
-    id: "reencode-detector",
-    title: "Re-encode Detector",
-    description: "Flag videos not in preferred codec or container as re-encode candidates.",
-    icon: ScanIcon,
-    category: "analyze",
-  },
-  {
-    id: "onemin-adjust",
-    title: "1MinVid Adjust",
-    description: "Assign sequential timestamps 60 seconds apart from a custom start time.",
-    icon: ClockIcon,
-    category: "convert",
-  },
+/** The five Media Organizer sort modes, shown as cards inside the Media box. */
+export interface MediaMode {
+  mode: SortMode;
+  title: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+}
+
+export const MEDIA_MODES: MediaMode[] = [
+  { mode: "ProVid", title: "Pro Vid", description: "Rename in place with a custom prefix.", icon: TagIcon },
+  { mode: "VidRes", title: "Vid Res", description: "Sort into resolution folders (4K, 1080p, 720p, HD, SD).", icon: MonitorIcon },
+  { mode: "ProMax", title: "Pro Max", description: "Sort into resolution + orientation subfolders.", icon: LayersIcon },
+  { mode: "MaxVid", title: "Max Vid", description: "Sort into resolution + orientation + FPS subfolders.", icon: MaximizeIcon },
+  { mode: "KeepName", title: "Name Keeper", description: "Sort into resolution folders, keep original filenames.", icon: BookmarkIcon },
+];
+
+/** The Media Organizer workflow tool (single page; modes above select its behavior). */
+export const MEDIA_ORGANIZER: ToolDefinition = {
+  id: "media-organizer",
+  title: "Video Organizer",
+  description: "Scan, filter, and organize videos by resolution.",
+  icon: FolderSyncIcon,
+  category: "organize",
+};
+
+/** Remaining smaller tools shown inside the Misc Organizer box. */
+export const MISC_TOOLS: ToolDefinition[] = [
   {
     id: "slomo-creator",
-    title: "Slo-Mo Creator",
-    description: "Create slow-motion copies using ffmpeg setpts at 0.5x or 0.25x speed.",
+    title: "Slo-Mo",
+    description: "Create slow-motion copies at 0.5x or 0.25x speed.",
     icon: FastForwardIcon,
     category: "convert",
   },
   {
-    id: "duplicate-finder",
-    title: "Duplicate Finder",
-    description: "Detect exact duplicate videos by MD5 hash and manage them.",
-    icon: CopyIcon,
-    category: "analyze",
+    id: "onemin-adjust",
+    title: "Time Sequencer",
+    description: "Re-stamp videos with sequential timestamps one minute apart.",
+    icon: ClockIcon,
+    category: "convert",
   },
   {
     id: "gps-sorter",
     title: "GPS Sorter",
-    description: "Sort videos into GPS / No-GPS folders from embedded location metadata.",
+    description: "Sort videos into GPS / No-GPS folders from location metadata.",
     icon: MapPinIcon,
     category: "organize",
   },
-  {
-    id: "codec-checker",
-    title: "Codec Checker",
-    description: "Read-only ffprobe report: codec, container, resolution, fps, duration, size.",
-    icon: CodeIcon,
-    category: "analyze",
-  },
 ];
+
+/** All routable tools (for the /tool/$toolId dispatcher and title lookups). */
+export const TOOL_REGISTRY: ToolDefinition[] = [MEDIA_ORGANIZER, ...MISC_TOOLS];
 
 export function getToolById(id: string): ToolDefinition | undefined {
   return TOOL_REGISTRY.find((t) => t.id === id);

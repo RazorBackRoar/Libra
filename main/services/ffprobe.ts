@@ -122,7 +122,6 @@ export async function probeFile(
     hasGPS: false,
     gps: null,
     creationTime: null,
-    md5: null,
     error: null,
   };
 

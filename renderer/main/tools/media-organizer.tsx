@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button, Input, Text, toast } from "@glaze/core/components";
-import { PlayIcon, DownloadIcon, Trash2Icon } from "lucide-react";
+import { PlayIcon, DownloadIcon, Trash2Icon, FolderOpenIcon } from "lucide-react";
 import { cn } from "@glaze/core/utils";
 
 import { ToolPage } from "../../components/tool-page";
 import { DropZone } from "../../components/drop-zone";
-import { ResultsTable, type SortKey, type SortDir } from "../../components/results-table";
+import { VideoList } from "../../components/video-list";
 import { CountPills, type CountPill } from "../../components/count-pills";
 import { FilterPills, type FilterPillDef } from "../../components/filter-pills";
 import { SortSelect } from "../../components/sort-select";
@@ -19,9 +19,9 @@ import type {
   VideoInfo,
   SortMode,
   JobProgress,
-  DuplicateGroup,
   FileOpResult,
   DeleteSummary,
+  Settings,
 } from "../types";
 
 // ── Filter definitions ────────────────────────────────────────────────────────
@@ -30,10 +30,10 @@ const FILTER_DEFS: FilterPillDef[] = [
   { id: "4K", label: "4K" },
   { id: "1080p", label: "1080p" },
   { id: "720p", label: "720p" },
+  { id: "HD", label: "HD" },
   { id: "SD", label: "SD" },
   { id: "GPS", label: "GPS" },
   { id: "iPhone", label: "iPhone" },
-  { id: "Duplicates", label: "Duplicates" },
 ];
 
 // ── IPC helpers ───────────────────────────────────────────────────────────────
@@ -42,25 +42,37 @@ async function invokeIpc<T>(channel: string, params: unknown): Promise<T> {
   return window.glazeAPI.glaze.ipc.invoke(channel, params) as Promise<T>;
 }
 
-// ── Main Organizer component ──────────────────────────────────────────────────
+// ── Video Organizer component ─────────────────────────────────────────────────
 
-export function MainOrganizer() {
-  const toolId = "main-organizer";
+export function MediaOrganizer() {
+  const toolId = "media-organizer";
   const { session, updateSession } = useToolState(toolId);
   const jobId = useId();
 
   // ── Local state ──────────────────────────────────────────────────────────
-  const [sortMode, setSortMode] = useState<SortMode>("VidRes");
+  const presetMode = session.options.mode as SortMode | undefined;
+  const [sortMode, setSortMode] = useState<SortMode>(presetMode ?? "ProVid");
   const [prefix, setPrefix] = useState("");
   const [dryRun, setDryRun] = useState(true);
   const [activeFilters, setActiveFilters] = useState<Record<string, boolean>>({});
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
+  const [outputFolder, setOutputFolder] = useState<string>("");
+  const [lastRun, setLastRun] = useState<{ moved: number; failed: number; dryRun: boolean; destination: string } | null>(null);
 
   const cancelledRef = useRef(false);
+
+  // ── Load persisted output folder ─────────────────────────────────────────
+  useEffect(() => {
+    invokeIpc<Settings>("settings:get", {})
+      .then((s) => setOutputFolder(s.outputFolder))
+      .catch((err) => console.log("[MediaOrganizer:settings:error]", { err }));
+  }, []);
+
+  // ── Apply a preset sort mode selected on the home screen ─────────────────
+  useEffect(() => {
+    if (presetMode) setSortMode(presetMode);
+  }, [presetMode]);
 
   // ── Subscribe to job:progress notifications ──────────────────────────────
   useEffect(() => {
@@ -70,7 +82,7 @@ export function MainOrganizer() {
         const p = payload as JobProgress;
         if (p.jobId === jobId) {
           setProgress(p);
-          console.log("[MainOrganizer:progress]", p);
+          console.log("[MediaOrganizer:progress]", p);
         }
       },
     );
@@ -81,64 +93,38 @@ export function MainOrganizer() {
 
   // ── Derived: filtered file list ──────────────────────────────────────────
   const anyFilterActive = Object.values(activeFilters).some(Boolean);
-  const duplicatePaths = new Set(
-    duplicateGroups.flatMap((g) => g.files.map((f) => f.path)),
-  );
 
   const filteredFiles = anyFilterActive
     ? session.scannedFiles.filter((f) => {
         if (activeFilters["4K"] && f.resolutionClass !== "4K") return false;
         if (activeFilters["1080p"] && f.resolutionClass !== "1080p") return false;
         if (activeFilters["720p"] && f.resolutionClass !== "720p") return false;
+        if (activeFilters["HD"] && f.resolutionClass !== "HD") return false;
         if (activeFilters["SD"] && f.resolutionClass !== "SD") return false;
         if (activeFilters["GPS"] && !f.hasGPS) return false;
         if (activeFilters["iPhone"] && !f.isApple) return false;
-        if (activeFilters["Duplicates"] && !duplicatePaths.has(f.path)) return false;
         return true;
       })
     : session.scannedFiles;
 
-  // ── Count pills ──────────────────────────────────────────────────────────
+  // ── Count pills — useful video metadata only ─────────────────────────────
+  const files = session.scannedFiles;
   const countPills: CountPill[] = [
-    { label: "Files", count: session.scannedFiles.length, color: "primary" },
-    {
-      label: "Duplicates",
-      count: duplicatePaths.size,
-      color: duplicatePaths.size > 0 ? "yellow" : "secondary",
-    },
-    {
-      label: "GPS",
-      count: session.scannedFiles.filter((f) => f.hasGPS).length,
-      color: "blue",
-    },
-    {
-      label: "iPhone",
-      count: session.scannedFiles.filter((f) => f.isApple).length,
-      color: "purple",
-    },
-    {
-      label: "4K",
-      count: session.scannedFiles.filter((f) => f.resolutionClass === "4K").length,
-      color: "green",
-    },
-    {
-      label: "1080p",
-      count: session.scannedFiles.filter((f) => f.resolutionClass === "1080p").length,
-      color: "secondary",
-    },
-    {
-      label: "720p",
-      count: session.scannedFiles.filter((f) => f.resolutionClass === "720p").length,
-      color: "secondary",
-    },
+    { label: "Files", count: files.length },
+    { label: "GPS", count: files.filter((f) => f.hasGPS).length },
+    { label: "iPhone", count: files.filter((f) => f.isApple).length },
+    { label: "4K", count: files.filter((f) => f.resolutionClass === "4K").length },
+    { label: "1080p", count: files.filter((f) => f.resolutionClass === "1080p").length },
+    { label: "720p", count: files.filter((f) => f.resolutionClass === "720p").length },
+    { label: "HD", count: files.filter((f) => f.resolutionClass === "HD").length },
+    { label: "SD", count: files.filter((f) => f.resolutionClass === "SD").length },
   ];
 
   // ── Handle paths from drop / dialog ─────────────────────────────────────
   const handlePaths = useCallback(
     (paths: string[]) => {
-      console.log("[MainOrganizer:paths]", { count: paths.length });
+      console.log("[MediaOrganizer:paths]", { count: paths.length });
       updateSession({ droppedPaths: paths, scannedFiles: [] });
-      setDuplicateGroups([]);
       setProgress(null);
     },
     [updateSession],
@@ -150,38 +136,23 @@ export function MainOrganizer() {
       cancelledRef.current = false;
       setIsScanning(true);
       setProgress(null);
-      console.log("[MainOrganizer:scan:start]", { jobId, paths: session.droppedPaths });
+      console.log("[MediaOrganizer:scan:start]", { jobId, paths: session.droppedPaths });
       const result = await invokeIpc<{ files: VideoInfo[]; cancelled: boolean }>(
         "scan:start",
         { jobId, paths: session.droppedPaths },
       );
       return result;
     },
-    onSuccess: async (result) => {
+    onSuccess: (result) => {
       setIsScanning(false);
       setProgress(null);
       updateSession({ scannedFiles: result.files, selectedPaths: new Set() });
-      console.log("[MainOrganizer:scan:done]", { count: result.files.length, cancelled: result.cancelled });
-
-      if (!result.cancelled) {
-        // Auto-run duplicate detection
-        console.log("[MainOrganizer:hash:start]", { jobId });
-        try {
-          const dupResult = await invokeIpc<{ groups: DuplicateGroup[]; cancelled: boolean }>(
-            "hash:duplicates",
-            { jobId, files: result.files },
-          );
-          setDuplicateGroups(dupResult.groups);
-          console.log("[MainOrganizer:hash:done]", { groupCount: dupResult.groups.length });
-        } catch (err) {
-          console.log("[MainOrganizer:hash:error]", { err });
-        }
-      }
+      console.log("[MediaOrganizer:scan:done]", { count: result.files.length, cancelled: result.cancelled });
     },
     onError: (err) => {
       setIsScanning(false);
       setProgress(null);
-      console.log("[MainOrganizer:scan:error]", { err });
+      console.log("[MediaOrganizer:scan:error]", { err });
       toast.error("Scan failed", { description: String(err) });
     },
   });
@@ -189,41 +160,54 @@ export function MainOrganizer() {
   // ── Cancel ───────────────────────────────────────────────────────────────
   const handleCancel = async () => {
     cancelledRef.current = true;
-    console.log("[MainOrganizer:cancel]", { jobId });
+    console.log("[MediaOrganizer:cancel]", { jobId });
     await invokeIpc("job:cancel", { jobId });
     setIsScanning(false);
     setProgress(null);
   };
 
   // ── Sort apply mutation ──────────────────────────────────────────────────
+  // ProVid renames in place; every other mode moves into the output folder.
+  const sortsInPlace = sortMode === "ProVid";
+
   const sortMutation = useMutation({
     mutationFn: async () => {
-      console.log("[MainOrganizer:sort:start]", { mode: sortMode, dryRun, prefix });
+      console.log("[MediaOrganizer:sort:start]", { mode: sortMode, dryRun, prefix, destRoot: sortsInPlace ? null : outputFolder });
       const result = await invokeIpc<{ results: FileOpResult[] }>("sort:apply", {
         mode: sortMode,
         files: filteredFiles,
         prefix: prefix || undefined,
         dryRun,
+        destRoot: sortsInPlace ? undefined : outputFolder || undefined,
       });
       return result;
     },
     onSuccess: ({ results }) => {
-      const suffixed = results.filter((r) => r.to && r.to.includes("("));
+      const suffixed = results.filter((r) => r.to && / \(\d+\)\./.test(r.to));
       if (suffixed.length > 0) {
-        toast.info(`${suffixed.length} file${suffixed.length > 1 ? "s" : ""} renamed with auto-suffix to avoid collisions.`);
+        toast.info(`${suffixed.length} file${suffixed.length > 1 ? "s" : ""} auto-suffixed (1), (2)… to avoid overwriting.`);
       }
       const errors = results.filter((r) => r.status === "error");
+      const moved = results.filter((r) => r.status === "ok" || r.status === "dryrun").length;
+      setLastRun({
+        moved,
+        failed: errors.length,
+        dryRun,
+        destination: sortsInPlace ? "their original folders" : outputFolder,
+      });
       if (errors.length > 0) {
-        toast.error(`${errors.length} operation${errors.length > 1 ? "s" : ""} failed.`);
+        toast.error(`${errors.length} operation${errors.length > 1 ? "s" : ""} failed — see error rows.`);
       } else if (dryRun) {
         toast.success("Dry run complete", { description: `${results.length} operations previewed.` });
       } else {
-        toast.success("Sort applied", { description: `${results.length} files moved.` });
+        toast.success("Videos organized", {
+          description: sortsInPlace ? `${moved} files renamed in place.` : `${moved} files moved to ${outputFolder}.`,
+        });
       }
-      console.log("[MainOrganizer:sort:done]", { count: results.length, errors: errors.length });
+      console.log("[MediaOrganizer:sort:done]", { count: results.length, errors: errors.length });
     },
     onError: (err) => {
-      console.log("[MainOrganizer:sort:error]", { err });
+      console.log("[MediaOrganizer:sort:error]", { err });
       toast.error("Sort failed", { description: String(err) });
     },
   });
@@ -232,7 +216,7 @@ export function MainOrganizer() {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       const paths = [...session.selectedPaths];
-      console.log("[MainOrganizer:delete:start]", { count: paths.length, dryRun });
+      console.log("[MediaOrganizer:delete:start]", { count: paths.length, dryRun });
       const result = await invokeIpc<DeleteSummary>("files:delete", { paths, dryRun });
       return result;
     },
@@ -253,21 +237,21 @@ export function MainOrganizer() {
         );
         const remaining = session.scannedFiles.filter((f) => !deletedPaths.has(f.path));
         updateSession({ scannedFiles: remaining, selectedPaths: new Set() });
-        console.log("[MainOrganizer:delete:done]", {
+        console.log("[MediaOrganizer:delete:done]", {
           deleted: summary.deleted,
           failed: summary.failed,
         });
       }
     },
     onError: (err) => {
-      console.log("[MainOrganizer:delete:error]", { err });
+      console.log("[MediaOrganizer:delete:error]", { err });
       toast.error("Delete failed", { description: String(err) });
     },
   });
 
   // ── CSV export ───────────────────────────────────────────────────────────
   const handleExportCsv = async () => {
-    console.log("[MainOrganizer:csv:start]", { count: filteredFiles.length });
+    console.log("[MediaOrganizer:csv:start]", { count: filteredFiles.length });
     const headers = ["Name", "Path", "Resolution", "Size (bytes)", "Codec", "FPS", "Duration (s)", "GPS", "iPhone", "Error"];
     const rows: string[][] = [
       headers,
@@ -286,11 +270,24 @@ export function MainOrganizer() {
     ];
     try {
       await invokeIpc("csv:export", { rows, suggestedName: "libra-organizer-export.csv" });
-      console.log("[MainOrganizer:csv:done]");
+      console.log("[MediaOrganizer:csv:done]");
     } catch (err) {
-      console.log("[MainOrganizer:csv:error]", { err });
+      console.log("[MediaOrganizer:csv:error]", { err });
       toast.error("Export failed", { description: String(err) });
     }
+  };
+
+  // ── Change output folder ─────────────────────────────────────────────────
+  const handleChangeOutputFolder = async () => {
+    const res = await window.glazeAPI.dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"],
+      title: "Choose output folder",
+    });
+    if (res.canceled || res.filePaths.length === 0) return;
+    const folder = res.filePaths[0];
+    setOutputFolder(folder);
+    await invokeIpc<Settings>("settings:set", { patch: { outputFolder: folder } });
+    console.log("[MediaOrganizer:outputFolder]", { folder });
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -299,7 +296,7 @@ export function MainOrganizer() {
   const hasPaths = session.droppedPaths.length > 0;
   const hasSelection = session.selectedPaths.size > 0;
 
-  const tableActions = (
+  const listActions = (
     <>
       <Button
         variant="filled"
@@ -323,19 +320,43 @@ export function MainOrganizer() {
     </>
   );
 
-  return (
-    <ToolPage title="Main Organizer" category="organize">
-      <Text variant="regular" color="secondary">
-        Filter, organize, review duplicates, and inspect rich video metadata.
-      </Text>
+  const listCount = hasFiles
+    ? anyFilterActive
+      ? `${filteredFiles.length} of ${session.scannedFiles.length} videos`
+      : `${session.scannedFiles.length} videos`
+    : "";
 
-      {/* Drop zone */}
+  return (
+    <ToolPage title="">
+      {/* Centered branded header */}
+      <div className="flex flex-col items-center text-center gap-2 pt-1 pb-1">
+        <h1 className="libra-title">L!bra</h1>
+        <Text variant="regular" color="secondary">
+          Filter, organize, review, and inspect rich video metadata.
+        </Text>
+      </div>
+
+      {/* Drop zone — also the scanned-video list area once files exist */}
       <DropZone
         onPaths={handlePaths}
         accept="both"
         disabled={isScanning}
-        hint="Drag videos or a folder here"
-      />
+        hint={hasFiles ? "Drag videos or a folder here to add more" : "Drag videos or a folder here"}
+      >
+        {hasFiles ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <Text variant="small" color="secondary">{listCount}</Text>
+              <div className="flex gap-2">{listActions}</div>
+            </div>
+            <VideoList
+              files={filteredFiles}
+              selectedPaths={session.selectedPaths}
+              onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
+            />
+          </div>
+        ) : null}
+      </DropZone>
 
       {/* Scan controls */}
       {hasPaths && !isScanning && (
@@ -347,7 +368,7 @@ export function MainOrganizer() {
             disabled={scanMutation.isPending}
           >
             <PlayIcon className="size-4" />
-            Scan
+            {hasFiles ? "Rescan" : "Scan"}
           </Button>
           <Text variant="small" color="tertiary">
             {session.droppedPaths.length} path{session.droppedPaths.length !== 1 ? "s" : ""} queued
@@ -380,6 +401,36 @@ export function MainOrganizer() {
         />
       </div>
 
+      {/* Destination — where processed files will go */}
+      <div className="flex flex-col gap-2">
+        <SectionLabel>Destination</SectionLabel>
+        <div className="flex items-center gap-3 rounded-card border border-separator bg-well px-4 py-3">
+          <FolderOpenIcon className="size-5 shrink-0 text-accent" />
+          <div className="flex flex-col min-w-0 flex-1">
+            {sortsInPlace ? (
+              <>
+                <Text variant="small-strong" color="primary">Renamed in place</Text>
+                <Text variant="small" color="secondary" truncate>
+                  Files stay in their original folders — only names change.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text variant="small-strong" color="primary">Sorted into this folder</Text>
+                <Text variant="small" color="secondary" truncate>
+                  {outputFolder || "Resolving default output folder…"}
+                </Text>
+              </>
+            )}
+          </div>
+          {!sortsInPlace && (
+            <Button variant="filled" size="small" onClick={() => void handleChangeOutputFolder()}>
+              Change…
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col gap-2">
         <SectionLabel>Filter</SectionLabel>
@@ -387,32 +438,9 @@ export function MainOrganizer() {
           filters={FILTER_DEFS}
           active={activeFilters}
           onToggle={(id, val) => {
-            console.log("[MainOrganizer:filter]", { id, val });
+            console.log("[MediaOrganizer:filter]", { id, val });
             setActiveFilters((prev) => ({ ...prev, [id]: val }));
           }}
-        />
-      </div>
-
-      {/* Results table */}
-      <div className="flex flex-col gap-2">
-        <SectionLabel>
-          Scanned Videos{" "}
-          {hasFiles
-            ? anyFilterActive
-              ? `(${filteredFiles.length} of ${session.scannedFiles.length})`
-              : `(${session.scannedFiles.length})`
-            : ""}
-        </SectionLabel>
-        <ResultsTable
-          files={filteredFiles}
-          selectedPaths={session.selectedPaths}
-          onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
-          emptyTitle={hasFiles ? "No videos match the current filters" : "No videos scanned yet"}
-          emptyDescription={hasFiles ? "Try clearing some filters." : "Drop videos above or choose a folder to begin."}
-          actions={tableActions}
         />
       </div>
 
@@ -436,6 +464,21 @@ export function MainOrganizer() {
           </Text>
         )}
       </div>
+
+      {/* Post-processing result summary — restates the destination */}
+      {lastRun && (
+        <div className="flex flex-col gap-1 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
+          <Text variant="small-strong" color="primary">
+            {lastRun.dryRun
+              ? `Dry run — ${lastRun.moved} operation${lastRun.moved !== 1 ? "s" : ""} previewed, no files changed.`
+              : `${lastRun.moved} file${lastRun.moved !== 1 ? "s" : ""} organized${lastRun.failed > 0 ? `, ${lastRun.failed} failed` : ""}.`}
+          </Text>
+          <Text variant="small" color="secondary" truncate>
+            {lastRun.dryRun ? "Would be placed in: " : "Location: "}
+            {lastRun.destination}
+          </Text>
+        </div>
+      )}
     </ToolPage>
   );
 }

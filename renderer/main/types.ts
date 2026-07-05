@@ -1,9 +1,12 @@
 // Shared types mirroring the IPC contract in project-plans/CONTRACT.md.
 // These match structurally what the backend emits over JSON.
 
-export type ResolutionClass = "4K" | "1080p" | "720p" | "SD" | "Unknown";
+export type ResolutionClass = "4K" | "1080p" | "720p" | "HD" | "SD" | "Unknown";
 export type Orientation = "landscape" | "portrait" | "square" | "unknown";
 export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName";
+
+/** Canonical, ordered resolution labels shown anywhere in the UI. */
+export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "1080p", "720p", "HD", "SD"];
 
 export interface VideoInfo {
   path: string; // absolute path
@@ -25,7 +28,6 @@ export interface VideoInfo {
   hasGPS: boolean;
   gps: { lat: number; lon: number } | null;
   creationTime: string | null; // ISO 8601
-  md5: string | null; // filled only by duplicate detection, else null
   error: string | null; // non-null => probe failed; UI renders an error row
 }
 
@@ -42,24 +44,20 @@ export interface DeleteSummary {
   results: { path: string; status: "ok" | "error"; error: string | null }[];
 }
 
-export interface DuplicateGroup {
-  hash: string;
-  files: VideoInfo[];
-}
-
 export interface Settings {
   ffmpegPath: string | null;
   ffprobePath: string | null;
   videoExtensions: string[]; // default: ["mp4","mov","m4v","avi","mkv","webm","mpg","mpeg","wmv","flv","3gp","m2ts","mts"]
   dryRunDefault: boolean;
   lastFolders: Record<string, string>; // toolId -> last folder
+  outputFolder: string; // where Media Organizer moves sorted files (default: <Desktop>/L!bra Organized)
 }
 
 export interface JobProgress {
   jobId: string;
   done: number;
   total: number;
-  phase: string; // e.g. "scanning", "hashing", "encoding"
+  phase: string; // e.g. "scanning", "encoding"
 }
 
 export interface DepsCheckResult {
@@ -85,17 +83,6 @@ export interface ScanResult {
   cancelled: boolean;
 }
 
-export interface HashDuplicatesParams {
-  jobId: string;
-  paths?: string[];
-  files?: VideoInfo[];
-  extensions?: string[];
-}
-
-export interface HashDuplicatesResult {
-  groups: DuplicateGroup[];
-  cancelled: boolean;
-}
 
 export interface SortApplyParams {
   mode: SortMode;
