@@ -175,12 +175,12 @@ export function OneminAdjust() {
     : filteredFiles;
 
   return (
-    <ToolPage title="One Minute Adjuster">
+    <ToolPage title="Divided by One">
       {/* Centered title + subtitle */}
       <div className="flex flex-col items-center text-center gap-1.5 pt-1 pb-1">
-        <h1 className="libra-page-title">One Minute Adjuster</h1>
+        <h1 className="libra-page-title">Divided by One</h1>
         <Text variant="regular" color="secondary">
-          Sequential Timestamps, 60 Seconds Apart
+          Adjust Videos by 1 Min Apart
         </Text>
       </div>
 
@@ -210,7 +210,7 @@ export function OneminAdjust() {
 
       {hasFiles && (
         <>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 rounded-card libra-panel p-3">
             <SectionLabel>Scan Summary</SectionLabel>
             <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
           </div>
@@ -269,7 +269,7 @@ export function OneminAdjust() {
             />
           </div>
 
-          <div className="flex items-center gap-4 pt-2 border-t border-separator">
+          <div className="flex items-center gap-4 pt-2 border-t libra-faint-border">
             <Button
               variant="accent"
               size="large"

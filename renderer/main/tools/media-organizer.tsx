@@ -29,7 +29,7 @@ const MODE_LABELS: Record<SortMode, { title: string; subtitle: string }> = {
   ProMax: { title: "Pro Max", subtitle: "Resolution + Orientation" },
   MaxVid: { title: "Max Vid", subtitle: "Resolution + Orientation + FPS" },
   KeepName: { title: "Name Keeper", subtitle: "Sort by Resolution, Keep Names" },
-  SlowMotion: { title: "Slow Motion", subtitle: "Detect and Sort Slow-Motion Clips" },
+  SlowMotion: { title: "Slo-Mo", subtitle: "Slow Down Videos" },
 };
 
 // ── Scan Summary — 18 categories (CONTRACT.md §5), AND-combinable ──────────────
@@ -324,7 +324,7 @@ export function MediaOrganizer() {
 
       {/* Empty-result state */}
       {scannedEmpty && (
-        <div className="rounded-card border border-separator bg-well px-4 py-6 text-center">
+        <div className="rounded-card border libra-faint-border libra-panel px-4 py-6 text-center">
           <Text variant="regular" color="secondary">
             No recognized videos found in the dropped folder.
           </Text>
@@ -334,7 +334,7 @@ export function MediaOrganizer() {
       {hasFiles && (
         <>
           {/* Scan Summary */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 rounded-card libra-panel p-3">
             <SectionLabel>Scan Summary</SectionLabel>
             <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
           </div>
@@ -358,7 +358,7 @@ export function MediaOrganizer() {
           </div>
 
           {/* Name Videos prefix (left) + Process button (right), just above the drop zone */}
-          <div className="flex items-end gap-4 pt-2 border-t border-separator">
+          <div className="flex items-end gap-4 pt-2 border-t libra-faint-border">
             <div className="flex flex-col gap-2 flex-1 min-w-0">
               <SectionLabel>Name Videos</SectionLabel>
               <Input

@@ -17,10 +17,28 @@
  */
 .dark,
 :root {
-  --bg: #0d0d0d;
-  --bg-secondary: #141414;
+  --bg: #0a0e17;
+  --bg-secondary: #10151f;
   --fg: #f0ead8;
   --theme-accent: #c9a227;
+  /* Force the accent to gold. The framework's --accent otherwise falls back to
+     the macOS system accent (usually blue), which would override --theme-accent
+     for text-accent, accent buttons, counts, and selection tints. */
+  --accent: #c9a227;
+}
+
+/* Slightly larger base font so cards and labels read easier everywhere */
+:root {
+  font-size: 17px;
+}
+
+/* Blended dark blue → gold app background (gold gently fades into the blue) */
+body {
+  background-color: #0a0e17;
+  background-image:
+    radial-gradient(115% 80% at 50% -8%, rgba(201, 162, 39, 0.1) 0%, rgba(201, 162, 39, 0) 55%),
+    linear-gradient(180deg, #0c1322 0%, #080a12 100%);
+  background-attachment: fixed;
 }
 
 /* ── Gold accent helper classes ──────────────────────────────────────────── */
@@ -110,12 +128,13 @@
   color: #f0d98a;
 }
 
-/* Tool / mode card inside a box */
+/* Tool / mode card — blended blue base with a faint, thin gold border */
 .libra-mode-card {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 100%),
-    #161616;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+    radial-gradient(120% 140% at 100% 0%, rgba(201, 162, 39, 0.07) 0%, rgba(201, 162, 39, 0) 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%),
+    #0e1420;
+  border: 1px solid rgba(201, 162, 39, 0.18);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 .libra-mode-card:hover {
@@ -138,4 +157,18 @@
 .libra-mode-card-accent:hover {
   border-color: rgba(201, 162, 39, 0.75);
   box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.4), 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Very thin, faint gold border — for dividers and structural edges on tool pages */
+.libra-faint-border {
+  border-color: rgba(201, 162, 39, 0.18);
+}
+
+/* Blended blue/gold panel — matches the home cards, used to group tool-page sections */
+.libra-panel {
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(201, 162, 39, 0.06) 0%, rgba(201, 162, 39, 0) 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%),
+    #0e1420;
+  border: 1px solid rgba(201, 162, 39, 0.18);
 }

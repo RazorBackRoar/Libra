@@ -86,7 +86,7 @@ function DropCard({ icon: Icon, title, description, onActivate, accent = false }
         <Icon className={cn("size-4.5", chipGold ? "text-accent" : "text-secondary group-hover:text-primary")} />
       </div>
       <div className="flex flex-col min-w-0 flex-1">
-        <Text variant="strong" color={isDragOver ? "accent" : "primary"} truncate>
+        <Text variant="strong" color="accent" truncate>
           {isDragOver ? "Drop files here" : title}
         </Text>
         <Text variant="regular" color="secondary" className="line-clamp-1">

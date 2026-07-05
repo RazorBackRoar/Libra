@@ -152,12 +152,12 @@ export function GpsSorter() {
     : filteredFiles;
 
   return (
-    <ToolPage title="GPS Sorter">
+    <ToolPage title="GPS Hunter">
       {/* Centered title + subtitle */}
       <div className="flex flex-col items-center text-center gap-1.5 pt-1 pb-1">
-        <h1 className="libra-page-title">GPS Sorter</h1>
+        <h1 className="libra-page-title">GPS Hunter</h1>
         <Text variant="regular" color="secondary">
-          Sort by Location Metadata
+          Location Off or On Hunter
         </Text>
       </div>
 
@@ -187,7 +187,7 @@ export function GpsSorter() {
 
       {hasFiles && (
         <>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 rounded-card libra-panel p-3">
             <SectionLabel>Scan Summary</SectionLabel>
             <ScanSummary pills={scanSummaryPills} activeIds={activeFilterIds} onChange={setActiveFilterIds} />
           </div>
@@ -206,7 +206,7 @@ export function GpsSorter() {
             />
           </div>
 
-          <div className="flex items-center gap-4 pt-2 border-t border-separator">
+          <div className="flex items-center gap-4 pt-2 border-t libra-faint-border">
             <Button
               variant="accent"
               size="large"
