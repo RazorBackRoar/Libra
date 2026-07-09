@@ -25,7 +25,7 @@
   "build": {
     "appId": "com.razorbackroar.libra",
     "productName": "L!bra",
-    "executableName": "L!bra",
+    "executableName": "Libra",
     "files": [
       "build/**/*",
       "package.json"
@@ -38,6 +38,12 @@
       "category": "public.app-category.video",
       "target": [
         "dmg"
+      ],
+      "extraResources": [
+        {
+          "from": "app-icon.png",
+          "to": "icon.png"
+        }
       ]
     },
     "dmg": {

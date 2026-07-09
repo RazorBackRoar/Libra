@@ -11,6 +11,7 @@ Guidance for AI agents working in this repository.
 | npm `package.json` `name` | `l-bra` | npm name rules |
 | electron-builder `appId` | `com.razorbackroar.libra` | reverse-DNS; no `!` |
 | `productName` / `app.setName` | `L!bra` | User-facing |
+| `executableName` / binary | `Libra` | Avoid `!` in Mach-O executable name |
 
 Constants live in `electron-core/utils/brand.ts`. Prefer `DISPLAY_NAME` over hardcoding.
 

@@ -22,9 +22,16 @@ import { ensureDir, appDataDir, appLogDir } from "../electron-core/utils/paths.j
 // Get directory paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const ICON_PATH = app.isPackaged
+// Packaged Dock/Finder use Resources/icon.icns (electron-builder).
+// For dock.setIcon(), PNG is more reliable than ICNS under Electron.
+const ICON_ICNS = app.isPackaged
   ? path.join(process.resourcesPath, "icon.icns")
   : path.join(__dirname, "..", "..", "app-icon.icns");
+const ICON_PNG = app.isPackaged
+  ? path.join(process.resourcesPath, "icon.png")
+  : path.join(__dirname, "..", "..", "app-icon.png");
+const WINDOW_ICON = ICON_ICNS;
+const DOCK_ICON = ICON_PNG;
 
 // ── IPC Handlers ──────────────────────────────────────────────────────
 // ipcMain is already wired to the IPC server by the runtime bootstrap.
@@ -83,7 +90,7 @@ async function createMainWindow() {
     titleBarStyle: "hidden",
     trafficLightPosition: { x: 14, y: 14 },
     backgroundColor: "#0a0e17",
-    icon: nativeImage.createFromPath(ICON_PATH),
+    icon: nativeImage.createFromPath(WINDOW_ICON),
     show: false, // Don't show until WebView is ready (prevents flickering)
     webPreferences: {
       preload: getPreloadPath(),
@@ -291,7 +298,13 @@ app.whenReady().then(async () => {
   await setupApplicationMenu();
 
   if (process.platform === "darwin" && app.dock) {
-    app.dock.setIcon(nativeImage.createFromPath(ICON_PATH));
+    const dockImage = nativeImage.createFromPath(DOCK_ICON);
+    if (!dockImage.isEmpty()) {
+      app.dock.setIcon(dockImage);
+    } else {
+      const fallback = nativeImage.createFromPath(WINDOW_ICON);
+      if (!fallback.isEmpty()) app.dock.setIcon(fallback);
+    }
   }
 
   createMainWindow()
