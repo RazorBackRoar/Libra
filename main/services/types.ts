@@ -9,7 +9,7 @@ export type ResolutionClass = "4K" | "1080p" | "720p" | "HD" | "SD" | "Unknown";
 export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "1080p", "720p", "HD", "SD"];
 
 export type Orientation = "landscape" | "portrait" | "square" | "unknown";
-export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName";
+export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName" | "SlowMotion";
 
 export interface VideoInfo {
   path: string;
@@ -88,6 +88,8 @@ export const OUTPUT_FOLDER_NAMES: string[] = [
   "MISC",
   "GPS",
   "No GPS",
+  "Slow Motion",
+  "Normal Speed",
   "Wide",
   "Vertical",
   "Wide 30fps",

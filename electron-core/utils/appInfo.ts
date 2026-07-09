@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 import {
   ARCHITECTURE,
   COPYRIGHT_FULL,
@@ -15,16 +18,46 @@ export interface AppInfo {
   architecture: string;
 }
 
+function readPackageVersion(startDir: string): string | null {
+  let dir = startDir;
+  for (let i = 0; i < 6; i++) {
+    const candidate = path.join(dir, "package.json");
+    try {
+      if (fs.existsSync(candidate)) {
+        const pkg = JSON.parse(fs.readFileSync(candidate, "utf8")) as {
+          version?: string;
+          productName?: string;
+        };
+        // Prefer the app package (has productName L!bra), not a nested one.
+        if (pkg.version && (pkg.productName === DISPLAY_NAME || pkg.version !== "0.0.0")) {
+          return pkg.version;
+        }
+        if (pkg.version) return pkg.version;
+      }
+    } catch {
+      // continue walking up
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
 function resolveVersion(): string {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require("electron") as typeof Electron;
+    const fromDisk =
+      readPackageVersion(app.getAppPath()) ??
+      readPackageVersion(process.cwd());
+    if (fromDisk) return fromDisk;
     const v = app.getVersion();
     if (v) return v;
   } catch {
     // not in electron
   }
-  return "0.0.0";
+  return readPackageVersion(process.cwd()) ?? "0.0.0";
 }
 
 export function getAppInfo(): AppInfo {

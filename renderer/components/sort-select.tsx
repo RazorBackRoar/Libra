@@ -19,6 +19,7 @@ const SORT_MODES: { value: SortMode; label: string; sublabel: string }[] = [
   { value: "ProMax", label: "Pro Max", sublabel: "Resolution + orientation subfolders" },
   { value: "MaxVid", label: "Max Vid", sublabel: "Resolution + orientation + FPS subfolders" },
   { value: "KeepName", label: "Name Keeper", sublabel: "Sort into folders, keep original filename" },
+  { value: "SlowMotion", label: "Slow Motion", sublabel: "Sort into Slow Motion / Normal Speed folders" },
 ];
 
 export function SortSelect({ value, onValueChange, className }: SortSelectProps) {

@@ -36,15 +36,8 @@ export function appDataDir(): string {
 }
 
 export function appCacheDir(): string {
-  const app = electronApp();
-  if (app) {
-    try {
-      // Electron's "cache" is under Caches/<name> once name is set.
-      return app.getPath("cache");
-    } catch {
-      // app not ready yet
-    }
-  }
+  // Electron has no getPath("cache"); use the macOS Caches layout with the
+  // display name so update checks land under ~/Library/Caches/L!bra/.
   return path.join(os.homedir(), "Library", "Caches", DISPLAY_NAME);
 }
 

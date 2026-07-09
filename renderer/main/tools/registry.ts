@@ -2,6 +2,7 @@ import {
     BookmarkIcon,
     ClockIcon,
     FolderSyncIcon,
+    GaugeIcon,
     LayersIcon,
     MapPinIcon,
     MaximizeIcon,
@@ -35,6 +36,7 @@ export const MEDIA_MODES: MediaMode[] = [
   { mode: "ProMax", title: "Pro Max", description: "Resolution + Orientation Sort", icon: LayersIcon },
   { mode: "MaxVid", title: "Max Vid", description: "Full Sort", icon: MaximizeIcon },
   { mode: "KeepName", title: "Name Keeper", description: "Resolution + Keep Names", icon: BookmarkIcon },
+  { mode: "SlowMotion", title: "Slow Motion", description: "Slow Motion vs Normal Speed", icon: GaugeIcon },
 ];
 
 /** The Media Organizer workflow tool (single page; modes above select its behavior). */

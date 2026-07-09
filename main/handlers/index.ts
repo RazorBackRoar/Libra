@@ -246,7 +246,7 @@ export function registerHandlers(): void {
   ipcMain.handle("sort:apply", async (_event, params: unknown) => {
     const p = params as SortApplyParams;
     const mode = p?.mode as SortMode;
-    if (!["ProVid", "VidRes", "ProMax", "MaxVid", "KeepName"].includes(mode)) {
+    if (!["ProVid", "VidRes", "ProMax", "MaxVid", "KeepName", "SlowMotion"].includes(mode)) {
       throw new Error(`Invalid sort mode: ${String(mode)}`);
     }
     const dryRun = assertBoolean(p?.dryRun, "dryRun");
@@ -268,7 +268,7 @@ export function registerHandlers(): void {
     const p = params as ProcessRunParams;
     const jobId = assertString(p?.jobId, "jobId");
     const mode = p?.mode as SortMode;
-    if (!["ProVid", "VidRes", "ProMax", "MaxVid", "KeepName"].includes(mode)) {
+    if (!["ProVid", "VidRes", "ProMax", "MaxVid", "KeepName", "SlowMotion"].includes(mode)) {
       throw new Error(`Invalid mode: ${String(mode)}`);
     }
     const droppedPaths = assertStringArray(p?.droppedPaths, "droppedPaths");

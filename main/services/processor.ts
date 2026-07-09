@@ -142,6 +142,8 @@ function targetDir(root: string, mode: SortMode, info: VideoInfo): string {
         info.resolutionClass,
         `${folderOrientation(info.orientation)} ${fpsFolderToken(info.fps)}`,
       );
+    case "SlowMotion":
+      return path.join(root, info.isSlowMotion ? "Slow Motion" : "Normal Speed");
   }
 }
 
@@ -310,7 +312,7 @@ export async function processFolder(opts: ProcessOptions): Promise<ProcessReport
   for (const f of files) sizeCounts.set(f.sizeBytes, (sizeCounts.get(f.sizeBytes) ?? 0) + 1);
   const seenHash = new Map<string, { fullBase: string; dupCount: number; dir: string; ext: string }>();
 
-  const generatesNames = mode !== "KeepName";
+  const generatesNames = mode !== "KeepName" && mode !== "SlowMotion";
 
   // Perform a move/rename, classifying fatal vs. skippable errors.
   async function performMove(
@@ -399,7 +401,7 @@ export async function processFolder(opts: ProcessOptions): Promise<ProcessReport
           await performMove(info.path, path.join(dir, name), "organized", abnormalNote);
         }
       } else {
-        // KeepName — original filename preserved; only sort into resolution folder.
+        // KeepName / SlowMotion — original filename preserved; only sort into folders.
         if (path.dirname(info.path) === dir) {
           items.push({ from: info.path, to: info.path, status: "skipped", kind: "organized", note: "already organized" });
         } else {

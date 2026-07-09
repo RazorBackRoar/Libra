@@ -30,6 +30,7 @@ const MODE_LABELS: Record<SortMode, { title: string; subtitle: string }> = {
   ProMax: { title: "Pro Max", subtitle: "Resolution + Orientation Sort" },
   MaxVid: { title: "Max Vid", subtitle: "Full Sort" },
   KeepName: { title: "Name Keeper", subtitle: "Resolution + Keep Names" },
+  SlowMotion: { title: "Slow Motion", subtitle: "Slow Motion vs Normal Speed" },
 };
 
 // ── Filter set (spec §3) ───────────────────────────────────────────────────────

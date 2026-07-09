@@ -143,6 +143,9 @@ export function buildSortDestPath(
       // Same folder structure as VidRes but never alter the filename
       return path.join(base, info.resolutionClass, info.name);
     }
+    case "SlowMotion": {
+      return path.join(base, info.isSlowMotion ? "Slow Motion" : "Normal Speed", info.name);
+    }
   }
 }
 

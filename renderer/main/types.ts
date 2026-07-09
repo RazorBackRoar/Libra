@@ -3,7 +3,7 @@
 
 export type ResolutionClass = "4K" | "1080p" | "720p" | "HD" | "SD" | "Unknown";
 export type Orientation = "landscape" | "portrait" | "square" | "unknown";
-export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName";
+export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName" | "SlowMotion";
 
 /** Canonical, ordered resolution labels shown anywhere in the UI. */
 export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "1080p", "720p", "HD", "SD"];
