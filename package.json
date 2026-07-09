@@ -23,8 +23,9 @@
     "dist": "npm run build && electron-builder --mac --publish never"
   },
   "build": {
-    "appId": "com.yourcompany.libra",
+    "appId": "com.razorbackroar.libra",
     "productName": "L!bra",
+    "executableName": "L!bra",
     "files": [
       "build/**/*",
       "package.json"

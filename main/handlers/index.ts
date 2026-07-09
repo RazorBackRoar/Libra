@@ -154,6 +154,10 @@ export function registerHandlers(): void {
     return await appHandlers.getInfo();
   });
 
+  ipcMain.handle("app:checkForUpdates", async (_event) => {
+    return await appHandlers.checkForUpdates();
+  });
+
   ipcMain.handle("app:getProjectPath", async () => {
     return path.join(__dirname, "..", "..");
   });

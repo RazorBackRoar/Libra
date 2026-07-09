@@ -7,12 +7,17 @@
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-import { app, BrowserWindow, Menu, nativeImage, nativeTheme, logger, initDevToolsButtonState, protocol } from "@electron-core/backend";
+import { app, BrowserWindow, Menu, dialog, nativeImage, nativeTheme, logger, initDevToolsButtonState, protocol, shell } from "@electron-core/backend";
 
 import { registerHandlers } from "./handlers/index.js";
 import { getPreloadPath, getWindowUrl } from "./windows/window-paths.js";
 import { openSettingsWindow } from "./windows/settings-window.js";
 import { thumbnailsCacheDir } from "./services/thumbnails.js";
+import { DISPLAY_NAME } from "../electron-core/utils/brand.js";
+import { getAppInfo, printStartupInfo } from "../electron-core/utils/appInfo.js";
+import { setupLogging } from "../electron-core/utils/logging.js";
+import { checkForUpdates } from "../electron-core/utils/updates.js";
+import { ensureDir, appDataDir, appLogDir } from "../electron-core/utils/paths.js";
 
 // Get directory paths
 const __filename = fileURLToPath(import.meta.url);
@@ -127,14 +132,78 @@ async function createMainWindow() {
   });
 }
 
+async function showAboutDialog() {
+  const info = getAppInfo();
+  await dialog.showMessageBox({
+    type: "info",
+    title: `About ${info.name}`,
+    message: info.name,
+    detail: [
+      `Version ${info.version}`,
+      info.license,
+      info.organization,
+      info.architecture,
+      info.copyright,
+    ].join("\n"),
+    buttons: ["OK"],
+  });
+}
+
+async function runUpdateCheck() {
+  const info = getAppInfo();
+  const result = await checkForUpdates(info.version);
+  if (result.error) {
+    await dialog.showMessageBox({
+      type: "warning",
+      title: `${info.name} Updates`,
+      message: "Update check failed",
+      detail: result.error,
+      buttons: ["OK"],
+    });
+    return;
+  }
+  if (result.update_available) {
+    const response = await dialog.showMessageBox({
+      type: "info",
+      title: `${info.name} Updates`,
+      message: `Update available: ${result.latest_version}`,
+      detail: `You have ${result.current_version}.${result.download_url ? `\n\n${result.download_url}` : ""}`,
+      buttons: result.download_url ? ["Open Release", "OK"] : ["OK"],
+      defaultId: 0,
+    });
+    if (result.download_url && response.response === 0) {
+      await shell.openExternal(result.download_url);
+    }
+    return;
+  }
+  await dialog.showMessageBox({
+    type: "info",
+    title: `${info.name} Updates`,
+    message: "You're up to date",
+    detail: `Current version: ${result.current_version}`,
+    buttons: ["OK"],
+  });
+}
+
 // ── Application menu ──────────────────────────────────────────────────
 async function setupApplicationMenu() {
   await initDevToolsButtonState();
   const menu = Menu.buildFromTemplate([
     {
-      label: "App",
+      label: DISPLAY_NAME,
       submenu: [
-        { role: "about" },
+        {
+          label: `About ${DISPLAY_NAME}`,
+          click: () => {
+            void showAboutDialog();
+          },
+        },
+        {
+          label: "Check for Updates…",
+          click: () => {
+            void runUpdateCheck();
+          },
+        },
         { type: "separator" },
         {
           label: "Settings…",
@@ -201,6 +270,16 @@ logger.info("main", "⏱️ [COLD_START] Waiting for app ready...", {
 
 // ── Force dark appearance for black/gold theme ────────────────────────────
 nativeTheme.themeSource = "dark";
+
+// Display name is L!bra; GitHub/npm/appId stay ASCII (Libra / l-bra / com.razorbackroar.libra).
+app.setName(DISPLAY_NAME);
+printStartupInfo();
+setupLogging();
+ensureDir(appDataDir());
+logger.info("main", "Data directories ready", {
+  appData: appDataDir(),
+  logs: appLogDir(),
+});
 
 app.whenReady().then(async () => {
   const windowCreateStartTime = Date.now();

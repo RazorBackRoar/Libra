@@ -43,6 +43,9 @@ export function cn(...inputs: ClassValue[]) {
   return result.join(" ");
 }
 
+/** Kept for renderer bootstrap; file logging is main-process only. */
 export function initLogging() {
-  // No-op for standalone Electron builds; Electron's built-in console logging is sufficient.
+  // No-op in renderer; Electron console logging is sufficient here.
 }
+
+export { DISPLAY_NAME, GITHUB_REPO, APP_ID } from "./brand.js";

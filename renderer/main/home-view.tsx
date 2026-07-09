@@ -151,7 +151,74 @@ export function HomeView() {
       <ScrollArea className="h-full">
         <div className="mx-auto w-full max-w-4xl px-8 pt-12 pb-10 flex flex-col gap-8">
           {/* Hero */}
-          <div className="flex flex-col items-center text-center gap-1.5">
+          <div
+            className="flex flex-col items-center text-center gap-1.5 select-none"
+            title="Double-click for About · Right-click for updates"
+            onDoubleClick={() => {
+              void window.electronAPI.app.ipc.invoke("app:getInfo").then(async (info) => {
+                const i = info as {
+                  name: string;
+                  version: string;
+                  license: string;
+                  organization: string;
+                  architecture: string;
+                  copyright: string;
+                };
+                await window.electronAPI.dialog.showMessageBox({
+                  type: "info",
+                  title: `About ${i.name}`,
+                  message: i.name,
+                  detail: [
+                    `Version ${i.version}`,
+                    i.license,
+                    i.organization,
+                    i.architecture,
+                    i.copyright,
+                  ].join("\n"),
+                  buttons: ["OK"],
+                });
+              });
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              void window.electronAPI.app.ipc.invoke("app:checkForUpdates").then(async (result) => {
+                const r = result as {
+                  current_version: string;
+                  latest_version: string;
+                  update_available: boolean;
+                  download_url?: string | null;
+                  error?: string | null;
+                };
+                if (r.error) {
+                  await window.electronAPI.dialog.showMessageBox({
+                    type: "warning",
+                    title: "L!bra Updates",
+                    message: "Update check failed",
+                    detail: r.error,
+                    buttons: ["OK"],
+                  });
+                  return;
+                }
+                if (r.update_available) {
+                  await window.electronAPI.dialog.showMessageBox({
+                    type: "info",
+                    title: "L!bra Updates",
+                    message: `Update available: ${r.latest_version}`,
+                    detail: `You have ${r.current_version}.${r.download_url ? `\n\n${r.download_url}` : ""}`,
+                    buttons: ["OK"],
+                  });
+                  return;
+                }
+                await window.electronAPI.dialog.showMessageBox({
+                  type: "info",
+                  title: "L!bra Updates",
+                  message: "You're up to date",
+                  detail: `Current version: ${r.current_version}`,
+                  buttons: ["OK"],
+                });
+              });
+            }}
+          >
             <h1 className="libra-title">L!bra</h1>
             <p className="libra-subtitle">Professional Video Organizer</p>
             <Text variant="regular" color="tertiary" className="mt-2">
