@@ -1,5 +1,5 @@
-import { Switch, Text } from "@glaze/core/components";
-import { cn } from "@glaze/core/utils";
+import { Switch, Text } from "@electron-core/components";
+import { cn } from "@electron-core/utils";
 
 interface DryRunToggleProps {
   checked: boolean;

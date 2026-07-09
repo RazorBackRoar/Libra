@@ -4,7 +4,7 @@
  */
 
 import type { ChildProcess } from "node:child_process";
-import { ipcMain } from "@glaze/core/backend";
+import { ipcMain } from "@electron-core/backend";
 import type { JobProgress } from "./types.js";
 
 interface JobEntry {

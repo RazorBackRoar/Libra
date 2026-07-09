@@ -4,7 +4,7 @@ import { ToolPage } from "../../components/tool-page";
 import { MediaOrganizer } from "./media-organizer";
 import { OneminAdjust } from "./onemin-adjust";
 import { GpsSorter } from "./gps-sorter";
-import { Text } from "@glaze/core/components";
+import { Text } from "@electron-core/components";
 
 function ToolPlaceholder({ toolId }: { toolId: string }) {
   const tool = getToolById(toolId);

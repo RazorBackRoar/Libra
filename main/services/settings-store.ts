@@ -2,7 +2,7 @@
  * Persistent settings store — JSON file under app.getPath("userData").
  */
 
-import { app } from "@glaze/core/backend";
+import { app } from "@electron-core/backend";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { type Settings, DEFAULT_SETTINGS } from "./types.js";

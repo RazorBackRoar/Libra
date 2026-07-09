@@ -12,7 +12,7 @@ import {
   Button,
   Text,
   toast,
-} from "@glaze/core/components";
+} from "@electron-core/components";
 import type { Settings } from "../main/types";
 
 const DEFAULT_EXTENSIONS = [
@@ -20,11 +20,11 @@ const DEFAULT_EXTENSIONS = [
 ];
 
 async function getSettings(): Promise<Settings> {
-  return window.glazeAPI.glaze.ipc.invoke("settings:get", {}) as Promise<Settings>;
+  return window.electronAPI.app.ipc.invoke("settings:get", {}) as Promise<Settings>;
 }
 
 async function setSettings(patch: Partial<Settings>): Promise<Settings> {
-  return window.glazeAPI.glaze.ipc.invoke("settings:set", { patch }) as Promise<Settings>;
+  return window.electronAPI.app.ipc.invoke("settings:set", { patch }) as Promise<Settings>;
 }
 
 export function SettingsView() {
@@ -50,7 +50,7 @@ export function SettingsView() {
       ) return;
       if (document.querySelector("[data-radix-popper-content-wrapper]")) return;
       event.preventDefault();
-      void window.glazeAPI.glaze.ipc.invoke("window:closeSettings", {});
+      void window.electronAPI.app.ipc.invoke("window:closeSettings", {});
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -74,7 +74,7 @@ export function SettingsView() {
   }, []);
 
   const handleChooseFolder = async () => {
-    const res = await window.glazeAPI.dialog.showOpenDialog({
+    const res = await window.electronAPI.dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
       title: "Choose output folder",
     });

@@ -1,6 +1,6 @@
-import { Button } from "@glaze/core/components";
+import { Button } from "@electron-core/components";
 import { XIcon } from "lucide-react";
-import { cn } from "@glaze/core/utils";
+import { cn } from "@electron-core/utils";
 
 interface CancelButtonProps {
   onCancel: () => void;

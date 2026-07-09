@@ -4,7 +4,7 @@ Single source of truth for this task. Both workstreams read this file first. Typ
 bridge as JSON — keep `main/services/types.ts` and `renderer/main/types.ts` structurally
 identical. Do not change a shape without updating this file.
 
-Frontend calls: `window.glazeAPI.glaze.ipc.invoke("channel", params)`.
+Frontend calls: `window.electronAPI.app.ipc.invoke("channel", params)`.
 Backend handles: `ipcMain.handle("channel", async (_event, params) => …)`.
 
 ## 1. Resolution classification (replaces current 5-tier system with 6 tiers)
@@ -75,7 +75,7 @@ Response: { url: string | null }   // null if generation failed (e.g. corrupt fi
 ```
 Backend: generate via ffmpeg (`-ss 1 -frames:v 1 -vf scale=160:-1`) into a cache file at
 `app.getPath("userData")/thumbnails/<sha1(path+mtimeMs+size)>.jpg`, reuse if already cached.
-Serve cached files through a registered custom protocol (invoke the `glaze-protocol-large-files`
+Serve cached files through a registered custom protocol (invoke the `app-protocol-large-files`
 skill for the exact registration pattern) — do NOT return base64 over IPC. Frontend requests a
 thumbnail per visible row lazily (on row mount), caches the returned URL in component state
 keyed by path, and shows a neutral placeholder icon until it resolves or fails.

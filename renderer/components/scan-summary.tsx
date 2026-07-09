@@ -1,4 +1,4 @@
-import { cn } from "@glaze/core/utils";
+import { cn } from "@electron-core/utils";
 
 export interface ScanSummaryPill {
   id: string;

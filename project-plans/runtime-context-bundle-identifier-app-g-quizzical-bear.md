@@ -2,7 +2,7 @@
 
 ## Context
 
-L!bra is described in the prompt as an existing app needing a redesign, but exploration confirmed the app is currently an **empty Glaze scaffold**: only the template home view, a single `/` route, stub IPC handlers, a theme-only Settings window, and no backend video logic. The prompt describing "the current Organizer split layout" etc. refers to a desired end-state, not existing code.
+L!bra is described in the prompt as an existing app needing a redesign, but exploration confirmed the app is currently an **empty Electron scaffold**: only the template home view, a single `/` route, stub IPC handlers, a theme-only Settings window, and no backend video logic. The prompt describing "the current Organizer split layout" etc. refers to a desired end-state, not existing code.
 
 This plan therefore builds the **entire app from scratch in one pass**: a black/gold, drag-and-drop-first, local video toolkit with 12 tools, backed by ffprobe (metadata) and ffmpeg (write operations), with one-click Homebrew onboarding, Settings, session state persistence, and a consistent MaxVid-style page pattern across all tools.
 
@@ -11,25 +11,25 @@ Decisions confirmed with the user:
 - **Tool defaults:** Re-encode Detector flags videos not in a preferred codec/container (non-H.264/HEVC MP4) as re-encode candidates; Slo-Mo Creator uses ffmpeg `setpts` slowdown at selectable 0.5x/0.25x, drops audio, writes dated output copies; Codec Checker is a read-only ffprobe report; GPS Sorter sorts into GPS / No-GPS folders from embedded location metadata.
 - **ffmpeg onboarding:** detect missing ffmpeg/ffprobe on first launch/scan and show a macOS sheet with a large "Install with Homebrew" button + a manual custom-path secondary option.
 
-The drag-drop path bridge is already wired: `renderer/preload.ts` exposes `webUtils` via `createWebUtilsAPI()`, so `window.glazeAPI.webUtils.getPathForFile(file)` resolves Finder drop paths today. No preload change needed for that; sensitive APIs (shell.openPath) will be enabled in preload as needed.
+The drag-drop path bridge is already wired: `renderer/preload.ts` exposes `webUtils` via `createWebUtilsAPI()`, so `window.electronAPI.webUtils.getPathForFile(file)` resolves Finder drop paths today. No preload change needed for that; sensitive APIs (shell.openPath) will be enabled in preload as needed.
 
 ## Visual language (black/gold) — applied globally
 
 Establish once as reusable tokens/classes (in `renderer/styles.css` + small helpers), used by every page:
 - near-black app background; dark card surfaces; thin charcoal borders; white titles; **gold section labels**; large **gold primary buttons**; **black secondary buttons**; muted-gray helper text; subtle bronze/gold glow accents; rounded modern macOS panels/cards.
-- Prefer design-system components + Tailwind semantic utilities; introduce a small set of gold accent classes (e.g. `--libra-gold`) rather than hand-rolled CSS files. Use `glaze-theming` + `glaze-component-patterns` when implementing.
+- Prefer design-system components + Tailwind semantic utilities; introduce a small set of gold accent classes (e.g. `--libra-gold`) rather than hand-rolled CSS files. Use `app-theming` + `app-component-patterns` when implementing.
 
 ## Architecture
 
 ### Backend engine (`main/services/`)
-- `cli-utils.ts` — `isCliInstalled()`, resolve ffmpeg/ffprobe paths (Settings override → `which` → common Homebrew paths). `execFile` only, explicit `maxBuffer` + `timeout` (per `glaze-cli-dependencies`).
+- `cli-utils.ts` — `isCliInstalled()`, resolve ffmpeg/ffprobe paths (Settings override → `which` → common Homebrew paths). `execFile` only, explicit `maxBuffer` + `timeout` (per `app-cli-dependencies`).
 - `ffprobe.ts` — probe one file → normalized `VideoInfo`. Fields: `path, name, dir, ext, sizeBytes, width, height, resolutionClass (4K|1080p|720p|SD), orientation (landscape|portrait|square), fps, durationSec, codec, container, make, model, isApple, hasGPS, gps{lat,lon}, creationTime, error?`.
 - `scanner.ts` — walk folder(s)/files, filter by configurable extensions, probe with bounded concurrency; emit progress; support cancel via job token.
 - `hashing.ts` — streamed MD5 (exact-match duplicate detection, clearly labeled "Exact MD5").
 - `file-ops.ts` — move/rename/copy/delete with **collision auto-suffix `(1),(2)…`**, never silent overwrite; per-file success/error results; dry-run support; used by all sort/rename/delete tools.
 - `ffmpeg-ops.ts` — slo-mo (`setpts`), timestamp adjust (metadata `creation_time` + fs mtime), any re-encode writes. Cancelable child processes.
 - `jobs.ts` — job registry keyed by `jobId`: tracks child processes / cancel flags, emits `job:progress` and `job:done` notifications, supports `job:cancel`.
-- `settings-store.ts` — JSON persistence in `app.getPath("userData")`: ffmpeg/ffprobe paths, video extension list, dry-run defaults, last-folder-per-tool, basic filter states. (Follow `glaze-data-storage` / `glaze-backend-rules`.)
+- `settings-store.ts` — JSON persistence in `app.getPath("userData")`: ffmpeg/ffprobe paths, video extension list, dry-run defaults, last-folder-per-tool, basic filter states. (Follow `app-data-storage` / `app-backend-rules`.)
 
 ### IPC contract (`main/handlers/index.ts`, channel → shape)
 - `deps:check` → `{ ffmpeg: bool, ffprobe: bool, ffmpegPath, ffprobePath }`
@@ -43,7 +43,7 @@ Establish once as reusable tokens/classes (in `renderer/styles.css` + small help
 - `slomo:create` `{ jobId, files[], factor, dryRun }` → streamed progress + results.
 - `timeadjust:apply` `{ jobId, files[], startISO, stepSeconds:60, mode:'copies'|'inplace', dryRun }` → results.
 - `codec:report` = reuse scan output (read-only).
-- `csv:export` handled in renderer (build CSV string) → `window.glazeAPI.dialog.showSaveDialog` + backend `file:write` handler, OR a `csv:export {rows, path}` handler. Use one backend write handler.
+- `csv:export` handled in renderer (build CSV string) → `window.electronAPI.dialog.showSaveDialog` + backend `file:write` handler, OR a `csv:export {rows, path}` handler. Use one backend write handler.
 - `settings:get` / `settings:set` `{ patch }` → persisted settings.
 
 All handlers: validate inputs, never overwrite silently, return structured per-file errors so the UI can render **red "Error" rows with inspectable details**.
@@ -80,7 +80,7 @@ Mutating tools include: dry-run toggle, cancel during long ops, collision auto-s
 Extend existing window: ffmpeg path, ffprobe path, editable video-extension list, persistence options, dry-run defaults. Keep theme control. Wire to `settings:get/set`.
 
 ### Window & preload
-- `main/index.ts`: keep 1000×700 (fits 3-col grid); set a comfortable min (~760×560) so tool workflows aren't cramped; use `glaze-window-sizing`. No frameless/transparent window; keep standard frame. If any frosted panel is wanted, use native vibrancy (never CSS blur) per project rules.
+- `main/index.ts`: keep 1000×700 (fits 3-col grid); set a comfortable min (~760×560) so tool workflows aren't cramped; use `app-window-sizing`. No frameless/transparent window; keep standard frame. If any frosted panel is wanted, use native vibrancy (never CSS blur) per project rules.
 - `preload.ts`: enable only the sensitive APIs actually needed (e.g. `shell.openPath` to reveal results in Finder) following IPC security rules; everything else through backend handlers.
 
 ## Execution order
@@ -90,7 +90,7 @@ Extend existing window: ffmpeg path, ffprobe path, editable video-extension list
 4. **Tools:** Main Organizer first (exercises scan/sort/filter/delete/CSV), then the 4 sort tools (share sort engine), Duplicate Finder, GPS Sorter, Codec Checker, Re-encode Detector, 1MinVid Adjust, Slo-Mo Creator.
 5. **Polish:** toasts, error rows, cancel, empty states, keyboard shortcuts, persistence.
 
-Given breadth, backend engine (step 2) and the large frontend surface (steps 1/4) are candidates for delegation to `glaze-backend-architect` / `glaze-frontend-architect` against the IPC contract above, integrated and validated by me. Relevant skills invoked before each layer: `glaze-frontend-rules`, `glaze-backend-rules`, `glaze-drag-and-drop`, `glaze-cli-dependencies`, `glaze-backend-performance`, `glaze-data-storage`, `glaze-browser-window-recipes`, `glaze-component-patterns`, `glaze-window-sizing`, `glaze-theming`, `glaze-icon-usage`.
+Given breadth, backend engine (step 2) and the large frontend surface (steps 1/4) are candidates for delegation to `app-backend-architect` / `app-frontend-architect` against the IPC contract above, integrated and validated by me. Relevant skills invoked before each layer: `app-frontend-rules`, `app-backend-rules`, `app-drag-and-drop`, `app-cli-dependencies`, `app-backend-performance`, `app-data-storage`, `app-browser-window-recipes`, `app-component-patterns`, `app-window-sizing`, `app-theming`, `app-icon-usage`.
 
 ## Critical files
 - `main/index.ts` (window/min sizes), `main/handlers/index.ts` (all IPC), new `main/services/*` (engine), `renderer/preload.ts` (enable needed sensitive APIs).
@@ -105,4 +105,4 @@ Given breadth, backend engine (step 2) and the large frontend surface (steps 1/4
 - Slo-Mo/1MinVid/GPS Sorter/Re-encode/Codec: verify writes (dated copies vs in-place), progress + cancel, read-only reports.
 - Runtime UI checks via DOM inspection for the multi-section Organizer and drag-over states; screenshot only for the drop-zone glow/visual states if needed.
 - Confirm Settings persist (ffmpeg paths, extensions, dry-run defaults) and last-folder/window frame restore across relaunch.
-- Update `.glaze_memory/PROJECT-CONTEXT.md` after completion.
+- Update `.app_memory/PROJECT-CONTEXT.md` after completion.

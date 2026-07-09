@@ -1,5 +1,5 @@
-import { Text } from "@glaze/core/components";
-import { cn } from "@glaze/core/utils";
+import { Text } from "@electron-core/components";
+import { cn } from "@electron-core/utils";
 import type { JobProgress } from "../main/types";
 
 interface ProgressBarProps {

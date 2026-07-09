@@ -9,9 +9,9 @@ import {
   Badge,
   EmptyState,
   Text,
-} from "@glaze/core/components";
+} from "@electron-core/components";
 import { ChevronDownIcon, ChevronRightIcon, ImageIcon } from "lucide-react";
-import { cn } from "@glaze/core/utils";
+import { cn } from "@electron-core/utils";
 import type { VideoInfo } from "../main/types";
 
 export type SortKey = "name" | "resolutionClass" | "sizeBytes" | "codec" | "fps" | "creationTime";
@@ -96,7 +96,7 @@ function ThumbnailCell({
     if (cachedUrl !== undefined) return; // already fetched (resolved or failed)
     let cancelled = false;
     console.log("[ResultsTable:thumbnail:get]", { path });
-    window.glazeAPI.glaze.ipc
+    window.electronAPI.app.ipc
       .invoke<{ url: string | null }>("thumbnail:get", { path })
       .then((res) => {
         if (!cancelled) onResolved(path, res.url);

@@ -1,5 +1,5 @@
-import { ToggleButton, Text } from "@glaze/core/components";
-import { cn } from "@glaze/core/utils";
+import { ToggleButton, Text } from "@electron-core/components";
+import { cn } from "@electron-core/utils";
 
 export interface FilterPillDef {
   id: string;

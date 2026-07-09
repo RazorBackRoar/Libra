@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Dialog, Button, Text, toast } from "@glaze/core/components";
+import { Dialog, Button, Text, toast } from "@electron-core/components";
 import { DownloadIcon, FolderOpenIcon } from "lucide-react";
 import type { DepsCheckResult } from "../main/types";
 
 async function checkDeps(): Promise<DepsCheckResult> {
   console.log("[DepsGate:check]");
-  return window.glazeAPI.glaze.ipc.invoke("deps:check", {}) as Promise<DepsCheckResult>;
+  return window.electronAPI.app.ipc.invoke("deps:check", {}) as Promise<DepsCheckResult>;
 }
 
 async function installDeps(): Promise<{ success: boolean; error?: string }> {
   console.log("[DepsGate:install]");
-  return window.glazeAPI.glaze.ipc.invoke("deps:install", {}) as Promise<{ success: boolean; error?: string }>;
+  return window.electronAPI.app.ipc.invoke("deps:install", {}) as Promise<{ success: boolean; error?: string }>;
 }
 
 interface DepsGateProps {
@@ -59,7 +59,7 @@ export function DepsGate({ children }: DepsGateProps) {
   const handleOpenSettings = async () => {
     console.log("[DepsGate:openSettings]");
     setDialogOpen(false);
-    await window.glazeAPI.glaze.ipc.invoke("window:openSettings", {});
+    await window.electronAPI.app.ipc.invoke("window:openSettings", {});
   };
 
   return (

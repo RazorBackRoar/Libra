@@ -11,7 +11,7 @@ import * as fs from "node:fs/promises";
 import { appHandlers } from "./app.js";
 import { getSettingsWindow, openSettingsWindow } from "../windows/settings-window.js";
 
-import { ipcMain, logger, shell, dialog } from "@glaze/core/backend";
+import { ipcMain, logger, shell, dialog } from "@electron-core/backend";
 
 // Services
 import { resolveBinaryPath } from "../services/cli-utils.js";
@@ -452,7 +452,7 @@ export function registerHandlers(): void {
         console.log("[thumbnail:get] failed", { path: filePath });
         return { url: null };
       }
-      const url = `glaze-thumb://thumb?file=${encodeURIComponent(path.basename(cachePath))}`;
+      const url = `app-thumb://thumb?file=${encodeURIComponent(path.basename(cachePath))}`;
       console.log("[thumbnail:get] done", { path: filePath, url });
       return { url };
     } catch (e) {

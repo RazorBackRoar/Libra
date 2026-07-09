@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
-import { Button, Text } from "@glaze/core/components";
+import { Button, Text } from "@electron-core/components";
 import { UploadCloudIcon, FolderOpenIcon } from "lucide-react";
-import { cn } from "@glaze/core/utils";
+import { cn } from "@electron-core/utils";
 
 interface DropZoneProps {
   onPaths: (paths: string[]) => void;
@@ -30,7 +30,7 @@ export function DropZone({ onPaths, accept = "both", disabled = false, hint, cla
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file) {
-        const p = window.glazeAPI.webUtils.getPathForFile(file);
+        const p = window.electronAPI.webUtils.getPathForFile(file);
         if (p) paths.push(p);
       }
     }
@@ -71,7 +71,7 @@ export function DropZone({ onPaths, accept = "both", disabled = false, hint, cla
 
   const handleOpenFolder = async () => {
     console.log("[DropZone:openFolder]");
-    const result = await window.glazeAPI.dialog.showOpenDialog({
+    const result = await window.electronAPI.dialog.showOpenDialog({
       properties: ["openDirectory", "multiSelections"],
     });
     if (!result.canceled && result.filePaths.length > 0) {
@@ -81,7 +81,7 @@ export function DropZone({ onPaths, accept = "both", disabled = false, hint, cla
 
   const handleSelectFiles = async () => {
     console.log("[DropZone:selectFiles]");
-    const result = await window.glazeAPI.dialog.showOpenDialog({
+    const result = await window.electronAPI.dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       filters: [
         {

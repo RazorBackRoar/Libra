@@ -4,7 +4,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@glaze/core/components";
+} from "@electron-core/components";
 import type { SortMode } from "../main/types";
 
 interface SortSelectProps {

@@ -10,7 +10,7 @@ import {
   NativeDatePickerRoot,
   NativeDatePickerTrigger,
   NativeDatePickerValue,
-} from "@glaze/core/components";
+} from "@electron-core/components";
 import { PlayIcon, CalendarIcon } from "lucide-react";
 
 import { ToolPage } from "../../components/tool-page";
@@ -25,7 +25,7 @@ import { useToolState } from "../tool-state";
 import type { VideoInfo, JobProgress, FileOpResult } from "../types";
 
 async function invokeIpc<T>(channel: string, params: unknown): Promise<T> {
-  return window.glazeAPI.glaze.ipc.invoke(channel, params) as Promise<T>;
+  return window.electronAPI.app.ipc.invoke(channel, params) as Promise<T>;
 }
 
 type AdjustMode = "copies" | "inplace";
@@ -55,7 +55,7 @@ export function OneminAdjust() {
   const cancelledRef = useRef(false);
 
   useEffect(() => {
-    const unsub = window.glazeAPI.glaze.ipc.onNotification(
+    const unsub = window.electronAPI.app.ipc.onNotification(
       "job:progress",
       (payload: unknown) => {
         const p = payload as JobProgress;

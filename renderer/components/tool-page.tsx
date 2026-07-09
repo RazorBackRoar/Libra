@@ -1,7 +1,8 @@
-import React from "react";
+import { ScrollArea, Toolbar, ToolbarActions, ToolbarBackButton, ToolbarContent } from "@electron-core/components";
+import { cn } from "@electron-core/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { ScrollArea, Toolbar, ToolbarContent, ToolbarActions, ToolbarBackButton } from "@glaze/core/components";
-import { cn } from "@glaze/core/utils";
+import { ChevronLeft } from "lucide-react";
+import React from "react";
 import { SectionLabel } from "./section-label";
 
 interface ToolPageProps {
@@ -26,7 +27,9 @@ export function ToolPage({ title, category, actions, children, className }: Tool
       className="h-full"
       toolbar={
         <Toolbar>
-          <ToolbarBackButton label="Home" onClick={handleBack} />
+          <ToolbarBackButton aria-label="Back" onClick={handleBack}>
+            <ChevronLeft className="size-5" />
+          </ToolbarBackButton>
           {/* No toolbar title — each tool page shows its own centered gold title */}
           <ToolbarContent />
           {(actions || category) && (
@@ -38,7 +41,7 @@ export function ToolPage({ title, category, actions, children, className }: Tool
         </Toolbar>
       }
     >
-      <div className={cn("px-6 py-4 flex flex-col gap-6 pb-10", className)}>
+      <div className={cn("px-6 py-2 flex flex-col gap-4 pb-4", className)}>
         {children}
       </div>
     </ScrollArea>

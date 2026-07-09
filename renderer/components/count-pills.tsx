@@ -1,5 +1,5 @@
-import { Badge, Text } from "@glaze/core/components";
-import { cn } from "@glaze/core/utils";
+import { Badge, Text } from "@electron-core/components";
+import { cn } from "@electron-core/utils";
 
 export interface CountPill {
   label: string;

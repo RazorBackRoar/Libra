@@ -1,8 +1,10 @@
 /*
- * Glaze framework styles (@import "@glaze/core/..." and @import "tailwindcss")
+ * Electron framework styles (@import "@electron-core/..." and @import "tailwindcss")
  * are automatically injected before this file during build and dev.
  * Add your custom styles and @source directives below.
  */
+
+@import "tailwindcss";
 
 /* Tell Tailwind to scan all local renderer window files for class names */
 @source "./**/*.{ts,tsx}";
@@ -25,6 +27,7 @@
      the macOS system accent (usually blue), which would override --theme-accent
      for text-accent, accent buttons, counts, and selection tints. */
   --accent: #c9a227;
+  --accent-hover: #d9b94a;
 }
 
 /* Slightly larger base font so cards and labels read easier everywhere */
@@ -33,12 +36,35 @@
 }
 
 /* Blended dark blue → gold app background (gold gently fades into the blue) */
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
+  box-sizing: border-box;
+  margin: 0;
   background-color: #0a0e17;
   background-image:
     radial-gradient(115% 80% at 50% -8%, rgba(201, 162, 39, 0.1) 0%, rgba(201, 162, 39, 0) 55%),
     linear-gradient(180deg, #0c1322 0%, #080a12 100%);
   background-attachment: fixed;
+  padding-top: 28px;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
 }
 
 /* ── Gold accent helper classes ──────────────────────────────────────────── */
@@ -93,7 +119,7 @@ body {
 
 /* Smaller gold gradient title for tool/mode detail pages (home hero stays .libra-title) */
 .libra-page-title {
-  font-size: 1.75rem;
+  font-size: 2.5rem;
   line-height: 1.15;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -171,4 +197,107 @@ body {
     linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%),
     #0e1420;
   border: 1px solid rgba(201, 162, 39, 0.18);
+}
+
+/* Common foreground / surface design tokens used by electron-core components */
+:root {
+  --fg: #f0ead8;
+  --fg-secondary: #a0a0a0;
+  --fg-tertiary: #8e8e8e;
+  --bg-control: rgba(255, 255, 255, 0.06);
+  --bg-control-active: rgba(255, 255, 255, 0.12);
+  --bg-control-subtle: rgba(255, 255, 255, 0.04);
+  --bg-well: rgba(0, 0, 0, 0.35);
+  --separator: rgba(255, 255, 255, 0.12);
+  --support-green: #4ade80;
+  --support-orange: #fb923c;
+  --support-red: #f87171;
+}
+
+/* Primary / secondary / tertiary text */
+.text-primary {
+  color: var(--fg);
+}
+
+.text-secondary {
+  color: var(--fg-secondary);
+}
+
+.text-tertiary {
+  color: var(--fg-tertiary);
+}
+
+/* Support status colors */
+.text-support-green {
+  color: var(--support-green);
+}
+
+.text-support-orange {
+  color: var(--support-orange);
+}
+
+.text-support-red {
+  color: var(--support-red);
+}
+
+.bg-support-green {
+  background-color: var(--support-green);
+}
+
+/* Accent utilities */
+.text-accent {
+  color: var(--accent);
+}
+
+.bg-accent {
+  background-color: var(--accent);
+}
+
+.bg-accent-hover {
+  background-color: var(--accent-hover);
+}
+
+.bg-accent-20 {
+  background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.bg-accent\/10 {
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.border-accent {
+  border-color: var(--accent);
+}
+
+.accent-accent {
+  accent-color: var(--accent);
+}
+
+/* Control surfaces */
+.bg-control {
+  background-color: var(--bg-control);
+}
+
+.bg-control-active {
+  background-color: var(--bg-control-active);
+}
+
+.bg-control-subtle {
+  background-color: var(--bg-control-subtle);
+}
+
+.bg-well {
+  background-color: var(--bg-well);
+}
+
+.border-separator {
+  border-color: var(--separator);
+}
+
+.rounded-control {
+  border-radius: 10px;
+}
+
+.rounded-card {
+  border-radius: 12px;
 }

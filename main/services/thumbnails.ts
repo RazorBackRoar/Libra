@@ -13,7 +13,7 @@ import { promisify } from "node:util";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createHash } from "node:crypto";
-import { app } from "@glaze/core/backend";
+import { app } from "@electron-core/backend";
 
 const execFileAsync = promisify(execFile);
 

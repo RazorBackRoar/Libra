@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, type ComponentType } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { ScrollArea, Text } from "@glaze/core/components";
-import { cn } from "@glaze/core/utils";
+import { ScrollArea, Text } from "@electron-core/components";
+import { cn } from "@electron-core/utils";
 import { useToolStateContext } from "./tool-state";
 import { MEDIA_MODES, UTILITY_TOOLS } from "./tools/registry";
 import type { SortMode } from "./types";
@@ -28,7 +28,7 @@ function DropCard({ icon: Icon, title, description, onActivate, accent = false }
     for (let i = 0; i < e.dataTransfer.files.length; i++) {
       const file = e.dataTransfer.files[i];
       if (file) {
-        const p = window.glazeAPI.webUtils.getPathForFile(file);
+        const p = window.electronAPI.webUtils.getPathForFile(file);
         if (p) paths.push(p);
       }
     }

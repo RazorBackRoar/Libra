@@ -1,26 +1,26 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { Button, Input, Text, toast } from "@electron-core/components";
+import { cn } from "@electron-core/utils";
 import { useMutation } from "@tanstack/react-query";
-import { Button, Input, Text, toast } from "@glaze/core/components";
-import { PlayIcon, DownloadIcon, Trash2Icon } from "lucide-react";
-import { cn } from "@glaze/core/utils";
+import { DownloadIcon, PlayIcon, Trash2Icon } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { ToolPage } from "../../components/tool-page";
+import { CancelButton } from "../../components/cancel-button";
 import { DropZone } from "../../components/drop-zone";
-import { ResultsTable, type SortKey, type SortDir } from "../../components/results-table";
-import { ScanSummary, type ScanSummaryPill } from "../../components/scan-summary";
 import { DryRunToggle } from "../../components/dry-run-toggle";
 import { ProgressBar } from "../../components/progress-bar";
-import { CancelButton } from "../../components/cancel-button";
+import { ResultsTable, type SortDir, type SortKey } from "../../components/results-table";
+import { ScanSummary, type ScanSummaryPill } from "../../components/scan-summary";
 import { SectionLabel } from "../../components/section-label";
+import { ToolPage } from "../../components/tool-page";
 import { useToolState } from "../tool-state";
-import { fpsBucket } from "../types";
 import type {
-  VideoInfo,
-  SortMode,
-  JobProgress,
-  DeleteSummary,
-  ProcessReport,
+    DeleteSummary,
+    JobProgress,
+    ProcessReport,
+    SortMode,
+    VideoInfo,
 } from "../types";
+import { fpsBucket } from "../types";
 
 // ── Title / subtitle per mode (shown centered at the top of the page) ──────────
 
@@ -41,31 +41,39 @@ interface ScanSummaryDef {
   predicate: (f: VideoInfo) => boolean;
 }
 
-/** Exact left-to-right order from the spec (§4). "Total Videos" is prepended
- *  at render time and clears all active filters. */
-const SCAN_SUMMARY_DEFS: ScanSummaryDef[] = [
-  { id: "4K", label: "4K", predicate: (f) => f.resolutionClass === "4K" },
-  { id: "FHD", label: "FHD", predicate: (f) => f.resolutionClass === "FHD" },
-  { id: "1080p", label: "1080p", predicate: (f) => f.resolutionClass === "1080p" },
-  { id: "HD", label: "HD", predicate: (f) => f.resolutionClass === "HD" },
-  { id: "720p", label: "720p", predicate: (f) => f.resolutionClass === "720p" },
-  { id: "SD", label: "SD", predicate: (f) => f.resolutionClass === "SD" },
-  { id: "iPhone", label: "iPhone", predicate: (f) => f.isApple },
-  { id: "SubFPS", label: "Sub FPS", predicate: (f) => fpsBucket(f.fps) === "Sub" },
-  { id: "30fps", label: "30fps", predicate: (f) => fpsBucket(f.fps) === "30" },
-  { id: "60fps", label: "60fps", predicate: (f) => fpsBucket(f.fps) === "60" },
-  { id: "120fps", label: "120fps", predicate: (f) => fpsBucket(f.fps) === "120" },
-  { id: "V", label: "V", predicate: (f) => f.orientation === "portrait" },
-  { id: "W", label: "W", predicate: (f) => f.orientation !== "portrait" },
-  { id: "GPS", label: "GPS", predicate: (f) => f.hasGPS },
-  { id: "NoGPS", label: "No GPS", predicate: (f) => !f.hasGPS },
-  { id: "OtherDevice", label: "Other Device", predicate: (f) => !f.isApple },
-  { id: "ScreenRec", label: "Screen REC", predicate: (f) => f.isScreenRecording },
-  { id: "Camera", label: "Camera", predicate: (f) => f.hasCameraInfo },
-  { id: "NoCamera", label: "No Camera", predicate: (f) => !f.hasCameraInfo },
-  { id: "FrontCamera", label: "Front Camera", predicate: (f) => f.cameraFront },
-  { id: "BackCamera", label: "Back Camera", predicate: (f) => f.cameraBack },
+/** Scan Summary filters in three fixed rows (spec). Every bubble is a
+ *  combinable AND filter; "Total Videos" is a separate count-only element. */
+const SCAN_SUMMARY_ROWS: ScanSummaryDef[][] = [
+  [
+    { id: "4K", label: "4K", predicate: (f) => f.resolutionClass === "4K" },
+    { id: "FHD", label: "FHD", predicate: (f) => f.resolutionClass === "FHD" },
+    { id: "1080p", label: "1080p", predicate: (f) => f.resolutionClass === "1080p" },
+    { id: "HD", label: "HD", predicate: (f) => f.resolutionClass === "HD" },
+    { id: "720p", label: "720p", predicate: (f) => f.resolutionClass === "720p" },
+    { id: "SD", label: "SD", predicate: (f) => f.resolutionClass === "SD" },
+    { id: "iPhone", label: "iPhone", predicate: (f) => f.isApple },
+    { id: "OtherDevice", label: "Other Device", predicate: (f) => !f.isApple },
+  ],
+  [
+    { id: "V", label: "V", predicate: (f) => f.orientation === "portrait" },
+    { id: "W", label: "W", predicate: (f) => f.orientation !== "portrait" },
+    { id: "GPS", label: "GPS", predicate: (f) => f.hasGPS },
+    { id: "NoGPS", label: "No GPS", predicate: (f) => !f.hasGPS },
+    { id: "30fps", label: "30fps", predicate: (f) => fpsBucket(f.fps) === "30" },
+    { id: "60fps", label: "60fps", predicate: (f) => fpsBucket(f.fps) === "60" },
+    { id: "120fps", label: "120fps", predicate: (f) => fpsBucket(f.fps) === "120" },
+    { id: "SubFPS", label: "Sub FPS", predicate: (f) => fpsBucket(f.fps) === "Sub" },
+  ],
+  [
+    { id: "Camera", label: "Camera", predicate: (f) => f.hasCameraInfo },
+    { id: "NoCamera", label: "No Camera", predicate: (f) => !f.hasCameraInfo },
+    { id: "FrontCamera", label: "Front Camera", predicate: (f) => f.cameraFront },
+    { id: "BackCamera", label: "Back Camera", predicate: (f) => f.cameraBack },
+    { id: "ScreenRec", label: "Screen Recording", predicate: (f) => f.isScreenRecording },
+  ],
 ];
+
+const SCAN_SUMMARY_DEFS: ScanSummaryDef[] = SCAN_SUMMARY_ROWS.flat();
 
 /** Opposite pairs — selecting one turns the other off (spec §7). */
 const EXCLUSIVE_GROUPS: string[][] = [
@@ -76,7 +84,7 @@ const EXCLUSIVE_GROUPS: string[][] = [
 // ── IPC helpers ───────────────────────────────────────────────────────────────
 
 async function invokeIpc<T>(channel: string, params: unknown): Promise<T> {
-  return window.glazeAPI.glaze.ipc.invoke(channel, params) as Promise<T>;
+  return window.electronAPI.app.ipc.invoke(channel, params) as Promise<T>;
 }
 
 function ReportStat({ label, value }: { label: string; value: number }) {
@@ -118,7 +126,7 @@ export function MediaOrganizer() {
 
   // ── Subscribe to job:progress notifications ──────────────────────────────
   useEffect(() => {
-    const unsub = window.glazeAPI.glaze.ipc.onNotification("job:progress", (payload: unknown) => {
+    const unsub = window.electronAPI.app.ipc.onNotification("job:progress", (payload: unknown) => {
       const p = payload as JobProgress;
       if (p.jobId === jobId) setProgress(p);
     });
@@ -130,10 +138,8 @@ export function MediaOrganizer() {
   // ── Derived: scan summary pills + AND-filtered file list ──────────────────
   const files = session.scannedFiles;
 
-  const scanSummaryPills: ScanSummaryPill[] = [
-    { id: "total", label: "Total Videos", count: files.length },
-    ...SCAN_SUMMARY_DEFS.map((d) => ({ id: d.id, label: d.label, count: files.filter(d.predicate).length })),
-  ];
+  const pillsFor = (defs: ScanSummaryDef[]): ScanSummaryPill[] =>
+    defs.map((d) => ({ id: d.id, label: d.label, count: files.filter(d.predicate).length }));
 
   const activeDefs = SCAN_SUMMARY_DEFS.filter((d) => activeFilterIds.has(d.id));
   const filteredFiles = activeDefs.length > 0 ? files.filter((f) => activeDefs.every((d) => d.predicate(f))) : files;
@@ -310,12 +316,15 @@ export function MediaOrganizer() {
       <div className="flex flex-col gap-4 rounded-card libra-panel p-4">
         <div className="flex flex-col gap-2">
           <SectionLabel>Scan Summary</SectionLabel>
-          <ScanSummary
-            pills={scanSummaryPills}
-            activeIds={activeFilterIds}
-            onChange={setActiveFilterIds}
-            exclusiveGroups={EXCLUSIVE_GROUPS}
-          />
+          {SCAN_SUMMARY_ROWS.map((row, i) => (
+            <ScanSummary
+              key={i}
+              pills={pillsFor(row)}
+              activeIds={activeFilterIds}
+              onChange={setActiveFilterIds}
+              exclusiveGroups={EXCLUSIVE_GROUPS}
+            />
+          ))}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -350,6 +359,14 @@ export function MediaOrganizer() {
             <PlayIcon className="size-4" />
             {processMutation.isPending ? "Processing…" : "Process"}
           </Button>
+        </div>
+
+        {/* Total Videos — count only, centered at the bottom (not a filter) */}
+        <div className="flex justify-center">
+          <span className="flex items-center gap-1.5 rounded-full bg-control px-3 py-1">
+            <span className="text-accent text-[13px] font-semibold tabular-nums">{files.length}</span>
+            <span className="text-primary text-[13px]">Total Videos</span>
+          </span>
         </div>
       </div>
 

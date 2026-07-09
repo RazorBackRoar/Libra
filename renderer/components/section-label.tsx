@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "@glaze/core/utils";
+import { cn } from "@electron-core/utils";
 
 interface SectionLabelProps {
   children: React.ReactNode;
