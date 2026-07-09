@@ -1,7 +1,7 @@
-import React, { useCallback, useRef, useState, type ComponentType } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { ScrollArea, Text } from "@electron-core/components";
 import { cn } from "@electron-core/utils";
+import { useNavigate } from "@tanstack/react-router";
+import React, { useCallback, useRef, useState, type ComponentType } from "react";
 import { useToolStateContext } from "./tool-state";
 import { MEDIA_MODES, UTILITY_TOOLS } from "./tools/registry";
 import type { SortMode } from "./types";
@@ -86,7 +86,7 @@ function DropCard({ icon: Icon, title, description, onActivate, accent = false }
         <Icon className={cn("size-4.5", chipGold ? "text-accent" : "text-secondary group-hover:text-primary")} />
       </div>
       <div className="flex flex-col min-w-0 flex-1">
-        <Text variant="strong" color="accent" truncate>
+        <Text variant="strong" color="primary" truncate>
           {isDragOver ? "Drop files here" : title}
         </Text>
         <Text variant="regular" color="secondary" className="line-clamp-1">

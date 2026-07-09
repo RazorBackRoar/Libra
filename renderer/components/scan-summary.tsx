@@ -1,4 +1,5 @@
 import { cn } from "@electron-core/utils";
+import type { VideoInfo } from "../main/types";
 
 export interface ScanSummaryPill {
   id: string;
@@ -79,6 +80,41 @@ export function ScanSummary({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// ── Stat grid — 2-column scan summary used by the L!bra media organizer ───────
+
+interface StatGridProps {
+  files: VideoInfo[];
+  className?: string;
+}
+
+export function StatGrid({ files, className }: StatGridProps) {
+  const stats = [
+    { label: "Videos", value: files.length },
+    { label: "iPhone", value: files.filter((f) => f.isApple).length },
+    { label: "GPS", value: files.filter((f) => f.hasGPS).length },
+    { label: "Camera", value: files.filter((f) => f.hasCameraInfo).length },
+    { label: "4K", value: files.filter((f) => f.resolutionClass === "4K").length },
+    { label: "HD", value: files.filter((f) => f.resolutionClass === "HD").length },
+    { label: "1080p", value: files.filter((f) => f.resolutionClass === "1080p").length },
+    { label: "SD", value: files.filter((f) => f.resolutionClass === "SD").length },
+    { label: "720p", value: files.filter((f) => f.resolutionClass === "720p").length },
+    { label: "—", value: undefined },
+  ];
+
+  return (
+    <div className={cn("grid grid-cols-2 gap-3", className)}>
+      {stats.map((s, i) => (
+        <div key={i} className="flex flex-col gap-0.5">
+          <span className="text-accent text-lg font-semibold tabular-nums">
+            {s.value ?? "—"}
+          </span>
+          <span className="text-secondary text-xs">{s.label}</span>
+        </div>
+      ))}
     </div>
   );
 }

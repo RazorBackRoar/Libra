@@ -16,21 +16,22 @@
  * what completed.
  */
 
-import * as fs from "node:fs/promises";
-import { createReadStream } from "node:fs";
-import * as path from "node:path";
 import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import { emitProgress } from "./jobs.js";
 import {
-  OUTPUT_FOLDER_NAMES,
-  isHousekeepingName,
-  orientationCode,
-  fpsToken,
-  fpsFolderToken,
-  type VideoInfo,
-  type SortMode,
-  type ProcessReport,
-  type ProcessResultItem,
+    OUTPUT_FOLDER_NAMES,
+    folderOrientation,
+    fpsFolderToken,
+    fpsToken,
+    isHousekeepingName,
+    orientationCode,
+    type ProcessReport,
+    type ProcessResultItem,
+    type SortMode,
+    type VideoInfo
 } from "./types.js";
 
 const OUTPUT_FOLDERS = new Set(OUTPUT_FOLDER_NAMES);
@@ -69,24 +70,27 @@ function sanitizePrefix(raw: string | undefined): string {
   return out.trim();
 }
 
-/** Emoji segment in the fixed order 📱 📷 🌍 (device / camera / GPS), empty
- *  when none apply (spec §16). */
+/** Emoji segment in the fixed order 📱 📷 🌍 ✂️, empty when none apply. */
 function emojiSet(info: VideoInfo): string {
   let s = "";
   if (info.isApple) s += "📱";
   if (info.hasCameraInfo) s += "📷";
   if (info.hasGPS) s += "🌍";
+  if (info.isEdited) s += "✂️";
   return s;
 }
 
 /** Strip a previously-applied L!bra convention suffix so re-runs never stack
- *  metadata (e.g. "Jennifer 1080p W60 📱📷🌍 003" → "Jennifer"). */
+ *  metadata (e.g. "Jennifer 1080p W 60 📱🌍 003" → "Jennifer"). */
 function stripConventionSuffix(base: string): string {
   let b = base;
-  b = b.replace(/\s+\d{3,}(?:\s+X+)?$/i, ""); // trailing " NNN" / " NNN X…"
-  // trailing " RES O[fps]" optionally followed by the emoji token (a single run
-  // of non-space characters, e.g. "📱📷🌍").
-  b = b.replace(/\s+(?:4K|FHD|1080p|HD|720p|SD|Unknown)\s+[WV]\d*(?:\s+\S+)?$/i, "");
+  // trailing " RES O fps [emoji] NNN [X…]" (emojis are a single non-space, non-digit run).
+  b = b.replace(
+    /\s+(?:4K|1080p|720p|HD|SD|Unknown)\s+[WV]\s+(?:30|60)(?:\s+[^\s\d]+)?\s+\d{3,}(?:\s+X+)?$/iu,
+    "",
+  );
+  // trailing " NNN" / " NNN X…" (bare number suffix from old names or duplicates).
+  b = b.replace(/\s+\d{3,}(?:\s+X+)?$/i, "");
   return b.trim();
 }
 
@@ -98,12 +102,12 @@ function baseNameFor(prefix: string, info: VideoInfo): string {
   return sanitizePrefix(stripConventionSuffix(originalBase)) || "video";
 }
 
-/** Full name without NUMBER/extension: "{base} {RES} {O}{fps} {emojis}" (spec §15). */
+/** Full name without NUMBER/extension: "{base} {RES} {O} {fps} [emojis]" (spec §15). */
 function buildBaseName(prefix: string, info: VideoInfo): string {
   const parts: string[] = [
     baseNameFor(prefix, info),
     info.resolutionClass,
-    `${orientationCode(info.orientation)}${fpsToken(info.fps)}`,
+    `${orientationCode(info.orientation)} ${fpsToken(info.fps)}`,
   ];
   const em = emojiSet(info);
   if (em) parts.push(em);
@@ -118,7 +122,7 @@ function numberStr(n: number): string {
 /** Output-group token (resolution + orientation + frame rate) used to reset
  *  numbering in Pro Vid (spec §18). */
 function groupToken(info: VideoInfo): string {
-  return `${info.resolutionClass} ${orientationCode(info.orientation)}${fpsToken(info.fps)}`;
+  return `${info.resolutionClass} ${orientationCode(info.orientation)} ${fpsToken(info.fps)}`;
 }
 
 function targetDir(root: string, mode: SortMode, info: VideoInfo): string {
@@ -129,16 +133,15 @@ function targetDir(root: string, mode: SortMode, info: VideoInfo): string {
     case "KeepName":
       return path.join(root, info.resolutionClass);
     case "ProMax":
-      // Flat, single-level — e.g. "4K W" (NOT nested "4K/Wide").
-      return path.join(root, `${info.resolutionClass} ${orientationCode(info.orientation)}`);
+      // Resolution/Orientation (2 layers): e.g. "4K/Wide".
+      return path.join(root, info.resolutionClass, folderOrientation(info.orientation));
     case "MaxVid":
-      // Flat, single-level — e.g. "4K W 60" / "4K W 120" (NOT 3 nested levels).
+      // Resolution/Orientation+FPS (2 layers): e.g. "4K/Wide 60fps".
       return path.join(
         root,
-        `${info.resolutionClass} ${orientationCode(info.orientation)} ${fpsFolderToken(info.fps)}`,
+        info.resolutionClass,
+        `${folderOrientation(info.orientation)} ${fpsFolderToken(info.fps)}`,
       );
-    case "SlowMotion":
-      return path.join(root, info.isSlowMotion ? "Slow Motion" : "Normal Speed");
   }
 }
 
@@ -228,7 +231,9 @@ async function collectNonVideos(
   extensionSet: Set<string>,
   nonVideos: string[],
   symlinks: string[],
+  depth = 0,
 ): Promise<void> {
+  if (depth > 2) return;
   let entries;
   try {
     entries = await fs.readdir(root, { withFileTypes: true });
@@ -243,9 +248,12 @@ async function collectNonVideos(
       continue;
     }
     if (entry.isDirectory()) {
-      // Never descend into our own output folders (incl. MISC).
+      // Never descend into our own output folders (incl. MISC) and never go
+      // deeper than 2 layers below the dropped folder.
       if (OUTPUT_FOLDERS.has(entry.name)) continue;
-      await collectNonVideos(full, extensionSet, nonVideos, symlinks);
+      if (depth < 2) {
+        await collectNonVideos(full, extensionSet, nonVideos, symlinks, depth + 1);
+      }
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).replace(/^\./, "").toLowerCase();
       if (!extensionSet.has(ext)) nonVideos.push(full);
@@ -347,7 +355,11 @@ export async function processFolder(opts: ProcessOptions): Promise<ProcessReport
 
       if (generatesNames) {
         const baseName = buildBaseName(prefix, info);
-        const conventionRe = new RegExp(`^${escapeRegex(baseName)} (\\d{3,})( X+)?${escapeRegex(ext)}$`, "i");
+        const orientFps = `${orientationCode(info.orientation)} ${fpsToken(info.fps)}`;
+        const conventionRe = new RegExp(
+          `^${escapeRegex(baseName)} ${escapeRegex(info.resolutionClass)} ${escapeRegex(orientFps)}(?:\\s+[^\\s\\d]+)?\\s+(\\d{3,})(?:\\s+X+)?${escapeRegex(ext)}$`,
+          "iu",
+        );
 
         // Already organized (correct folder + convention name) → skip.
         if (path.dirname(info.path) === dir && conventionRe.test(info.name)) {

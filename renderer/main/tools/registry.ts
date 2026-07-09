@@ -1,15 +1,14 @@
-import type { ComponentType } from "react";
 import {
-  FolderSyncIcon,
-  TagIcon,
-  MonitorIcon,
-  LayersIcon,
-  MaximizeIcon,
-  BookmarkIcon,
-  ClockIcon,
-  FastForwardIcon,
-  MapPinIcon,
+    BookmarkIcon,
+    ClockIcon,
+    FolderSyncIcon,
+    LayersIcon,
+    MapPinIcon,
+    MaximizeIcon,
+    MonitorIcon,
+    TagIcon
 } from "lucide-react";
+import type { ComponentType } from "react";
 import type { SortMode } from "../types";
 
 export type ToolCategory = "organize" | "rename" | "analyze" | "convert";
@@ -31,12 +30,11 @@ export interface MediaMode {
 }
 
 export const MEDIA_MODES: MediaMode[] = [
-  { mode: "ProVid", title: "Pro Vid", description: "Rename in place with a custom prefix.", icon: TagIcon },
-  { mode: "VidRes", title: "Vid Res", description: "Sort into resolution folders only", icon: MonitorIcon },
-  { mode: "ProMax", title: "Pro Max", description: "Sort into resolution + orientation subfolders.", icon: LayersIcon },
-  { mode: "MaxVid", title: "Max Vid", description: "Sort into resolution + orientation + FPS subfolders.", icon: MaximizeIcon },
-  { mode: "KeepName", title: "Name Keeper", description: "Sort into resolution folders, keep original filenames.", icon: BookmarkIcon },
-  { mode: "SlowMotion", title: "Slo-Mo", description: "Slow down videos", icon: FastForwardIcon },
+  { mode: "ProVid", title: "Pro Vid", description: "Prefix Rename", icon: TagIcon },
+  { mode: "VidRes", title: "Vid Res", description: "Resolution Sort", icon: MonitorIcon },
+  { mode: "ProMax", title: "Pro Max", description: "Resolution + Orientation Sort", icon: LayersIcon },
+  { mode: "MaxVid", title: "Max Vid", description: "Full Sort", icon: MaximizeIcon },
+  { mode: "KeepName", title: "Name Keeper", description: "Resolution + Keep Names", icon: BookmarkIcon },
 ];
 
 /** The Media Organizer workflow tool (single page; modes above select its behavior). */

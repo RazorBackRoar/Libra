@@ -5,7 +5,8 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { FileOpResult, VideoInfo, SortMode } from "./types.js";
+import type { FileOpResult, SortMode, VideoInfo } from "./types.js";
+import { folderOrientation, fpsFolderToken } from "./types.js";
 
 // ─── Collision-safe destination ───────────────────────────────────────────────
 
@@ -126,18 +127,21 @@ export function buildSortDestPath(
       return path.join(base, info.resolutionClass, newName);
     }
     case "ProMax": {
-      return path.join(base, info.resolutionClass, info.orientation, newName);
+      // Resolution/Orientation (2 layers): e.g. "4K/Wide".
+      return path.join(base, info.resolutionClass, folderOrientation(info.orientation), newName);
     }
     case "MaxVid": {
-      const fps = info.fps !== null ? `${info.fps}fps` : "unknownfps";
-      return path.join(base, info.resolutionClass, info.orientation, fps, newName);
+      // Resolution/Orientation+FPS (2 layers): e.g. "4K/Wide 60fps".
+      return path.join(
+        base,
+        info.resolutionClass,
+        `${folderOrientation(info.orientation)} ${fpsFolderToken(info.fps)}`,
+        newName,
+      );
     }
     case "KeepName": {
       // Same folder structure as VidRes but never alter the filename
       return path.join(base, info.resolutionClass, info.name);
-    }
-    case "SlowMotion": {
-      return path.join(base, info.isSlowMotion ? "Slow Motion" : "Normal Speed", newName);
     }
   }
 }

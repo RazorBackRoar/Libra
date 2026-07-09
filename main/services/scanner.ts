@@ -17,14 +17,15 @@ const OUTPUT_FOLDERS = new Set(OUTPUT_FOLDER_NAMES);
  * - app-created output folders (4K/1080p/720p/HD/SD/MISC) are skipped so
  *   re-runs never re-read prior output,
  * - symbolic links are skipped (and reported),
- * - macOS housekeeping entries are ignored.
+ * - macOS housekeeping entries are ignored,
+ * - depth is capped at 2 layers below the dropped folder.
  */
 async function collectFiles(
   root: string,
   extensionSet: Set<string>,
   out: string[],
   skippedSymlinks: string[],
-  isTopLevel: boolean,
+  depth = 0,
 ): Promise<void> {
   let stat;
   try {
@@ -42,8 +43,10 @@ async function collectFiles(
   if (!stat.isDirectory()) return;
 
   // Never recurse into the app's own output folders (unless the user dropped
-  // one of them directly as the top-level path).
-  if (!isTopLevel && OUTPUT_FOLDERS.has(path.basename(root))) return;
+  // one of them directly as the top-level path) and never go deeper than 2
+  // layers below the dropped folder.
+  if (depth > 0 && OUTPUT_FOLDERS.has(path.basename(root))) return;
+  if (depth > 2) return;
 
   let entries;
   try {
@@ -60,7 +63,9 @@ async function collectFiles(
       continue;
     }
     if (entry.isDirectory()) {
-      await collectFiles(full, extensionSet, out, skippedSymlinks, false);
+      if (depth < 2) {
+        await collectFiles(full, extensionSet, out, skippedSymlinks, depth + 1);
+      }
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).replace(/^\./, "").toLowerCase();
       if (extensionSet.has(ext)) out.push(full);
@@ -90,7 +95,7 @@ export async function scan(opts: {
   const skippedSymlinks: string[] = [];
   for (const p of paths) {
     if (cancelFlag.cancelled) return { files: [], cancelled: true, skippedSymlinks };
-    await collectFiles(p, extensionSet, filePaths, skippedSymlinks, true);
+    await collectFiles(p, extensionSet, filePaths, skippedSymlinks, 0);
   }
 
   const total = filePaths.length;

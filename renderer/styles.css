@@ -154,49 +154,49 @@ body::-webkit-scrollbar {
   color: #f0d98a;
 }
 
-/* Tool / mode card — blended blue base with a faint, thin gold border */
+/* Tool / mode card — blended blue base with a subtle, thin gold border */
 .libra-mode-card {
   background:
-    radial-gradient(120% 140% at 100% 0%, rgba(201, 162, 39, 0.07) 0%, rgba(201, 162, 39, 0) 55%),
+    radial-gradient(120% 140% at 100% 0%, rgba(201, 162, 39, 0.04) 0%, rgba(201, 162, 39, 0) 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%),
     #0e1420;
-  border: 1px solid rgba(201, 162, 39, 0.18);
+  border: 1px solid rgba(201, 162, 39, 0.12);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 .libra-mode-card:hover {
-  border-color: rgba(201, 162, 39, 0.6);
-  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.28), 0 6px 18px rgba(0, 0, 0, 0.45);
+  border-color: rgba(201, 162, 39, 0.45);
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.2), 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 .libra-mode-card:focus-visible {
   outline: none;
-  border-color: rgba(201, 162, 39, 0.7);
-  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.5);
+  border-color: rgba(201, 162, 39, 0.55);
+  box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.35);
 }
 
 /* Accented mode card — primary organizer buttons get a warmer gold tint */
 .libra-mode-card-accent {
   background:
-    linear-gradient(180deg, rgba(201, 162, 39, 0.1) 0%, rgba(201, 162, 39, 0.02) 100%),
+    linear-gradient(180deg, rgba(201, 162, 39, 0.08) 0%, rgba(201, 162, 39, 0.02) 100%),
     #171512;
-  border-color: rgba(201, 162, 39, 0.32);
+  border-color: rgba(201, 162, 39, 0.28);
 }
 .libra-mode-card-accent:hover {
-  border-color: rgba(201, 162, 39, 0.75);
-  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.4), 0 6px 20px rgba(0, 0, 0, 0.5);
+  border-color: rgba(201, 162, 39, 0.65);
+  box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.35), 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 /* Very thin, faint gold border — for dividers and structural edges on tool pages */
 .libra-faint-border {
-  border-color: rgba(201, 162, 39, 0.18);
+  border-color: rgba(201, 162, 39, 0.12);
 }
 
 /* Blended blue/gold panel — matches the home cards, used to group tool-page sections */
 .libra-panel {
   background:
-    radial-gradient(120% 160% at 100% 0%, rgba(201, 162, 39, 0.06) 0%, rgba(201, 162, 39, 0) 55%),
+    radial-gradient(120% 160% at 100% 0%, rgba(201, 162, 39, 0.04) 0%, rgba(201, 162, 39, 0) 55%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 100%),
     #0e1420;
-  border: 1px solid rgba(201, 162, 39, 0.18);
+  border: 1px solid rgba(201, 162, 39, 0.12);
 }
 
 /* Common foreground / surface design tokens used by electron-core components */

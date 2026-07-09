@@ -7,9 +7,10 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CancelButton } from "../../components/cancel-button";
 import { DropZone } from "../../components/drop-zone";
 import { DryRunToggle } from "../../components/dry-run-toggle";
+import { FilterPills, type FilterPillDef } from "../../components/filter-pills";
 import { ProgressBar } from "../../components/progress-bar";
 import { ResultsTable, type SortDir, type SortKey } from "../../components/results-table";
-import { ScanSummary, type ScanSummaryPill } from "../../components/scan-summary";
+import { StatGrid } from "../../components/scan-summary";
 import { SectionLabel } from "../../components/section-label";
 import { ToolPage } from "../../components/tool-page";
 import { useToolState } from "../tool-state";
@@ -20,66 +21,40 @@ import type {
     SortMode,
     VideoInfo,
 } from "../types";
-import { fpsBucket } from "../types";
 
-// ── Title / subtitle per mode (shown centered at the top of the page) ──────────
+// ── Title / subtitle per mode (shown as the page category) ─────────────────────
 
 const MODE_LABELS: Record<SortMode, { title: string; subtitle: string }> = {
-  ProVid: { title: "Pro Vid", subtitle: "Prefix Rename Videos" },
-  VidRes: { title: "Vid Res", subtitle: "Sort by Resolution" },
-  ProMax: { title: "Pro Max", subtitle: "Resolution + Orientation" },
-  MaxVid: { title: "Max Vid", subtitle: "Resolution + Orientation + FPS" },
-  KeepName: { title: "Name Keeper", subtitle: "Sort by Resolution, Keep Names" },
-  SlowMotion: { title: "Slo-Mo", subtitle: "Slow Down Videos" },
+  ProVid: { title: "Pro Vid", subtitle: "Prefix Rename" },
+  VidRes: { title: "Vid Res", subtitle: "Resolution Sort" },
+  ProMax: { title: "Pro Max", subtitle: "Resolution + Orientation Sort" },
+  MaxVid: { title: "Max Vid", subtitle: "Full Sort" },
+  KeepName: { title: "Name Keeper", subtitle: "Resolution + Keep Names" },
 };
 
-// ── Scan Summary — the filter system (spec §4/§5), AND-combinable ─────────────
+// ── Filter set (spec §3) ───────────────────────────────────────────────────────
 
-interface ScanSummaryDef {
-  id: string;
-  label: string;
-  predicate: (f: VideoInfo) => boolean;
-}
-
-/** Scan Summary filters in three fixed rows (spec). Every bubble is a
- *  combinable AND filter; "Total Videos" is a separate count-only element. */
-const SCAN_SUMMARY_ROWS: ScanSummaryDef[][] = [
-  [
-    { id: "4K", label: "4K", predicate: (f) => f.resolutionClass === "4K" },
-    { id: "FHD", label: "FHD", predicate: (f) => f.resolutionClass === "FHD" },
-    { id: "1080p", label: "1080p", predicate: (f) => f.resolutionClass === "1080p" },
-    { id: "HD", label: "HD", predicate: (f) => f.resolutionClass === "HD" },
-    { id: "720p", label: "720p", predicate: (f) => f.resolutionClass === "720p" },
-    { id: "SD", label: "SD", predicate: (f) => f.resolutionClass === "SD" },
-    { id: "iPhone", label: "iPhone", predicate: (f) => f.isApple },
-    { id: "OtherDevice", label: "Other Device", predicate: (f) => !f.isApple },
-  ],
-  [
-    { id: "V", label: "V", predicate: (f) => f.orientation === "portrait" },
-    { id: "W", label: "W", predicate: (f) => f.orientation !== "portrait" },
-    { id: "GPS", label: "GPS", predicate: (f) => f.hasGPS },
-    { id: "NoGPS", label: "No GPS", predicate: (f) => !f.hasGPS },
-    { id: "30fps", label: "30fps", predicate: (f) => fpsBucket(f.fps) === "30" },
-    { id: "60fps", label: "60fps", predicate: (f) => fpsBucket(f.fps) === "60" },
-    { id: "120fps", label: "120fps", predicate: (f) => fpsBucket(f.fps) === "120" },
-    { id: "SubFPS", label: "Sub FPS", predicate: (f) => fpsBucket(f.fps) === "Sub" },
-  ],
-  [
-    { id: "Camera", label: "Camera", predicate: (f) => f.hasCameraInfo },
-    { id: "NoCamera", label: "No Camera", predicate: (f) => !f.hasCameraInfo },
-    { id: "FrontCamera", label: "Front Camera", predicate: (f) => f.cameraFront },
-    { id: "BackCamera", label: "Back Camera", predicate: (f) => f.cameraBack },
-    { id: "ScreenRec", label: "Screen Recording", predicate: (f) => f.isScreenRecording },
-  ],
+const FILTER_DEFS: FilterPillDef[] = [
+  { id: "4K", label: "4K" },
+  { id: "1080p", label: "1080p" },
+  { id: "720p", label: "720p" },
+  { id: "HD", label: "HD" },
+  { id: "SD", label: "SD" },
+  { id: "GPS", label: "GPS" },
+  { id: "iPhone", label: "iPhone" },
+  { id: "Camera", label: "Camera" },
 ];
 
-const SCAN_SUMMARY_DEFS: ScanSummaryDef[] = SCAN_SUMMARY_ROWS.flat();
-
-/** Opposite pairs — selecting one turns the other off (spec §7). */
-const EXCLUSIVE_GROUPS: string[][] = [
-  ["GPS", "NoGPS"],
-  ["Camera", "NoCamera"],
-];
+const FILTER_PREDICATES: Record<string, (f: VideoInfo) => boolean> = {
+  "4K": (f) => f.resolutionClass === "4K",
+  "1080p": (f) => f.resolutionClass === "1080p",
+  "720p": (f) => f.resolutionClass === "720p",
+  HD: (f) => f.resolutionClass === "HD",
+  SD: (f) => f.resolutionClass === "SD",
+  GPS: (f) => f.hasGPS,
+  iPhone: (f) => f.isApple,
+  Camera: (f) => f.hasCameraInfo,
+};
 
 // ── IPC helpers ───────────────────────────────────────────────────────────────
 
@@ -107,7 +82,6 @@ export function MediaOrganizer() {
   const { session, updateSession } = useToolState(toolId);
   const jobId = useId();
 
-  // Mode is chosen on the mode-selection screen; default to Max Vid.
   const presetMode = session.options.mode as SortMode | undefined;
   const mode: SortMode = presetMode ?? "MaxVid";
   const isKeepName = mode === "KeepName";
@@ -135,27 +109,27 @@ export function MediaOrganizer() {
     };
   }, [jobId]);
 
-  // ── Derived: scan summary pills + AND-filtered file list ──────────────────
+  // ── Derived state ────────────────────────────────────────────────────────
   const files = session.scannedFiles;
+  const filteredFiles =
+    activeFilterIds.size > 0
+      ? files.filter((f) => [...activeFilterIds].every((id) => FILTER_PREDICATES[id]?.(f)))
+      : files;
 
-  const pillsFor = (defs: ScanSummaryDef[]): ScanSummaryPill[] =>
-    defs.map((d) => ({ id: d.id, label: d.label, count: files.filter(d.predicate).length }));
-
-  const activeDefs = SCAN_SUMMARY_DEFS.filter((d) => activeFilterIds.has(d.id));
-  const filteredFiles = activeDefs.length > 0 ? files.filter((f) => activeDefs.every((d) => d.predicate(f))) : files;
+  const hasFiles = files.length > 0;
+  const hasSelection = session.selectedPaths.size > 0;
 
   // ── Handle paths from drop / dialog ─────────────────────────────────────
   const handlePaths = useCallback(
     (paths: string[]) => {
       console.log("[media-organizer:paths]", { count: paths.length });
       updateSession({ droppedPaths: paths, scannedFiles: [] });
-      setProgress(null);
       setReport(null);
     },
     [updateSession],
   );
 
-  // ── Scan mutation (auto-triggered on drop / mount) ────────────────────────
+  // ── Scan mutation (auto-triggered on drop) ───────────────────────────────
   const scanMutation = useMutation({
     mutationFn: async (paths: string[]) => {
       cancelledRef.current = false;
@@ -163,10 +137,10 @@ export function MediaOrganizer() {
       setProgress(null);
       setReport(null);
       console.log("[media-organizer:scan:start]", { jobId, paths });
-      return invokeIpc<{ files: VideoInfo[]; cancelled: boolean }>("scan:start", {
-        jobId,
-        paths,
-      });
+      return invokeIpc<{ files: VideoInfo[]; cancelled: boolean; skippedSymlinks: string[] }>(
+        "scan:start",
+        { jobId, paths },
+      );
     },
     onSuccess: (result) => {
       setIsScanning(false);
@@ -182,15 +156,6 @@ export function MediaOrganizer() {
     },
   });
 
-  // ── Cancel ───────────────────────────────────────────────────────────────
-  const handleCancel = async () => {
-    cancelledRef.current = true;
-    await invokeIpc("job:cancel", { jobId });
-    setIsScanning(false);
-    setProgress(null);
-  };
-
-  // ── Auto-scan whenever the dropped paths change (drop or preload). ─────────
   const lastScannedRef = useRef<string>("");
   useEffect(() => {
     const sig = session.droppedPaths.join("\n");
@@ -200,11 +165,19 @@ export function MediaOrganizer() {
     }
   }, [session.droppedPaths]);
 
+  // ── Cancel ───────────────────────────────────────────────────────────────
+  const handleCancel = async () => {
+    cancelledRef.current = true;
+    await invokeIpc("job:cancel", { jobId });
+    setIsScanning(false);
+    setProgress(null);
+  };
+
   // ── Process mutation (full pipeline) ──────────────────────────────────────
   const processMutation = useMutation({
     mutationFn: async () => {
-      const organizeFiles = filteredFiles.filter((f) => f.error === null);
-      const unreadablePaths = session.scannedFiles.filter((f) => f.error !== null).map((f) => f.path);
+      const organizeFiles = files.filter((f) => f.error === null);
+      const unreadablePaths = files.filter((f) => f.error !== null).map((f) => f.path);
       console.log("[media-organizer:process:run]", { jobId, mode, count: organizeFiles.length, dryRun });
       return invokeIpc<ProcessReport>("process:run", {
         jobId,
@@ -289,22 +262,31 @@ export function MediaOrganizer() {
     }
   };
 
+  // ── Filter toggle ────────────────────────────────────────────────────────
+  const toggleFilter = useCallback((id: string) => {
+    setActiveFilterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   // ── Render ───────────────────────────────────────────────────────────────
 
-  const hasFiles = session.scannedFiles.length > 0;
-  const hasSelection = session.selectedPaths.size > 0;
+  const destinationPath = report?.droppedRoot ?? session.droppedPaths[0] ?? "—";
 
   return (
-    <ToolPage title={modeInfo.title}>
-      {/* Centered mode title + subtitle (never the "L!bra" hero — that's home-only) */}
+    <ToolPage title="L!bra" category={modeInfo.title}>
+      {/* Header */}
       <div className="flex flex-col items-center text-center gap-1.5 pt-1 pb-1">
-        <h1 className="libra-page-title">{modeInfo.title}</h1>
+        <h1 className="libra-page-title">L!bra</h1>
         <Text variant="regular" color="secondary">
-          {modeInfo.subtitle}
+          Filter, organize, review, and inspect rich video metadata.
         </Text>
       </div>
 
-      {/* Progress (scanning or processing) */}
+      {/* Progress */}
       {(isScanning || processMutation.isPending) && progress && (
         <div className="flex flex-col gap-3">
           <ProgressBar progress={progress} />
@@ -312,116 +294,123 @@ export function MediaOrganizer() {
         </div>
       )}
 
-      {/* ── Scan Summary box: filters + Rename Videos + actions + Process ── */}
-      <div className="flex flex-col gap-4 rounded-card libra-panel p-4">
-        <div className="flex flex-col gap-2">
-          <SectionLabel>Scan Summary</SectionLabel>
-          {SCAN_SUMMARY_ROWS.map((row, i) => (
-            <ScanSummary
-              key={i}
-              pills={pillsFor(row)}
-              activeIds={activeFilterIds}
-              onChange={setActiveFilterIds}
-              exclusiveGroups={EXCLUSIVE_GROUPS}
-            />
-          ))}
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Left sidebar — scan summary + filters */}
+        <div className="w-full lg:w-64 flex flex-col gap-4">
+          <div className="flex flex-col gap-3 rounded-card libra-panel p-4">
+            <SectionLabel className="text-[14px]">Scan Summary</SectionLabel>
+            <StatGrid files={files} />
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-card libra-panel p-4">
+            <SectionLabel>Filters</SectionLabel>
+            <FilterPills filters={FILTER_DEFS} active={activeFilterIds} onToggle={toggleFilter} />
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="filled" size="small" onClick={() => void handleExportCsv()} disabled={!hasFiles}>
-            <DownloadIcon className="size-4" />
-            Export CSV
-          </Button>
-          <Button
-            variant="filled"
-            size="small"
-            onClick={() => deleteMutation.mutate()}
-            disabled={!hasSelection || deleteMutation.isPending}
-            className={cn(hasSelection ? "text-support-red" : "")}
-          >
-            <Trash2Icon className="size-4" />
-            Delete Selected ({session.selectedPaths.size})
-          </Button>
-          <Input
-            className="flex-1 min-w-[160px]"
-            placeholder={isKeepName ? "Renaming disabled" : "Rename Videos"}
-            value={prefix}
-            onChange={(e) => setPrefix(e.target.value)}
-            disabled={isKeepName}
-          />
-          <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
-          <Button
-            variant="accent"
-            size="large"
-            onClick={() => processMutation.mutate()}
-            disabled={!hasFiles || processMutation.isPending}
-          >
-            <PlayIcon className="size-4" />
-            {processMutation.isPending ? "Processing…" : "Process"}
-          </Button>
-        </div>
+        {/* Right main area */}
+        <div className="flex-1 flex flex-col gap-4">
+          {/* Secondary toolbar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="filled" size="small" onClick={() => void handleExportCsv()} disabled={!hasFiles}>
+              <DownloadIcon className="size-4" />
+              Export CSV
+            </Button>
+            <Button
+              variant="filled"
+              size="small"
+              onClick={() => deleteMutation.mutate()}
+              disabled={!hasSelection || deleteMutation.isPending}
+              className={cn(hasSelection ? "text-support-red" : "")}
+            >
+              <Trash2Icon className="size-4" />
+              Delete Selected ({session.selectedPaths.size})
+            </Button>
+            <DryRunToggle checked={dryRun} onCheckedChange={setDryRun} />
+          </div>
 
-        {/* Total Videos — count only, centered at the bottom (not a filter) */}
-        <div className="flex justify-center">
-          <span className="flex items-center gap-1.5 rounded-full bg-control px-3 py-1">
-            <span className="text-accent text-[13px] font-semibold tabular-nums">{files.length}</span>
-            <span className="text-primary text-[13px]">Total Videos</span>
-          </span>
+          {/* Drop zone / results */}
+          <DropZone
+            onPaths={handlePaths}
+            accept="both"
+            disabled={isScanning}
+            className="min-h-[320px]"
+            hint={hasFiles ? "Drag more videos or a folder here" : "Drag videos or a folder here"}
+          >
+            {(hasFiles || report) ? (
+              <div className="flex flex-col gap-3">
+                {report && (
+                  <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
+                    <Text variant="small-strong" color="primary">
+                      {report.stopped
+                        ? `Stopped early — ${report.stopped.reason}`
+                        : report.dryRun
+                          ? "Dry run — no files were changed."
+                          : report.noVideos
+                            ? "No videos to organize; non-video files moved to MISC where present."
+                            : "Processing complete."}
+                    </Text>
+                    <Text variant="small" color="tertiary" truncate>
+                      {report.droppedRoot}
+                    </Text>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
+                      <ReportStat label="organized" value={report.counts.organized} />
+                      <ReportStat label="duplicates" value={report.counts.duplicates} />
+                      <ReportStat label="to MISC" value={report.counts.misc + report.counts.unreadable} />
+                      <ReportStat label="unreadable" value={report.counts.unreadable} />
+                      <ReportStat label="skipped" value={report.counts.skipped} />
+                      <ReportStat label="errors" value={report.counts.errors} />
+                    </div>
+                  </div>
+                )}
+                {hasFiles && (
+                  <div className="flex flex-col gap-2">
+                    <SectionLabel>Results ({filteredFiles.length})</SectionLabel>
+                    <ResultsTable
+                      files={filteredFiles}
+                      selectedPaths={session.selectedPaths}
+                      onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
+                      emptyTitle="No videos match the active filters"
+                      emptyDescription="Clear filters to see all scanned videos."
+                    />
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </DropZone>
+
+          {/* Bottom action bar — destination + rename + process */}
+          {hasFiles && (
+            <div className="flex items-end gap-3 flex-wrap justify-end">
+              <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                <SectionLabel>Destination</SectionLabel>
+                <Text variant="small" color="secondary" truncate>
+                  {destinationPath}
+                </Text>
+              </div>
+              <Input
+                className="flex-1 min-w-[160px]"
+                placeholder={isKeepName ? "Renaming disabled" : "Name Videos"}
+                value={prefix}
+                onChange={(e) => setPrefix(e.target.value)}
+                disabled={isKeepName}
+              />
+              <Button
+                variant="accent"
+                size="large"
+                onClick={() => processMutation.mutate()}
+                disabled={!hasFiles || processMutation.isPending}
+              >
+                <PlayIcon className="size-4" />
+                {processMutation.isPending ? "Processing…" : "Process"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* ── Main workspace: the drop area doubles as the results / finished-changes window ── */}
-      <DropZone
-        onPaths={handlePaths}
-        accept="both"
-        disabled={isScanning}
-        className="min-h-[320px]"
-        hint={hasFiles ? "Drag more videos or a folder here" : "Drag videos or a folder here"}
-      >
-        {(hasFiles || report) ? (
-          <div className="flex flex-col gap-3">
-            {report && (
-              <div className="flex flex-col gap-2 rounded-card border libra-gold-border libra-drop-bg px-4 py-3">
-                <Text variant="small-strong" color="primary">
-                  {report.stopped
-                    ? `Stopped early — ${report.stopped.reason}`
-                    : report.dryRun
-                      ? "Dry run — no files were changed."
-                      : report.noVideos
-                        ? "No videos to organize; non-video files moved to MISC where present."
-                        : "Processing complete."}
-                </Text>
-                <Text variant="small" color="tertiary" truncate>
-                  {report.droppedRoot}
-                </Text>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-1">
-                  <ReportStat label="organized" value={report.counts.organized} />
-                  <ReportStat label="duplicates" value={report.counts.duplicates} />
-                  <ReportStat label="to MISC" value={report.counts.misc} />
-                  <ReportStat label="unreadable" value={report.counts.unreadable} />
-                  <ReportStat label="skipped" value={report.counts.skipped} />
-                  <ReportStat label="errors" value={report.counts.errors} />
-                </div>
-              </div>
-            )}
-            {hasFiles && (
-              <div className="flex flex-col gap-2">
-                <SectionLabel>Results ({filteredFiles.length})</SectionLabel>
-                <ResultsTable
-                  files={filteredFiles}
-                  selectedPaths={session.selectedPaths}
-                  onSelectionChange={(paths) => updateSession({ selectedPaths: paths })}
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSortChange={(k, d) => { setSortKey(k); setSortDir(d); }}
-                  emptyTitle="No videos scanned"
-                  emptyDescription="Drop a folder or select files to get started."
-                />
-              </div>
-            )}
-          </div>
-        ) : null}
-      </DropZone>
     </ToolPage>
   );
 }

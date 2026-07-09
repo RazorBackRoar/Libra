@@ -3,12 +3,13 @@
  * Keep structurally identical to renderer/main/types.ts.
  */
 
-export type ResolutionClass = "4K" | "FHD" | "1080p" | "HD" | "720p" | "SD" | "Unknown";
+export type ResolutionClass = "4K" | "1080p" | "720p" | "HD" | "SD" | "Unknown";
 
 /** Canonical, ordered list of resolution labels shown anywhere in the app. */
-export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "FHD", "1080p", "HD", "720p", "SD"];
+export const RESOLUTION_CLASSES: ResolutionClass[] = ["4K", "1080p", "720p", "HD", "SD"];
+
 export type Orientation = "landscape" | "portrait" | "square" | "unknown";
-export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName" | "SlowMotion";
+export type SortMode = "ProVid" | "VidRes" | "ProMax" | "MaxVid" | "KeepName";
 
 export interface VideoInfo {
   path: string;
@@ -80,19 +81,19 @@ export interface JobProgress {
   phase: string;
 }
 
-/** Stable frame-rate folder tokens (matches fpsFolderToken output). */
-const FPS_FOLDER_TOKENS = ["30", "60", "120", "Sub", "NA"] as const;
-
 /** Folder names L!bra itself creates — skipped when scanning recursively so
- *  re-runs never re-process the app's own output. Computed from the resolution
- *  classes × orientation × frame-rate tokens plus the fixed utility folders. */
+ *  re-runs never re-process the app's own output. */
 export const OUTPUT_FOLDER_NAMES: string[] = [
   ...RESOLUTION_CLASSES,
-  "MISC", "GPS", "No GPS", "Slow Motion", "Normal Speed",
-  ...RESOLUTION_CLASSES.flatMap((r) => ["W", "V"].map((o) => `${r} ${o}`)),
-  ...RESOLUTION_CLASSES.flatMap((r) =>
-    ["W", "V"].flatMap((o) => FPS_FOLDER_TOKENS.map((f) => `${r} ${o} ${f}`)),
-  ),
+  "MISC",
+  "GPS",
+  "No GPS",
+  "Wide",
+  "Vertical",
+  "Wide 30fps",
+  "Wide 60fps",
+  "Vertical 30fps",
+  "Vertical 60fps",
 ];
 
 /** macOS housekeeping entries — never moved, never counted. */
@@ -152,8 +153,12 @@ export const DEFAULT_SETTINGS: Settings = {
 
 /**
  * Classify resolution from detected width/height (already rotation-corrected).
- * Uses long = max(width, height). Order matters — first match wins:
- *   4K → 1080p (~1920) → 720p (~1280) → FHD (>1080p, <4K) → HD (>720p) → SD
+ * First match wins; each check looks at width OR height (either field).
+ *   4K    → width >= 2160 or height >= 2160
+ *   1080p → width == 1920, height == 1920, width == 1080, or height == 1080
+ *   720p  → width == 1280, height == 1280, width == 720, or height == 720
+ *   HD    → the longer side >= 720
+ *   SD    → the longer side < 720
  */
 export function classifyResolution(
   width: number | null,
@@ -162,24 +167,29 @@ export function classifyResolution(
   if (width === null || height === null || width <= 0 || height <= 0) {
     return "Unknown";
   }
+
+  if (width >= 2160 || height >= 2160) return "4K";
+
+  if (
+    width === 1920 ||
+    height === 1920 ||
+    width === 1080 ||
+    height === 1080
+  ) {
+    return "1080p";
+  }
+
+  if (
+    width === 1280 ||
+    height === 1280 ||
+    width === 720 ||
+    height === 720
+  ) {
+    return "720p";
+  }
+
   const long = Math.max(width, height);
-
-  // 4K — long side >= 3840.
-  if (long >= 3840) return "4K";
-
-  // 1080p — long side within ±2 of 1920 (exact-ish 1920x1080).
-  if (Math.abs(long - 1920) <= 2) return "1080p";
-
-  // 720p — long side within ±2 of 1280 (exact-ish 1280x720).
-  if (Math.abs(long - 1280) <= 2) return "720p";
-
-  // FHD — strictly between 1080p and 4K.
-  if (long > 1920 && long < 3840) return "FHD";
-
-  // HD — everything else above 720p.
-  if (long > 720) return "HD";
-
-  // SD — long side <= 720.
+  if (long >= 720) return "HD";
   return "SD";
 }
 
@@ -198,41 +208,22 @@ export function orientationCode(o: Orientation): "W" | "V" {
   return o === "portrait" ? "V" : "W";
 }
 
-/** Frame-rate label: 60 when the source runs above 45fps, otherwise 30. */
+/** Folder orientation label: human-readable Wide/Vertical. */
+export function folderOrientation(o: Orientation): "Wide" | "Vertical" {
+  return o === "portrait" ? "Vertical" : "Wide";
+}
+
+/** Frame-rate label: 60 when the source is above 45fps, otherwise 30. */
 export function frameRateLabel(fps: number | null): 30 | 60 {
   return fps !== null && fps > 45 ? 60 : 30;
 }
 
-export type FpsBucket = "Sub" | "30" | "60" | "120" | null;
-
-/**
- * Frame-rate bucket per spec §8:
- *   Sub  = fps < 28.00
- *   30   = 28.00–32.00
- *   60   = 55.00–65.00
- *   120  = 100.00–130.00
- * Missing/unreadable fps, or values between named buckets, return null (so a
- * missing fps is never counted as 120fps).
- */
-export function fpsBucket(fps: number | null): FpsBucket {
-  if (fps === null || !isFinite(fps) || fps <= 0) return null;
-  if (fps < 28) return "Sub";
-  if (fps <= 32) return "30";
-  if (fps >= 55 && fps <= 65) return "60";
-  if (fps >= 100 && fps <= 130) return "120";
-  return null;
-}
-
-/** Frame-rate token used in generated filenames: bucket number, or the rounded
- *  fps for Sub / out-of-bucket values, or "" when fps is unknown. */
+/** Frame-rate token used in generated filenames (60 or 30). */
 export function fpsToken(fps: number | null): string {
-  const b = fpsBucket(fps);
-  if (b === "30" || b === "60" || b === "120") return b;
-  return fps !== null && isFinite(fps) && fps > 0 ? String(Math.round(fps)) : "";
+  return String(frameRateLabel(fps));
 }
 
-/** Stable frame-rate token used in folder names (always one of the known
- *  tokens so the scanner skip-list stays exhaustive). */
+/** Frame-rate token used in folder names (e.g. "60fps"). */
 export function fpsFolderToken(fps: number | null): string {
-  return fpsBucket(fps) ?? "NA";
+  return `${frameRateLabel(fps)}fps`;
 }
