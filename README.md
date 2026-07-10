@@ -1,9 +1,8 @@
 # L!bra
 
-[![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)](package.json)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)](Sources/Libra/Resources/version.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet?style=for-the-badge)](LICENSE)
-[![Electron](https://img.shields.io/badge/Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
 [![macOS](https://img.shields.io/badge/mac%20os-Apple%20Silicon-d32f2f?style=for-the-badge&logo=apple&logoColor=white)](https://support.apple.com/en-us/HT211814)
 
 > **TL;DR:** Local-first macOS video organization toolkit. User-facing brand is **L!bra**; the GitHub repo and npm package stay ASCII (`Libra` / `l-bra`).
@@ -21,15 +20,19 @@
 ## Development
 
 ```bash
-npm install
-npm run type-check
-npm run build
-npm start
+swift build
+swift run
 ```
 
-Package a macOS build with `npm run dist`.
+`swift test` requires the full Xcode.app (XCTest).
 
-Per-app Electron helpers live under `electron-core/` (not a shared workspace package). Contracts: see the Apps workspace `Docs/razorcore-api-spec.md`.
+Package a macOS `.app` and DMG with ad-hoc signing:
+
+```bash
+./scripts/build-mac.sh
+```
+
+Output: `build/Release/Libra.app` and `build/Release/Libra.dmg`.
 
 ## License
 

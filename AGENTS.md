@@ -10,43 +10,50 @@ Guidance for agents in this repository. Use with `../AGENTS.md`.
 | GitHub | `RazorBackRoar/Libra` | GitHub disallows `!` |
 | npm `name` | `l-bra` | npm name rules |
 | `appId` | `com.razorbackroar.libra` | reverse-DNS |
-| `productName` / `app.setName` | `L!bra` | User-facing |
+| `productName` / app name | `L!bra` | User-facing |
 | Executable / Mach-O name | `Libra` | Avoid `!` in binary name |
 
-Constants: `electron-core/utils/brand.ts`. Prefer `DISPLAY_NAME` over hardcoding.
+Constants: `Sources/Libra/Utilities/Brand.swift`.
 
 ## Purpose and entry points
 
-Local-first macOS video organization toolkit (Electron + React/Vite).
+Local-first macOS video organization toolkit. Swift + SwiftUI.
 
-- Main: `main/index.ts`
-- Renderer: `renderer/`
-- Per-app Electron adapters: `electron-core/` (not a shared workspace package)
+- App entry: `Sources/Libra/LibraApp.swift`
+- UI views: `Sources/Libra/Views/`
+- Services: `Sources/Libra/Services/`
+- Utilities: `Sources/Libra/Utilities/`
 
-### electron-core contracts (v1.1)
+### RazorCore contracts (v1.1)
 
 | Module | Role |
 |--------|------|
-| `utils/brand.ts` | Display vs machine-safe IDs |
-| `utils/paths.ts` | userData / cache under display name **L!bra** |
-| `utils/logging.ts` | Logs under Application Support |
-| `utils/appInfo.ts` | Metadata + startup banner |
-| `utils/updates.ts` | GitHub Releases check (`RazorBackRoar/Libra`) |
-
-Behavioral SSOT: `../Docs/razorcore-api-spec.md`.
+| `Utilities/Brand.swift` | Display vs machine-safe IDs |
+| `Utilities/Paths.swift` | Application Support / cache / logs under **L!bra** |
+| `Utilities/Logging.swift` | Console + file logs under Application Support |
+| `Utilities/AppInfo.swift` | Metadata + startup banner |
+| `Utilities/Updates.swift` | GitHub Releases check (`RazorBackRoar/Libra`) |
+| `Utilities/Settings.swift` | Persistent JSON settings |
 
 ## Commands
 
 ```zsh
-npm run type-check
-npm run build
-npm run lint
-npm start
-npm run dist
+swift build
+swift run
 ```
+
+`swift test` requires the full Xcode.app (XCTest); the command-line tools ship without it.
+
+Package a macOS `.app` and DMG with ad-hoc signing:
+
+```zsh
+./scripts/build-mac.sh
+```
+
+Output: `build/Release/Libra.app` and `build/Release/Libra.dmg`.
 
 ## Repository rules
 
-- Do not create `Shared/razorcore-ts/` for v1.1.
+- Do not create `Shared/razorcore-swift/` for v1.1.
 - Do not rename the GitHub repo to include `!`.
 - Do not commit, push, or create branches unless explicitly requested.
