@@ -21,7 +21,19 @@ Local-first macOS video organization toolkit (Electron + React/Vite).
 
 - Main: `main/index.ts`
 - Renderer: `renderer/`
+- Tool registry (SSOT): `renderer/main/tools/registry.ts` — `MEDIA_MODES`, `UTILITY_TOOLS`, `TOOL_REGISTRY`
+- Tool routes: `renderer/main/router.tsx` (`/tool/$toolId`)
 - Per-app Electron adapters: `electron-core/` (not a shared workspace package)
+
+### Tools (from registry)
+
+| ID | Title | Role |
+|----|-------|------|
+| `media-organizer` | Video Organizer | Six sort modes (`ProVid`, `VidRes`, `ProMax`, `MaxVid`, `KeepName`, `SlowMotion`) on one page |
+| `gps-sorter` | GPS Hunter | GPS on/off sorting |
+| `onemin-adjust` | Divided by One | One-minute timestamp adjustment |
+
+Add or rename tools in `registry.ts` first; home grid and routing read from it.
 
 ### electron-core contracts (v1.1)
 
