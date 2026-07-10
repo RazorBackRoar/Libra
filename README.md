@@ -18,6 +18,43 @@
 | appId | `com.razorbackroar.libra` |
 | Executable | `Libra` |
 
+## Features
+
+L!bra is a local-first video toolkit. All processing runs on your Mac — no cloud upload.
+
+### Video Organizer
+
+The primary workflow scans folders and organizes videos by resolution and metadata.
+Six sort modes are available from the home page:
+
+| Mode | Behavior |
+|------|----------|
+| **Pro Vid** | Prefix rename |
+| **Vid Res** | Sort by resolution |
+| **Pro Max** | Resolution + orientation sort |
+| **Max Vid** | Full sort (resolution, orientation, metadata) |
+| **Name Keeper** | Resolution sort while preserving original filenames |
+| **Slow Motion** | Separate slow-motion vs normal-speed clips |
+
+### Utility tools
+
+| Tool | Purpose |
+|------|---------|
+| **GPS Hunter** | Find videos with location metadata on or off |
+| **Divided by One** | Adjust clip timestamps so files are spaced one minute apart |
+
+Tool definitions live in `renderer/main/tools/registry.ts`; backend handlers in `main/handlers/`.
+
+## Project layout
+
+```text
+Libra/
+├── main/              # Electron main process (handlers, services)
+├── renderer/          # React + Vite UI
+├── electron-core/     # Per-app adapters (brand, paths, logging, appInfo, updates)
+└── package.json
+```
+
 ## Development
 
 ```bash
