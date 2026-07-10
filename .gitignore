@@ -11,6 +11,9 @@ build/
 .DS_Store
 Thumbs.db
 
+# Source icon asset (generated AppIcon.icns is in Resources)
+Libra.png
+
 # Logs
 *.log
 tmp/*
