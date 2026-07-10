@@ -1,27 +1,39 @@
 # L!bra AGENTS
 
-Guidance for AI agents working in this repository.
+Guidance for agents in this repository. Use with `../AGENTS.md`.
 
 ## Branding
 
 | Surface | Value | Why |
 |---------|-------|-----|
-| Display name (UI, Dock, About, menus, Application Support) | **L!bra** | Product brand |
-| GitHub repo | `RazorBackRoar/Libra` | GitHub disallows `!` in repo names |
-| npm `package.json` `name` | `l-bra` | npm name rules |
-| electron-builder `appId` | `com.razorbackroar.libra` | reverse-DNS; no `!` |
+| Display (UI, Dock, About, menus, Application Support) | **L!bra** | Product brand |
+| GitHub | `RazorBackRoar/Libra` | GitHub disallows `!` |
+| npm `name` | `l-bra` | npm name rules |
+| `appId` | `com.razorbackroar.libra` | reverse-DNS |
 | `productName` / `app.setName` | `L!bra` | User-facing |
-| `executableName` / binary | `Libra` | Avoid `!` in Mach-O executable name |
+| Executable / Mach-O name | `Libra` | Avoid `!` in binary name |
 
-Constants live in `electron-core/utils/brand.ts`. Prefer `DISPLAY_NAME` over hardcoding.
+Constants: `electron-core/utils/brand.ts`. Prefer `DISPLAY_NAME` over hardcoding.
 
-## Purpose And Entry Points
+## Purpose and entry points
 
-L!bra is a local-first macOS video organization toolkit (Electron + React/Vite).
+Local-first macOS video organization toolkit (Electron + React/Vite).
 
 - Main: `main/index.ts`
 - Renderer: `renderer/`
-- Shared Electron adapters: `electron-core/` (per-app; not a shared workspace package)
+- Per-app Electron adapters: `electron-core/` (not a shared workspace package)
+
+### electron-core contracts (v1.1)
+
+| Module | Role |
+|--------|------|
+| `utils/brand.ts` | Display vs machine-safe IDs |
+| `utils/paths.ts` | userData / cache under display name **L!bra** |
+| `utils/logging.ts` | Logs under Application Support |
+| `utils/appInfo.ts` | Metadata + startup banner |
+| `utils/updates.ts` | GitHub Releases check (`RazorBackRoar/Libra`) |
+
+Behavioral SSOT: `../Docs/razorcore-api-spec.md`.
 
 ## Commands
 
@@ -29,10 +41,12 @@ L!bra is a local-first macOS video organization toolkit (Electron + React/Vite).
 npm run type-check
 npm run build
 npm run lint
+npm start
+npm run dist
 ```
 
-## Repository Rules
+## Repository rules
 
-- Do not create a shared `Shared/razorcore-ts/` package for v1.1.
+- Do not create `Shared/razorcore-ts/` for v1.1.
 - Do not rename the GitHub repo to include `!`.
-- Do not commit/push/branch unless explicitly requested.
+- Do not commit, push, or create branches unless explicitly requested.
