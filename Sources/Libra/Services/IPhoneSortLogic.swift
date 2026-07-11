@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 enum IPhoneSortLogic {
     struct Classification {
         let isIPhoneFolder: Bool

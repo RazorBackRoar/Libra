@@ -173,8 +173,9 @@ enum MediaProbe {
 
     private static func probeImage(filePath: String, name: String, dir: String, ext: String, size: Int64) -> VideoInfo {
         let url = URL(fileURLWithPath: filePath)
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-            return VideoInfo(
+
+        func failed(_ message: String) -> VideoInfo {
+            VideoInfo(
                 path: filePath,
                 name: name,
                 dir: dir,
@@ -194,8 +195,19 @@ enum MediaProbe {
                 hasiPhoneModel: false,
                 hasGPS: false,
                 creationTime: nil,
-                error: "Could not read image metadata"
+                error: message
             )
+        }
+
+        if size <= 0 {
+            return failed("Could not read image metadata (empty or unreadable file)")
+        }
+
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+            return failed("Could not read image metadata")
+        }
+        guard CGImageSourceGetCount(source) > 0 else {
+            return failed("Could not read image metadata (no image frames)")
         }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] ?? [:]
@@ -218,7 +230,6 @@ enum MediaProbe {
             hasGPS = true
         }
 
-        // Flatten any nested string make/model-like keys
         makeValues.append(contentsOf: DeviceMetadata.collectStringValues(from: properties, keys: DeviceMetadata.makeKeys))
         modelValues.append(contentsOf: DeviceMetadata.collectStringValues(from: properties, keys: DeviceMetadata.modelKeys))
 

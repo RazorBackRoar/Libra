@@ -9,14 +9,15 @@ struct IPhoneVerifyMain {
 
         print("VERIFY_ROOT=\(root)")
         let fm = FileManager.default
-        try? fm.removeItem(atPath: root)
-        try! fm.createDirectory(atPath: root, withIntermediateDirectories: true)
+        let input = (root as NSString).appendingPathComponent("input")
+        guard fm.fileExists(atPath: input) else {
+            fputs("Missing input directory at \(input)\n", stderr)
+            exit(1)
+        }
 
         let ffprobe = ["/opt/homebrew/bin/ffprobe", "/usr/local/bin/ffprobe"]
             .first { fm.isExecutableFile(atPath: $0) } ?? "ffprobe"
 
-        // Expect fixtures already created by the shell script under root/input
-        let input = (root as NSString).appendingPathComponent("input")
         let files = (try? fm.contentsOfDirectory(atPath: input)) ?? []
         var infos: [VideoInfo] = []
         for name in files.sorted() {
