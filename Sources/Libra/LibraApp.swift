@@ -9,7 +9,7 @@ struct LibraApp: App {
         Window("L!bra", id: "main") {
             LibraView()
         }
-        .defaultSize(width: 900, height: 700)
+        .defaultSize(width: 720, height: 560)
         .windowResizability(.contentSize)
 
         Settings {
@@ -40,6 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.backgroundColor = .black
+            // Override any restored oversized frame from earlier launches.
+            window.setContentSize(NSSize(width: 720, height: 560))
+            window.minSize = NSSize(width: 640, height: 480)
         }
     }
 

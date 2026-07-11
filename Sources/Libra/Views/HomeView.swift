@@ -74,7 +74,7 @@ struct ToolCard: View {
                     .lineLimit(3)
             }
             .padding()
-            .frame(height: 130)
+            .frame(height: 118)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.systemGray).opacity(0.15))
             .cornerRadius(12)
