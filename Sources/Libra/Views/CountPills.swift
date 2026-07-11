@@ -12,9 +12,9 @@ struct CountPills: View {
                 CountPill(label: "iPhone", value: files.filter { $0.hasiPhoneModel }.count)
                 CountPill(label: "Both", value: files.filter { $0.hasAppleMake && $0.hasiPhoneModel }.count)
             } else {
-                CountPill(label: "4K", value: files.filter { $0.resolutionClass == "4K" }.count)
-                CountPill(label: "1080p", value: files.filter { $0.resolutionClass == "1080p" }.count)
-                CountPill(label: "720p", value: files.filter { $0.resolutionClass == "720p" }.count)
+                ForEach(VideoInfo.resolutionClasses, id: \.self) { label in
+                    CountPill(label: label, value: files.filter { $0.resolutionClass == label }.count)
+                }
                 CountPill(label: "GPS", value: files.filter { $0.hasGPS }.count)
                 CountPill(label: "iPhone", value: files.filter { $0.isApple }.count)
             }

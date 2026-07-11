@@ -26,6 +26,9 @@ struct VideoInfo: Identifiable, Equatable {
 
     var isApple: Bool { hasAppleMake || hasiPhoneModel }
 
+    /// Canonical resolution bucket labels (contract order).
+    static let resolutionClasses = ["4K", "FHD", "1080p", "HD", "720p", "SD"]
+
     var resolutionFolder: String { resolutionClass }
     var orientationFolder: String { orientation.capitalized }
 

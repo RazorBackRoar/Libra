@@ -337,11 +337,16 @@ enum MediaProbe {
         return formatter.date(from: value)
     }
 
+    /// Six-tier buckets from the L!bra contract. First match wins on `long = max(w, h)`:
+    /// 4K (≥3840) → 1080p (±2 of 1920) → 720p (±2 of 1280) → FHD (>1920) → HD (>720) → SD.
     private static func resolutionClass(width: Int, height: Int) -> String {
-        let pixels = max(width, height)
-        if pixels >= 3840 { return "4K" }
-        if pixels >= 1920 { return "1080p" }
-        if pixels >= 1280 { return "720p" }
+        guard width > 0, height > 0 else { return "Unknown" }
+        let long = max(width, height)
+        if long >= 3840 { return "4K" }
+        if abs(long - 1920) <= 2 { return "1080p" }
+        if abs(long - 1280) <= 2 { return "720p" }
+        if long > 1920 { return "FHD" }
+        if long > 720 { return "HD" }
         return "SD"
     }
 
