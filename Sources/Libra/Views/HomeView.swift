@@ -4,7 +4,7 @@ struct HomeView: View {
     @Binding var selectedTool: Tool?
     @ObservedObject private var appState = AppState.shared
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 4)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
 
     var body: some View {
         ScrollView {

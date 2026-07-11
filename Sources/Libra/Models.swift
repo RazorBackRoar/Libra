@@ -38,14 +38,14 @@ struct VideoInfo: Identifiable, Equatable {
 }
 
 enum Tool: String, CaseIterable, Identifiable, Hashable {
-    case iphoneSorter = "iPhone Sorter"
     case provid = "ProVid"
     case vidres = "VidRes"
+    case keepName = "KeepName"
     case promax = "ProMax"
     case maxvid = "MaxVid"
-    case keepName = "KeepName"
-    case oneMin = "1MinVid"
+    case iphoneSorter = "iPhone Sorter"
     case slomo = "Slo-Mo"
+    case oneMin = "1MinVid"
     case gps = "GPS Sorter"
 
     var id: String { rawValue }
