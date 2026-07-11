@@ -52,26 +52,27 @@ struct ToolPage: View {
 
                 DropZone(
                     title: "Drop files here",
-                    subtitle: "Drop folders or video files to start.",
+                    subtitle: tool.acceptsImages
+                        ? "Drop folders, photos, or video files to start."
+                        : "Drop folders or video files to start.",
                     onDrop: { paths in
-                        Task { await state.scan(paths: paths, settings: appState.settings, ffmpegPath: appState.ffmpegPath ?? "", ffprobePath: appState.ffprobePath ?? "") }
+                        Task {
+                            await state.scan(
+                                paths: paths,
+                                settings: appState.settings,
+                                ffmpegPath: appState.ffmpegPath ?? "",
+                                ffprobePath: appState.ffprobePath ?? ""
+                            )
+                        }
                     },
                     onBrowse: { browse() },
                     onSelectFiles: { selectFiles() }
                 )
 
-                CountPills(files: state.filteredFiles)
+                CountPills(files: state.filteredFiles, tool: tool)
 
-                if tool == .organizer || tool == .vidres || tool == .promax || tool == .maxvid || tool == .keepName || tool == .provid {
-                    Picker("Sort Mode", selection: $state.sortMode) {
-                        ForEach(SortMode.allCases) { mode in
-                            Text(mode.rawValue).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(tool != .organizer && tool != .maxvid && tool != .promax && tool != .vidres && tool != .keepName)
-
-                    TextField("Prefix", text: $state.prefix)
+                if tool == .provid || tool == .vidres || tool == .promax || tool == .maxvid {
+                    TextField(tool == .provid ? "Prefix" : "Prefix (optional)", text: $state.prefix)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 300)
                 }
@@ -91,18 +92,6 @@ struct ToolPage: View {
                     }
                     .pickerStyle(.segmented)
                     DatePicker("Start time", selection: $state.oneMinStart)
-                }
-
-                if tool == .organizer {
-                    FilterPills(
-                        filter4K: $state.filter4K,
-                        filter1080: $state.filter1080,
-                        filter720: $state.filter720,
-                        filterSD: $state.filterSD,
-                        filterGPS: $state.filterGPS,
-                        filteriPhone: $state.filteriPhone,
-                        filterDuplicates: $state.filterDuplicates
-                    )
                 }
 
                 if state.running {
@@ -140,6 +129,7 @@ struct ToolPage: View {
         }
         .background(Color.black.ignoresSafeArea())
         .navigationTitle(tool.title)
+        .navigationBarBackButtonHidden(true)
     }
 
     private func browse() {
@@ -150,7 +140,14 @@ struct ToolPage: View {
         panel.allowedContentTypes = []
         if panel.runModal() == .OK {
             let paths = panel.urls.map { $0.path }
-            Task { await state.scan(paths: paths, settings: appState.settings, ffmpegPath: appState.ffmpegPath ?? "", ffprobePath: appState.ffprobePath ?? "") }
+            Task {
+                await state.scan(
+                    paths: paths,
+                    settings: appState.settings,
+                    ffmpegPath: appState.ffmpegPath ?? "",
+                    ffprobePath: appState.ffprobePath ?? ""
+                )
+            }
         }
     }
 
@@ -159,10 +156,21 @@ struct ToolPage: View {
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [UTType.movie, UTType.video, UTType.data]
+        if tool.acceptsImages {
+            panel.allowedContentTypes = [.image, .movie, .video, .data]
+        } else {
+            panel.allowedContentTypes = [UTType.movie, UTType.video, UTType.data]
+        }
         if panel.runModal() == .OK {
             let paths = panel.urls.map { $0.path }
-            Task { await state.scan(paths: paths, settings: appState.settings, ffmpegPath: appState.ffmpegPath ?? "", ffprobePath: appState.ffprobePath ?? "") }
+            Task {
+                await state.scan(
+                    paths: paths,
+                    settings: appState.settings,
+                    ffmpegPath: appState.ffmpegPath ?? "",
+                    ffprobePath: appState.ffprobePath ?? ""
+                )
+            }
         }
     }
 

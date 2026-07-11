@@ -65,9 +65,27 @@ enum FileOps {
         let ext = (path as NSString).pathExtension
         let base = (path as NSString).deletingPathExtension
         while FileManager.default.fileExists(atPath: candidate) {
-            candidate = "\(base) (\(counter)).\(ext)"
+            if ext.isEmpty {
+                candidate = "\(base) (\(counter))"
+            } else {
+                candidate = "\(base) (\(counter)).\(ext)"
+            }
             counter += 1
         }
         return candidate
+    }
+
+    /// Sanitize unsafe filename characters while preserving a readable base name.
+    static func sanitizeFileName(_ name: String) -> String {
+        let invalid = CharacterSet(charactersIn: "/:\\?%*|\"<>\0")
+        let parts = name.unicodeScalars.map { invalid.contains($0) ? "_" : Character($0) }
+        var cleaned = String(parts)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        while cleaned.contains("  ") {
+            cleaned = cleaned.replacingOccurrences(of: "  ", with: " ")
+        }
+        if cleaned.isEmpty { return "file" }
+        if cleaned == "." || cleaned == ".." { return "file" }
+        return cleaned
     }
 }

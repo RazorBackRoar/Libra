@@ -17,16 +17,14 @@ struct VideoInfo: Identifiable, Equatable {
     var container: String
     var make: String
     var model: String
-    var isApple: Bool
+    var hasAppleMake: Bool
+    var hasiPhoneModel: Bool
     var hasGPS: Bool
     var creationTime: Date?
     var error: String?
+    var unsupported: Bool = false
 
-    var isReencodeCandidate: Bool {
-        let containerOk = container.lowercased().contains("mp4")
-        let codecOk = codec.lowercased().contains("h264") || codec.lowercased().contains("h265") || codec.lowercased().contains("hevc")
-        return !(containerOk && codecOk)
-    }
+    var isApple: Bool { hasAppleMake || hasiPhoneModel }
 
     var resolutionFolder: String { resolutionClass }
     var orientationFolder: String { orientation.capitalized }
@@ -36,29 +34,16 @@ struct VideoInfo: Identifiable, Equatable {
     }
 }
 
-enum SortMode: String, CaseIterable, Identifiable {
-    case provid = "ProVid"
-    case vidres = "VidRes"
-    case promax = "ProMax"
-    case maxvid = "MaxVid"
-    case keepName = "KeepName"
-
-    var id: String { rawValue }
-}
-
 enum Tool: String, CaseIterable, Identifiable, Hashable {
-    case organizer = "Organizer"
+    case iphoneSorter = "iPhone Sorter"
     case provid = "ProVid"
     case vidres = "VidRes"
     case promax = "ProMax"
     case maxvid = "MaxVid"
     case keepName = "KeepName"
-    case reencode = "Re-encode"
     case oneMin = "1MinVid"
     case slomo = "Slo-Mo"
-    case duplicates = "Duplicates"
     case gps = "GPS Sorter"
-    case codec = "Codec"
 
     var id: String { rawValue }
 
@@ -66,47 +51,45 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
 
     var systemImage: String {
         switch self {
-        case .organizer: return "film.stack"
+        case .iphoneSorter: return "iphone"
         case .provid: return "text.badge.checkmark"
         case .vidres: return "rectangle.split.3x3"
         case .promax: return "rectangle.portrait.rotate"
         case .maxvid: return "waveform"
         case .keepName: return "doc.text"
-        case .reencode: return "arrow.triangle.2.circlepath"
         case .oneMin: return "clock.arrow.circlepath"
         case .slomo: return "slowmo"
-        case .duplicates: return "doc.on.doc"
         case .gps: return "location.circle"
-        case .codec: return "info.circle"
         }
     }
 
     var description: String {
         switch self {
-        case .organizer: return "Filter, organize, review duplicates, and inspect rich video metadata."
+        case .iphoneSorter: return "Sort into iPhone / Not iPhone folders with Apple and iPhone metadata markers."
         case .provid: return "Rename videos in place with an optional prefix."
         case .vidres: return "Sort videos into resolution folders."
         case .promax: return "Sort into resolution + orientation folders."
         case .maxvid: return "Sort into resolution + orientation + FPS folders."
         case .keepName: return "Sort into folders while keeping original filenames."
-        case .reencode: return "Flag videos not in H.264/HEVC MP4."
         case .oneMin: return "Apply sequential 60-second timestamps."
         case .slomo: return "Create slow-motion copies with ffmpeg."
-        case .duplicates: return "Find exact MD5 duplicate videos."
         case .gps: return "Sort into GPS / No-GPS folders."
-        case .codec: return "Read-only ffprobe codec report."
         }
     }
 
     var category: String {
         switch self {
-        case .organizer, .duplicates, .codec, .reencode, .gps:
+        case .iphoneSorter, .gps:
             return "Analyze"
         case .provid, .vidres, .promax, .maxvid, .keepName:
             return "Sort / Rename"
         case .oneMin, .slomo:
             return "Transform"
         }
+    }
+
+    var acceptsImages: Bool {
+        self == .iphoneSorter
     }
 }
 
@@ -125,16 +108,11 @@ enum OperationStatus: String, Equatable {
     case pending = "Pending"
 }
 
-struct DuplicateGroup: Identifiable {
-    let id = UUID()
-    var hash: String
-    var files: [VideoInfo]
-}
-
 struct AppSettings: Codable {
     var ffmpegPath: String?
     var ffprobePath: String?
     var videoExtensions: [String]
+    var imageExtensions: [String]
     var dryRunDefault: Bool
     var lastFolder: String?
 
@@ -142,7 +120,34 @@ struct AppSettings: Codable {
         ffmpegPath: nil,
         ffprobePath: nil,
         videoExtensions: ["mp4", "mov", "m4v", "mkv", "avi", "mts", "m2ts", "3gp", "webm"],
+        imageExtensions: ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "webp"],
         dryRunDefault: true,
         lastFolder: nil
     )
+
+    init(
+        ffmpegPath: String?,
+        ffprobePath: String?,
+        videoExtensions: [String],
+        imageExtensions: [String],
+        dryRunDefault: Bool,
+        lastFolder: String?
+    ) {
+        self.ffmpegPath = ffmpegPath
+        self.ffprobePath = ffprobePath
+        self.videoExtensions = videoExtensions
+        self.imageExtensions = imageExtensions
+        self.dryRunDefault = dryRunDefault
+        self.lastFolder = lastFolder
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        ffmpegPath = try container.decodeIfPresent(String.self, forKey: .ffmpegPath)
+        ffprobePath = try container.decodeIfPresent(String.self, forKey: .ffprobePath)
+        videoExtensions = try container.decodeIfPresent([String].self, forKey: .videoExtensions) ?? Self.default.videoExtensions
+        imageExtensions = try container.decodeIfPresent([String].self, forKey: .imageExtensions) ?? Self.default.imageExtensions
+        dryRunDefault = try container.decodeIfPresent(Bool.self, forKey: .dryRunDefault) ?? true
+        lastFolder = try container.decodeIfPresent(String.self, forKey: .lastFolder)
+    }
 }

@@ -4,7 +4,7 @@ struct HomeView: View {
     @Binding var selectedTool: Tool?
     @ObservedObject private var appState = AppState.shared
 
-    let columns = [GridItem(.adaptive(minimum: 180, maximum: 200), spacing: 16)]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 4)
 
     var body: some View {
         ScrollView {
@@ -45,6 +45,7 @@ struct HomeView: View {
             .padding()
         }
         .background(Color.black.ignoresSafeArea())
+        .navigationBarBackButtonHidden(true)
     }
 }
 

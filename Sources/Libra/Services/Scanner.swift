@@ -9,14 +9,28 @@ final class ScannerService {
         extensions: [String],
         ffprobePath: String,
         progress: @MainActor @escaping (Int, Int) -> Void
-    ) async -> [VideoInfo] {
+    ) async -> (supported: [VideoInfo], unsupported: [OperationResult]) {
         var files: [String] = []
+        var unsupported: [OperationResult] = []
+        let allowed = Set(extensions.map { $0.lowercased() })
+
         for path in paths {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
-                files.append(contentsOf: walkDirectory(path, extensions: extensions))
+                let walked = walkDirectory(path, extensions: Array(allowed))
+                files.append(contentsOf: walked.supported)
+                unsupported.append(contentsOf: walked.unsupported)
             } else {
-                files.append(path)
+                let ext = (path as NSString).pathExtension.lowercased()
+                if allowed.contains(ext) {
+                    files.append(path)
+                } else {
+                    unsupported.append(OperationResult(
+                        path: path,
+                        status: .skipped,
+                        reason: "Unsupported file type (.\(ext.isEmpty ? "?" : ext))"
+                    ))
+                }
             }
         }
 
@@ -24,26 +38,31 @@ final class ScannerService {
         var results: [VideoInfo] = []
         let total = deduped.count
         for (index, file) in deduped.enumerated() {
-            let info = await FfprobeService.probe(filePath: file, ffprobePath: ffprobePath)
+            let info = await MediaProbe.probe(filePath: file, ffprobePath: ffprobePath)
             results.append(info)
             progress(index + 1, total)
         }
-        return results
+        return (results, unsupported)
     }
 
-    private static func walkDirectory(_ path: String, extensions: [String]) -> [String] {
+    private static func walkDirectory(_ path: String, extensions: [String]) -> (supported: [String], unsupported: [OperationResult]) {
         var found: [String] = []
+        let unsupported: [OperationResult] = []
+        let allowed = Set(extensions)
         let enumerator = FileManager.default.enumerator(atPath: path)
         while let item = enumerator?.nextObject() as? String {
             let full = (path as NSString).appendingPathComponent(item)
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: full, isDirectory: &isDir), !isDir.boolValue {
                 let ext = (full as NSString).pathExtension.lowercased()
-                if extensions.contains(ext) {
+                if allowed.contains(ext) {
                     found.append(full)
+                } else if !ext.isEmpty {
+                    // Only report files that look like media attempts when walking; skip hidden/system noise
+                    continue
                 }
             }
         }
-        return found
+        return (found, unsupported)
     }
 }
