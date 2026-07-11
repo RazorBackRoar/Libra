@@ -1,11 +1,17 @@
 # L!bra
 
+[![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)](Sources/Libra/Resources/version.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet?style=for-the-badge)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
 [![macOS](https://img.shields.io/badge/mac%20os-Apple%20Silicon-d32f2f?style=for-the-badge&logo=apple&logoColor=white)](https://support.apple.com/en-us/HT211814)
 
-> **TL;DR:** Local-first macOS video organization toolkit. User-facing brand is **L!bra**; the GitHub repo and npm package stay ASCII (`Libra` / `l-bra`).
+<!-- Workspace Health Layer -->
+[![Status](https://img.shields.io/badge/status-active-2ea44f?style=for-the-badge)]()
+[![Tests](https://img.shields.io/badge/tests-build--gated-2ea44f?style=for-the-badge)]()
+[![Build](https://img.shields.io/badge/build-swift-F05138?style=for-the-badge)]()
+
+> **TL;DR:** Local-first macOS video organization toolkit. User-facing brand is **L!bra**; the GitHub repo and machine IDs stay ASCII (`Libra`).
 
 ## Branding
 
@@ -13,7 +19,6 @@
 |---------|-------|
 | Display name | **L!bra** |
 | GitHub | [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra) |
-| npm | `l-bra` |
 | appId | `com.razorbackroar.libra` |
 | Executable | `Libra` |
 
