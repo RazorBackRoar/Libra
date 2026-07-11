@@ -8,7 +8,6 @@ Guidance for agents in this repository. Use with `../AGENTS.md`.
 |---------|-------|-----|
 | Display (UI, Dock, About, menus, Application Support) | **L!bra** | Product brand |
 | GitHub | `RazorBackRoar/Libra` | GitHub disallows `!` |
-| npm `name` | `l-bra` | npm name rules |
 | `appId` | `com.razorbackroar.libra` | reverse-DNS |
 | `productName` / app name | `L!bra` | User-facing |
 | Executable / Mach-O name | `Libra` | Avoid `!` in binary name |
