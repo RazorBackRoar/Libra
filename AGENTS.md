@@ -4,13 +4,20 @@ Guidance for agents in this repository. Use with `../AGENTS.md`.
 
 ## Branding
 
+**Rule of thumb:** if a human reads it → **L!bra**. If a machine/path/API must be ASCII → **Libra**.
+
 | Surface | Value | Why |
 |---------|-------|-----|
-| Display (UI, Dock, About, menus, Application Support) | **L!bra** | Product brand |
-| GitHub | `RazorBackRoar/Libra` | GitHub disallows `!` |
+| UI, Dock, About, menus, window title | **L!bra** | Product brand |
+| Application Support / Caches folder | **L!bra** | User-visible path |
+| Built `.app` / `.dmg` / volume name | **L!bra** | Finder-facing |
+| Docs, issue templates, SECURITY subject | **L!bra** | Human-facing |
+| GitHub repo | `RazorBackRoar/Libra` | GitHub disallows `!` |
+| Local workspace folder | `Apps/Libra` | Matches GitHub |
 | `appId` | `com.razorbackroar.libra` | reverse-DNS |
-| `productName` / app name | `L!bra` | User-facing |
-| Executable / Mach-O name | `Libra` | Avoid `!` in binary name |
+| Mach-O / `CFBundleExecutable` | `Libra` | Avoid `!` in binary name |
+| Swift package / module / `Sources/Libra` | `Libra` | Swift identifiers |
+| Swift type names (`LibraApp`, …) | `Libra…` | Code identifiers |
 
 Constants: `Sources/Libra/Utilities/Brand.swift`.
 
@@ -49,7 +56,7 @@ Package a macOS `.app` and DMG with ad-hoc signing:
 ./scripts/build-mac.sh
 ```
 
-Output: `build/Release/Libra.app` and `build/Release/Libra.dmg`.
+Output: `build/Release/L!bra.app` and `build/Release/L!bra.dmg` (executable inside stays `Libra`).
 
 ## Repository rules
 

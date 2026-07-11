@@ -9,6 +9,7 @@ L!bra is a native macOS app built with **Swift** / **SwiftUI**
 (swift-tools 5.10+, macOS 14+), packaged with an ad-hoc signed `.app` / `.dmg`.
 
 User-facing brand is **L!bra**; GitHub/repo/binary IDs stay ASCII (`Libra`).
+Built artifacts: `L!bra.app` / `L!bra.dmg` (Mach-O inside remains `Libra`).
 
 ## Platform Requirements
 
@@ -46,8 +47,8 @@ swift run
 Output:
 
 ```text
-build/Release/Libra.app
-build/Release/Libra.dmg
+build/Release/L!bra.app
+build/Release/L!bra.dmg
 ```
 
 ## Release Process
@@ -70,7 +71,7 @@ build/Release/Libra.dmg
 |---------|-------------|
 | `swift test` fails without XCTest | Install full Xcode.app, not only CLT |
 | Gatekeeper blocks launch | Right-click → **Open** (ad-hoc signed builds) |
-| Stale `/Applications` copy | Rebuild, then `ditto build/Release/Libra.app` into Applications |
+| Stale `/Applications` copy | Rebuild, then `ditto "build/Release/L!bra.app" "/Applications/L!bra.app"` |
 | Window size restored huge | Quit app; relaunch after upgrading (defaults may cache old frames) |
 
 ## Related Docs

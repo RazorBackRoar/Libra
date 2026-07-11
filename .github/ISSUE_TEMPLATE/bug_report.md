@@ -5,7 +5,7 @@ labels: bug
 ---
 
 ## App
-L!bra (version: <!-- see About panel or pyproject.toml -->)
+L!bra (version: <!-- see About panel or Sources/Libra/Resources/version.json -->)
 
 ## Environment
 - macOS version:

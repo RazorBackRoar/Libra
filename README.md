@@ -17,10 +17,10 @@
 
 | Surface | Value |
 |---------|-------|
-| Display name | **L!bra** |
-| GitHub | [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra) |
+| Display name (UI, Dock, `.app`, DMG) | **L!bra** |
+| GitHub / folder | [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra) |
 | appId | `com.razorbackroar.libra` |
-| Executable | `Libra` |
+| Executable (Mach-O) | `Libra` |
 
 ## Development
 
@@ -37,7 +37,7 @@ Package a macOS `.app` and DMG with ad-hoc signing:
 ./scripts/build-mac.sh
 ```
 
-Output: `build/Release/Libra.app` and `build/Release/Libra.dmg`.
+Output: `build/Release/L!bra.app` and `build/Release/L!bra.dmg`.
 
 ## Community & docs
 

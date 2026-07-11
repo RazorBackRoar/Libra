@@ -1,6 +1,6 @@
 # Security Policy
 
-RazorBackRoar takes security seriously. This policy applies to **Libra** and matches the organization-wide standard used across RazorBackRoar product repositories.
+RazorBackRoar takes security seriously. This policy applies to **L!bra** (GitHub repo `Libra`) and matches the organization-wide standard used across RazorBackRoar product repositories.
 
 ## Supported Versions
 
@@ -18,7 +18,7 @@ Security fixes ship on `main` and in the next published release when applicable.
 Preferred reporting channels (in order):
 
 1. **GitHub Private Vulnerability Reporting** — use [Report a vulnerability](https://github.com/RazorBackRoar/Libra/security/advisories/new) on this repository when enabled.
-2. **Maintainer contact** — message [@RazorBackRoar](https://github.com/RazorBackRoar) on GitHub with a clear subject such as `SECURITY: Libra`.
+2. **Maintainer contact** — message [@RazorBackRoar](https://github.com/RazorBackRoar) on GitHub with a clear subject such as `SECURITY: L!bra`.
 
 Include as much of the following as you can:
 
