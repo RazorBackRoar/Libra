@@ -133,7 +133,8 @@ assert any(n.endswith(".mov") or ".mov" in n for n in names_i) or any(n.endswith
 assert any("samsung" in n.lower() or "Galaxy" in n or n.startswith("photo_samsung") for n in names_n), names_n
 assert any(n.startswith("photo_samsung") for n in names_n), names_n
 assert any(n.startswith("photo_nometa") for n in names_n), names_n
-assert not (root / "readme.txt").exists() or True  # unsupported may remain in input
+assert (root / "readme.txt").exists(), "unsupported readme should remain unmoved"
+assert not any(n == "readme.txt" for n in names_n), names_n
 print("PASS destination assertions")
 PY
 

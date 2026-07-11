@@ -20,10 +20,18 @@ struct IPhoneVerifyMain {
 
         let files = (try? fm.contentsOfDirectory(atPath: input)) ?? []
         var infos: [VideoInfo] = []
+        var results: [String] = []
         for name in files.sorted() {
             let path = (input as NSString).appendingPathComponent(name)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: path, isDirectory: &isDir), !isDir.boolValue else { continue }
+            let ext = (name as NSString).pathExtension.lowercased()
+            let allowed = Set(AppSettings.default.videoExtensions + AppSettings.default.imageExtensions)
+            if !allowed.contains(ext) {
+                print("SKIPPED_UNSUPPORTED\t\(name)")
+                results.append("Skipped\t\(name)\tUnsupported file type (.\(ext.isEmpty ? "?" : ext))\t")
+                continue
+            }
             let info = await MediaProbe.probe(filePath: path, ffprobePath: ffprobe)
             infos.append(info)
             print("PROBED\t\(name)\tmake=\(info.make)\tmodel=\(info.model)\tapple=\(info.hasAppleMake)\tiphone=\(info.hasiPhoneModel)\terror=\(info.error ?? "")")
@@ -33,7 +41,6 @@ struct IPhoneVerifyMain {
         let ordered = infos.sorted { $0.path < $1.path }
         var iphoneFiles: [VideoInfo] = []
         var otherFiles: [VideoInfo] = []
-        var results: [String] = []
 
         for file in ordered {
             if let error = file.error {
