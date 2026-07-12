@@ -57,8 +57,10 @@ build/Release/L!bra.dmg
 2. Confirm version in `Sources/Libra/Resources/version.json`.
 3. Run `./scripts/build-mac.sh`.
 4. Install/smoke-test the `.app` (core happy path).
-5. Publish a GitHub Release and attach the `.dmg`.
-6. Tag `vX.Y.Z` to match `Sources/Libra/Resources/version.json`.
+5. For GitHub, rename the asset to the machine-safe name: `cp "build/Release/L!bra.dmg" "build/Release/Libra.dmg"`.
+   GitHub release asset names do not accept `!` — if you upload `L!bra.dmg`, it becomes `L.bra.dmg`.
+6. Publish a GitHub Release with title `L!bra vX.Y.Z` and attach `build/Release/Libra.dmg`.
+7. Tag `vX.Y.Z` to match `Sources/Libra/Resources/version.json`.
 
 ## Versioning Expectations
 

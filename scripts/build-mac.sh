@@ -14,6 +14,9 @@ BUNDLE_ID="com.razorbackroar.libra"
 VERSION="$(sed -n 's/.*"version".*"\([^"]*\)".*/\1/p' "$PROJECT_DIR/Sources/Libra/Resources/version.json")"
 
 RELEASE_DIR="$PROJECT_DIR/build/Release"
+
+# Prevent stale artifacts from previous builds with different display names.
+rm -rf "$RELEASE_DIR"/*.app "$RELEASE_DIR"/*.dmg
 APP_PATH="$RELEASE_DIR/${DISPLAY_NAME}.app"
 DMG_PATH="$RELEASE_DIR/${DISPLAY_NAME}.dmg"
 EXEC_PATH="$PROJECT_DIR/.build/release/$EXEC_NAME"
