@@ -18,7 +18,8 @@ RELEASE_DIR="$PROJECT_DIR/build/Release"
 # Prevent stale artifacts from previous builds with different display names.
 rm -rf "$RELEASE_DIR"/*.app "$RELEASE_DIR"/*.dmg
 APP_PATH="$RELEASE_DIR/${DISPLAY_NAME}.app"
-DMG_PATH="$RELEASE_DIR/${DISPLAY_NAME}.dmg"
+# Output file uses the machine-safe name (GitHub rejects "!" in asset filenames).
+DMG_PATH="$RELEASE_DIR/${EXEC_NAME}.dmg"
 EXEC_PATH="$PROJECT_DIR/.build/release/$EXEC_NAME"
 RESOURCE_BUNDLE="$PROJECT_DIR/.build/release/${EXEC_NAME}_${EXEC_NAME}.bundle"
 
@@ -109,5 +110,7 @@ fi
 echo "Verifying locked DMG layout..."
 python3 "$RAZORCORE_DIR/verify-dmg-layout.py" "$DMG_PATH" "$DISPLAY_NAME"
 
-echo "Build complete: $APP_PATH"
-echo "DMG: $DMG_PATH"
+# Package as a single DMG; do not leave the .app bundle in the app folder.
+rm -rf "$APP_PATH"
+
+echo "Build complete: $DMG_PATH"

@@ -37,7 +37,7 @@ Package a macOS `.app` and DMG with ad-hoc signing:
 ./scripts/build-mac.sh
 ```
 
-Output: `build/Release/L!bra.app` and `build/Release/L!bra.dmg`.
+Output: `build/Release/Libra.dmg` (no `.app` bundle is left in the app folder).
 
 ## Community & docs
 
