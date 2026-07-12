@@ -1,7 +1,7 @@
 # L!bra
 
 [![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)](Sources/Libra/Resources/version.json)
+[![Version](https://img.shields.io/badge/version-1.0.1-blue?style=for-the-badge)](Sources/Libra/Resources/version.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet?style=for-the-badge)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
 [![macOS](https://img.shields.io/badge/mac%20os-Apple%20Silicon-d32f2f?style=for-the-badge&logo=apple&logoColor=white)](https://support.apple.com/en-us/HT211814)

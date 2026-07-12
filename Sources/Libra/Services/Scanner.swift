@@ -4,6 +4,11 @@ import Foundation
 final class ScannerService {
     private init() {}
 
+    /// macOS bundle-like directories that are apps/frameworks, not media folders.
+    private static let bundleExtensions: Set<String> = [
+        "app", "bundle", "framework", "xpc", "plugin", "kext", "driver", "appex", "qlgenerator"
+    ]
+
     static func scan(
         paths: [String],
         extensions: [String],
@@ -17,6 +22,14 @@ final class ScannerService {
         for path in paths {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+                if isBundleDirectory(path) {
+                    unsupported.append(OperationResult(
+                        path: path,
+                        status: .skipped,
+                        reason: "Skipped app/bundle directory"
+                    ))
+                    continue
+                }
                 let walked = walkDirectory(path, extensions: Array(allowed))
                 files.append(contentsOf: walked.supported)
                 unsupported.append(contentsOf: walked.unsupported)
@@ -47,22 +60,36 @@ final class ScannerService {
 
     private static func walkDirectory(_ path: String, extensions: [String]) -> (supported: [String], unsupported: [OperationResult]) {
         var found: [String] = []
-        let unsupported: [OperationResult] = []
+        var unsupported: [OperationResult] = []
         let allowed = Set(extensions)
         let enumerator = FileManager.default.enumerator(atPath: path)
         while let item = enumerator?.nextObject() as? String {
             let full = (path as NSString).appendingPathComponent(item)
             var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: full, isDirectory: &isDir), !isDir.boolValue {
-                let ext = (full as NSString).pathExtension.lowercased()
-                if allowed.contains(ext) {
-                    found.append(full)
-                } else if !ext.isEmpty {
-                    // Only report files that look like media attempts when walking; skip hidden/system noise
-                    continue
+            guard FileManager.default.fileExists(atPath: full, isDirectory: &isDir) else { continue }
+
+            if isDir.boolValue {
+                if isBundleDirectory(full) {
+                    enumerator?.skipDescendants()
+                    unsupported.append(OperationResult(
+                        path: full,
+                        status: .skipped,
+                        reason: "Skipped app/bundle directory"
+                    ))
                 }
+                continue
+            }
+
+            let ext = (full as NSString).pathExtension.lowercased()
+            if allowed.contains(ext) {
+                found.append(full)
             }
         }
         return (found, unsupported)
+    }
+
+    private static func isBundleDirectory(_ path: String) -> Bool {
+        let ext = (path as NSString).pathExtension.lowercased()
+        return bundleExtensions.contains(ext)
     }
 }
