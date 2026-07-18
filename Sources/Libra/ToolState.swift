@@ -62,7 +62,7 @@ final class ToolState: ObservableObject {
         let target = files
         switch tool {
         case .vidres, .promax, .maxvid, .keepName:
-            await sort(target: target, keepName: tool == .keepName)
+            await sort(target: target)
         case .provid:
             await rename(target: target, prefix: prefix)
         case .gps:
@@ -76,16 +76,36 @@ final class ToolState: ObservableObject {
         }
     }
 
-    private func sort(target: [VideoInfo], keepName: Bool) async {
+    private var usesPrefixField: Bool {
+        switch tool {
+        case .provid, .vidres, .promax, .maxvid:
+            return true
+        case .keepName, .iphoneSorter, .oneMin, .slomo, .gps:
+            return false
+        }
+    }
+
+    private func namingPrefix() -> String {
+        usesPrefixField ? prefix : ""
+    }
+
+    private func sort(target: [VideoInfo]) async {
+        let eligible = target.filter { $0.error == nil }
+        let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
+        var index = 0
         for file in target {
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
                 continue
             }
+            index += 1
             let folder = destinationFolder(for: file)
-            let filename = keepName
-                ? FileOps.sanitizeFileName(file.name) + "." + file.ext
-                : FileOps.sanitizeFileName(folderNamePrefix(prefix: prefix, file: file)) + "." + file.ext
+            let filename = FileNaming.standardFileName(
+                for: file,
+                prefix: namingPrefix(),
+                index: index,
+                padWidth: padWidth
+            )
             let dest = (folder as NSString).appendingPathComponent(filename)
             let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun)
             results.append(result)
@@ -93,23 +113,40 @@ final class ToolState: ObservableObject {
     }
 
     private func rename(target: [VideoInfo], prefix: String) async {
+        let eligible = target.filter { $0.error == nil }
+        let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
+        var index = 0
         for file in target {
-            let base = prefix.isEmpty ? file.name : "\(prefix) \(file.name)"
-            let newName = FileOps.sanitizeFileName(base)
-            let dest = (file.dir as NSString).appendingPathComponent(newName + "." + file.ext)
+            if let error = file.error {
+                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                continue
+            }
+            index += 1
+            let filename = FileNaming.standardFileName(
+                for: file,
+                prefix: prefix,
+                index: index,
+                padWidth: padWidth
+            )
+            let dest = (file.dir as NSString).appendingPathComponent(filename)
             let result = FileOps.renameFile(from: file.path, to: dest, dryRun: dryRun)
             results.append(result)
         }
     }
 
     private func gpsSort(target: [VideoInfo]) async {
+        let eligible = target.filter { $0.error == nil }
+        let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
+        var index = 0
         for file in target {
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
                 continue
             }
+            index += 1
             let folder = (file.dir as NSString).appendingPathComponent(file.hasGPS ? "GPS" : "No-GPS")
-            let dest = (folder as NSString).appendingPathComponent(FileOps.sanitizeFileName(file.name) + "." + file.ext)
+            let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
+            let dest = (folder as NSString).appendingPathComponent(filename)
             let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun)
             results.append(result)
         }
@@ -142,23 +179,20 @@ final class ToolState: ObservableObject {
             }
         }
 
-        let padWidth = IPhoneSortLogic.paddingWidth(forCount: iphoneFiles.count)
+        let allNamed = iphoneFiles + otherFiles
+        let padWidth = FileNaming.paddingWidth(forCount: allNamed.count)
         var reserved = Set<String>()
+        var index = 0
 
-        for (index, file) in iphoneFiles.enumerated() {
+        for file in iphoneFiles {
             let classification = IPhoneSortLogic.classify(
                 hasAppleMake: file.hasAppleMake,
                 hasiPhoneModel: file.hasiPhoneModel,
                 make: file.make,
                 model: file.model
             )
-            let filename = IPhoneSortLogic.iPhoneFileName(
-                baseName: file.name,
-                markers: classification.markers,
-                index: index + 1,
-                padWidth: padWidth,
-                ext: file.ext
-            )
+            index += 1
+            let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let folder = (file.dir as NSString).appendingPathComponent("iPhone")
             var dest = (folder as NSString).appendingPathComponent(filename)
             dest = uniqueReservedPath(dest, reserved: &reserved)
@@ -181,8 +215,9 @@ final class ToolState: ObservableObject {
                 make: file.make,
                 model: file.model
             )
+            index += 1
+            let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let folder = (file.dir as NSString).appendingPathComponent("Not iPhone")
-            let filename = IPhoneSortLogic.notIPhoneFileName(baseName: file.name, ext: file.ext)
             var dest = (folder as NSString).appendingPathComponent(filename)
             dest = uniqueReservedPath(dest, reserved: &reserved)
             let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun)
@@ -216,27 +251,51 @@ final class ToolState: ObservableObject {
     }
 
     private func oneMinAdjust(target: [VideoInfo], start: Date, mode: String, ffmpegPath: String) async {
+        let eligible = target.filter { $0.error == nil }
+        let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var current = start
+        var index = 0
         for file in target {
+            if let error = file.error {
+                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                continue
+            }
+            index += 1
+            let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let output: String
             if mode == "copies" {
                 let dir = (file.dir as NSString).appendingPathComponent("Adjusted")
                 try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-                output = (dir as NSString).appendingPathComponent(file.name + "_adjusted." + file.ext)
+                output = (dir as NSString).appendingPathComponent(filename)
             } else {
-                output = file.path
+                output = (file.dir as NSString).appendingPathComponent(filename)
             }
             let result = await FfmpegOps.adjustTimestamp(filePath: file.path, outputPath: output, creationTime: current, ffmpegPath: ffmpegPath)
+            if mode != "copies",
+               result.status == .success,
+               output != file.path,
+               !dryRun {
+                try? FileManager.default.removeItem(atPath: file.path)
+            }
             results.append(result)
             current = current.addingTimeInterval(60)
         }
     }
 
     private func sloMo(target: [VideoInfo], factor: Double, ffmpegPath: String) async {
+        let eligible = target.filter { $0.error == nil }
+        let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
+        var index = 0
         for file in target {
+            if let error = file.error {
+                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                continue
+            }
+            index += 1
             let dir = (file.dir as NSString).appendingPathComponent("SloMo")
             try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-            let output = (dir as NSString).appendingPathComponent(file.name + "_slow." + file.ext)
+            let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
+            let output = (dir as NSString).appendingPathComponent(filename)
             let result = await FfmpegOps.sloMo(filePath: file.path, outputPath: output, factor: factor, ffmpegPath: ffmpegPath)
             results.append(result)
         }
@@ -250,7 +309,7 @@ final class ToolState: ObservableObject {
         case .promax:
             parts = [file.resolutionClass, file.orientation.capitalized]
         case .maxvid:
-            parts = [file.resolutionClass, file.orientation.capitalized, "\(Int(file.fps))fps"]
+            parts = [file.resolutionClass, file.orientation.capitalized, "\(FileNaming.fpsBucket(file.fps))fps"]
         case .keepName:
             parts = [file.resolutionClass]
         case .iphoneSorter, .provid, .oneMin, .slomo, .gps:
@@ -259,10 +318,5 @@ final class ToolState: ObservableObject {
         let tail = parts.joined(separator: "/")
         if tail.isEmpty { return file.dir }
         return (file.dir as NSString).appendingPathComponent(tail)
-    }
-
-    private func folderNamePrefix(prefix: String, file: VideoInfo) -> String {
-        if prefix.isEmpty { return file.name }
-        return "\(prefix) \(file.name)"
     }
 }

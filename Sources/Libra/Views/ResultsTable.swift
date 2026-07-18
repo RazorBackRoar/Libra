@@ -82,10 +82,12 @@ struct ResultsTable: View {
             parts.append(formatDuration(file.durationSec))
         }
         parts.append(formatSize(file.sizeBytes))
-        if file.hasAppleMake || file.hasiPhoneModel {
-            var markers = ""
-            if file.hasAppleMake { markers += "🍎" }
-            if file.hasiPhoneModel { markers += "📱" }
+        let markers = FileNaming.metadataMarkers(
+            hasAppleMake: file.hasAppleMake,
+            hasiPhoneModel: file.hasiPhoneModel,
+            hasGPS: file.hasGPS
+        )
+        if !markers.isEmpty {
             parts.append(markers)
         }
         if !file.make.isEmpty || !file.model.isEmpty {

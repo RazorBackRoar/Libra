@@ -68,15 +68,15 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
 
     var description: String {
         switch self {
-        case .iphoneSorter: return "Sort into iPhone / Not iPhone folders with Apple and iPhone metadata markers."
-        case .provid: return "Rename videos in place with an optional prefix."
-        case .vidres: return "Sort videos into resolution folders."
-        case .promax: return "Sort into resolution + orientation folders."
-        case .maxvid: return "Sort into resolution + orientation + FPS folders."
-        case .keepName: return "Sort into folders while keeping original filenames."
-        case .oneMin: return "Apply sequential 60-second timestamps."
-        case .slomo: return "Create slow-motion copies with ffmpeg."
-        case .gps: return "Sort into GPS / No-GPS folders."
+        case .iphoneSorter: return "Sort into iPhone / Not iPhone folders using the standard filename format."
+        case .provid: return "Rename videos in place with the standard filename format and optional prefix."
+        case .vidres: return "Sort into resolution folders with the standard filename format."
+        case .promax: return "Sort into resolution + orientation folders with the standard filename format."
+        case .maxvid: return "Sort into resolution + orientation + FPS folders with the standard filename format."
+        case .keepName: return "Sort into resolution folders with the standard filename format."
+        case .oneMin: return "Apply sequential 60-second timestamps and the standard filename format."
+        case .slomo: return "Create slow-motion copies with the standard filename format."
+        case .gps: return "Sort into GPS / No-GPS folders with the standard filename format."
         }
     }
 
