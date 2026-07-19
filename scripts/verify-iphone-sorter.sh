@@ -79,6 +79,7 @@ swiftc -O -o "$BIN" \
   "$ROOT/Sources/Libra/Models.swift" \
   "$ROOT/Sources/Libra/Services/ProcessRunner.swift" \
   "$ROOT/Sources/Libra/Services/FileOps.swift" \
+  "$ROOT/Sources/Libra/Services/FileNaming.swift" \
   "$ROOT/Sources/Libra/Services/MediaProbe.swift" \
   "$ROOT/Sources/Libra/Services/IPhoneSortLogic.swift" \
   "$ROOT/scripts/iphone_verify_main.swift"
@@ -100,7 +101,7 @@ import re, sys
 text = open(sys.argv[1]).read()
 block = re.search(r'enum Tool:.*?\n\}', text, re.S).group(0)
 cases = re.findall(r'case (\w+)', block)
-expected = ['iphoneSorter','provid','vidres','promax','maxvid','keepName','oneMin','slomo','gps']
+expected = ['provid','vidres','keepName','promax','maxvid','iphoneSorter','slomo','oneMin','gps']
 assert cases == expected, (cases, expected)
 for f in ['organizer','reencode','duplicates','codec']:
     assert f not in cases, f
