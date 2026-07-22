@@ -255,6 +255,7 @@ final class ToolState: ObservableObject {
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var current = start
         var index = 0
+        var reserved = Set<String>()
         for file in target {
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
@@ -270,10 +271,11 @@ final class ToolState: ObservableObject {
             } else {
                 output = (file.dir as NSString).appendingPathComponent(filename)
             }
-            let result = await FfmpegOps.adjustTimestamp(filePath: file.path, outputPath: output, creationTime: current, ffmpegPath: ffmpegPath)
+            let safeOutput = uniqueReservedPath(output, reserved: &reserved)
+            let result = await FfmpegOps.adjustTimestamp(filePath: file.path, outputPath: safeOutput, creationTime: current, ffmpegPath: ffmpegPath)
             if mode != "copies",
                result.status == .success,
-               output != file.path,
+               safeOutput != file.path,
                !dryRun {
                 try? FileManager.default.removeItem(atPath: file.path)
             }
@@ -286,6 +288,7 @@ final class ToolState: ObservableObject {
         let eligible = target.filter { $0.error == nil }
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var index = 0
+        var reserved = Set<String>()
         for file in target {
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
@@ -295,7 +298,10 @@ final class ToolState: ObservableObject {
             let dir = (file.dir as NSString).appendingPathComponent("SloMo")
             try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
-            let output = (dir as NSString).appendingPathComponent(filename)
+            let output = uniqueReservedPath(
+                (dir as NSString).appendingPathComponent(filename),
+                reserved: &reserved
+            )
             let result = await FfmpegOps.sloMo(filePath: file.path, outputPath: output, factor: factor, ffmpegPath: ffmpegPath)
             results.append(result)
         }
