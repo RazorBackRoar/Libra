@@ -1,26 +1,45 @@
 # L!bra
 
+[![Download](https://img.shields.io/github/v/release/RazorBackRoar/Libra?style=for-the-badge&label=Download%20DMG&color=d32f2f)](https://github.com/RazorBackRoar/Libra/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.1-blue?style=for-the-badge)](Sources/Libra/Resources/version.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet?style=for-the-badge)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
 [![macOS](https://img.shields.io/badge/mac%20os-Apple%20Silicon-d32f2f?style=for-the-badge&logo=apple&logoColor=white)](https://support.apple.com/en-us/HT211814)
 
-<!-- Workspace Health Layer -->
-[![Status](https://img.shields.io/badge/status-active-2ea44f?style=for-the-badge)]()
-[![Tests](https://img.shields.io/badge/tests-build--gated-2ea44f?style=for-the-badge)]()
-[![Build](https://img.shields.io/badge/build-swift-F05138?style=for-the-badge)]()
+**Local-first macOS video organization toolkit.**
 
-> **TL;DR:** Local-first macOS video organization toolkit. User-facing brand is **L!bra**; the GitHub repo and machine IDs stay ASCII (`Libra`).
+Sort, rename, and tidy video libraries with GPS / iPhone-oriented helpers — all on your machine. The user-facing brand is **L!bra**; the GitHub repo and machine IDs stay ASCII (`Libra`).
 
-## Branding
+<p align="center">
+  <a href="https://github.com/RazorBackRoar/Libra/releases/latest/download/Libra.dmg"><strong>↓ Download Libra.dmg</strong></a>
+  ·
+  <a href="https://github.com/RazorBackRoar/Libra/releases">All releases</a>
+</p>
 
-| Surface | Value |
-|---------|-------|
-| Display name (UI, Dock, `.app`, DMG) | **L!bra** |
-| GitHub / folder | [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra) |
-| appId | `com.razorbackroar.libra` |
-| Executable (Mach-O) | `Libra` |
+![L!bra](docs/screenshots/app.png)
+
+## Features
+
+- **Local-first** — organize videos without cloud upload
+- **Sort & rename** — batch-friendly video library cleanup
+- **GPS / iPhone tools** — helpers for phone-shot media workflows
+- **Native SwiftUI** — Apple Silicon macOS app
+- **Safe packaging** — ad-hoc signed DMG from Releases
+
+## Install
+
+1. Download [`Libra.dmg`](https://github.com/RazorBackRoar/Libra/releases/latest/download/Libra.dmg)
+2. Open the DMG and drag **L!bra.app** to `/Applications`
+3. First launch — right-click → **Open** (ad-hoc signed build)
+
+Requires macOS on Apple Silicon.
+
+## Usage
+
+1. Open **L!bra**
+2. Point it at the folders you want organized
+3. Sort / rename / apply GPS or iPhone helpers as needed
+4. Review results on disk — nothing leaves your Mac
 
 ## Development
 
@@ -31,20 +50,25 @@ swift run
 
 `swift test` requires the full Xcode.app (XCTest).
 
-Package a macOS `.app` and DMG with ad-hoc signing:
+Package a macOS `.app` + DMG (ad-hoc signed):
 
 ```bash
 ./scripts/build-mac.sh
+# → build/Release/Libra.dmg
 ```
 
-Output: `build/Release/Libra.dmg` (no `.app` bundle is left in the app folder).
+| Surface | Value |
+|---------|-------|
+| Display name (UI, Dock, `.app`, DMG) | **L!bra** |
+| GitHub | [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra) |
+| appId | `com.razorbackroar.libra` |
 
-## Community & docs
+## Docs
 
-- [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md) — prerequisites, build, packaging, release, versioning
-- [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
-- [SECURITY.md](SECURITY.md) — vulnerability reporting
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards
+- [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [SECURITY.md](SECURITY.md)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 
 ## License
 
