@@ -67,48 +67,28 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © $(date +%Y) RazorBackRoar. All rights reserved.</string>
 </dict>
 </plist>
 EOF
 
 chmod +x "$APP_PATH/Contents/MacOS/$EXEC_NAME"
 
+# Keep copyright year current via shared helper (does not touch DMG layout).
+RAZORCORE_DIR="$(cd "$SCRIPT_DIR/../../.razorcore" && pwd)"
+"$RAZORCORE_DIR/patch-app-branding.sh" "$APP_PATH"
+
 echo "Ad-hoc signing ${DISPLAY_NAME}.app..."
 codesign --force --deep --sign - "$APP_PATH"
 
 echo "Creating ${DISPLAY_NAME}.dmg with shared layout..."
 mkdir -p "$RELEASE_DIR"
-RAZORCORE_DIR="$(cd "$SCRIPT_DIR/../../.razorcore" && pwd)"
-DMG_SETTINGS="$RAZORCORE_DIR/dmg-settings.py"
-VOL_ICNS="$APP_PATH/Contents/Resources/AppIcon.icns"
-rm -f "$DMG_PATH"
-
-dmg_defines=(-D "app=$APP_PATH" -D "app_name=$DISPLAY_NAME")
-if [ -f "$VOL_ICNS" ]; then
-    dmg_defines+=(-D "vol_icon=$VOL_ICNS")
-fi
-
-dmg_ok=0
-for attempt in 1 2 3; do
-    if [ -d "/Volumes/$DISPLAY_NAME" ]; then
-        hdiutil detach "/Volumes/$DISPLAY_NAME" -force -quiet 2>/dev/null || true
-    fi
-    rm -f "$DMG_PATH"
-    if uvx --from dmgbuild dmgbuild -s "$DMG_SETTINGS" "${dmg_defines[@]}" "$DISPLAY_NAME" "$DMG_PATH"; then
-        dmg_ok=1
-        break
-    fi
-    echo "Warning: DMG build attempt ${attempt}/3 failed for ${DISPLAY_NAME}; retrying..."
-    sleep 2
-done
-
-if [ "$dmg_ok" -ne 1 ]; then
-    echo "Error: DMG build failed after 3 attempts for ${DISPLAY_NAME}." >&2
-    exit 1
-fi
-
-echo "Verifying locked DMG layout..."
-python3 "$RAZORCORE_DIR/verify-dmg-layout.py" "$DMG_PATH" "$DISPLAY_NAME"
+"$RAZORCORE_DIR/package-dmg.sh" \
+  --app "$APP_PATH" \
+  --dmg "$DMG_PATH" \
+  --app-name "$DISPLAY_NAME" \
+  --volname "$DISPLAY_NAME"
 
 # Package as a single DMG; do not leave the .app bundle in the app folder.
 rm -rf "$APP_PATH"
