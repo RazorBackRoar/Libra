@@ -4,10 +4,11 @@ Guidance for agents in this repository. Use with `../AGENTS.md`.
 
 ## Branding
 
-**Rule of thumb:** if a human reads it → **L!bra**. If a machine/path/API must be ASCII → **Libra**.
+**Rule of thumb:** if a human reads it → **L!bra**. If a machine/path/API must
+be ASCII → **Libra**.
 
 | Surface | Value | Why |
-|---------|-------|-----|
+| --- | --- | --- |
 | UI, Dock, About, menus, window title | **L!bra** | Product brand |
 | Application Support / Caches folder | **L!bra** | User-visible path |
 | Built `.app` / `.dmg` / volume name | **L!bra** | Finder-facing |
@@ -33,7 +34,7 @@ Local-first macOS video organization toolkit. Swift + SwiftUI.
 ### RazorCore contracts (v1.1)
 
 | Module | Role |
-|--------|------|
+| --- | --- |
 | `Utilities/Brand.swift` | Display vs machine-safe IDs |
 | `Utilities/Paths.swift` | Application Support / cache / logs under **L!bra** |
 | `Utilities/Logging.swift` | Console + file logs under Application Support |
@@ -48,7 +49,8 @@ swift build
 swift run
 ```
 
-`swift test` requires the full Xcode.app (XCTest); the command-line tools ship without it.
+`swift test` requires the full Xcode.app (XCTest); the command-line tools ship
+without it.
 
 Package a macOS `.app` and DMG with ad-hoc signing:
 
@@ -56,7 +58,8 @@ Package a macOS `.app` and DMG with ad-hoc signing:
 ./scripts/build-mac.sh
 ```
 
-Output: `build/Release/L!bra.app` and `build/Release/L!bra.dmg` (executable inside stays `Libra`).
+Output: `build/Release/L!bra.app` and `build/Release/L!bra.dmg` (executable
+inside stays `Libra`).
 
 ## Repository rules
 
