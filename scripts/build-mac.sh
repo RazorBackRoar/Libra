@@ -25,6 +25,12 @@ RESOURCE_BUNDLE="$PROJECT_DIR/.build/release/${EXEC_NAME}_${EXEC_NAME}.bundle"
 
 echo "Building L!bra release..."
 cd "$PROJECT_DIR"
+
+if [[ -f "$PROJECT_DIR/Libra.png" ]]; then
+    ICON_PYTHON="${LIBRA_ICON_PYTHON:-$HOME/.local/bin/python3.14}"
+    "$ICON_PYTHON" "$SCRIPT_DIR/generate-icon.py"
+fi
+
 swift build -c release
 
 echo "Packaging ${DISPLAY_NAME}.app (executable ${EXEC_NAME})..."
