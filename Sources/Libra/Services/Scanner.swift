@@ -48,13 +48,27 @@ final class ScannerService {
         }
 
         let deduped = Array(Set(files)).sorted()
-        var results: [VideoInfo] = []
         let total = deduped.count
-        for (index, file) in deduped.enumerated() {
-            let info = await MediaProbe.probe(filePath: file, ffprobePath: ffprobePath)
-            results.append(info)
-            progress(index + 1, total)
+
+        let unorderedResults = await withTaskGroup(of: (Int, VideoInfo).self) { group in
+            for (index, file) in deduped.enumerated() {
+                group.addTask {
+                    let info = await MediaProbe.probe(filePath: file, ffprobePath: ffprobePath)
+                    return (index, info)
+                }
+            }
+
+            var completed = 0
+            var collected: [(Int, VideoInfo)] = []
+            for await result in group {
+                collected.append(result)
+                completed += 1
+                progress(completed, total)
+            }
+            return collected
         }
+
+        let results = unorderedResults.sorted { $0.0 < $1.0 }.map { $1 }
         return (results, unsupported)
     }
 
