@@ -19,6 +19,12 @@ let package = Package(
                 .process("Resources")
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "LibraTests",
+            dependencies: ["Libra"],
+            path: "Tests/LibraTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
 )
