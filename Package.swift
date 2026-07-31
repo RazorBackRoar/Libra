@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.0
 
 import PackageDescription
 
@@ -19,6 +19,11 @@ let package = Package(
                 .process("Resources")
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "LibraTests",
+            dependencies: ["Libra"],
+            path: "Tests/LibraTests"
         )
     ]
 )
