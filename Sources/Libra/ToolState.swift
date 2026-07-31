@@ -154,8 +154,9 @@ final class ToolState: ObservableObject {
 
     private func iphoneSort(target: [VideoInfo]) async {
         let ordered = target.sorted { $0.path < $1.path }
-        var iphoneFiles: [VideoInfo] = []
-        var otherFiles: [VideoInfo] = []
+        typealias ClassifiedFile = (file: VideoInfo, classification: IPhoneSortLogic.Classification)
+        var iphoneFiles: [ClassifiedFile] = []
+        var otherFiles: [ClassifiedFile] = []
 
         for file in ordered {
             if let error = file.error {
@@ -173,24 +174,20 @@ final class ToolState: ObservableObject {
                 model: file.model
             )
             if classification.isIPhoneFolder {
-                iphoneFiles.append(file)
+                iphoneFiles.append((file, classification))
             } else {
-                otherFiles.append(file)
+                otherFiles.append((file, classification))
             }
         }
 
-        let allNamed = iphoneFiles + otherFiles
-        let padWidth = FileNaming.paddingWidth(forCount: allNamed.count)
+        let totalNamed = iphoneFiles.count + otherFiles.count
+        let padWidth = FileNaming.paddingWidth(forCount: totalNamed)
         var reserved = Set<String>()
         var index = 0
 
-        for file in iphoneFiles {
-            let classification = IPhoneSortLogic.classify(
-                hasAppleMake: file.hasAppleMake,
-                hasiPhoneModel: file.hasiPhoneModel,
-                make: file.make,
-                model: file.model
-            )
+        for item in iphoneFiles {
+            let file = item.file
+            let classification = item.classification
             index += 1
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let folder = (file.dir as NSString).appendingPathComponent("iPhone")
@@ -208,13 +205,9 @@ final class ToolState: ObservableObject {
             ))
         }
 
-        for file in otherFiles {
-            let classification = IPhoneSortLogic.classify(
-                hasAppleMake: file.hasAppleMake,
-                hasiPhoneModel: file.hasiPhoneModel,
-                make: file.make,
-                model: file.model
-            )
+        for item in otherFiles {
+            let file = item.file
+            let classification = item.classification
             index += 1
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let folder = (file.dir as NSString).appendingPathComponent("Not iPhone")
