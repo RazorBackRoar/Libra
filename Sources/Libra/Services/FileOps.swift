@@ -60,19 +60,45 @@ enum FileOps {
     }
 
     static func uniquePath(for path: String) -> String {
-        var candidate = path
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: path) {
+            return path
+        }
+
+        let pathStr = path as NSString
+        let dir = pathStr.deletingLastPathComponent
+        let ext = pathStr.pathExtension
+        let baseName = (pathStr.lastPathComponent as NSString).deletingPathExtension
+
+        guard let files = try? fileManager.contentsOfDirectory(atPath: dir) else {
+            var candidate = path
+            var counter = 1
+            let base = pathStr.deletingPathExtension
+            while fileManager.fileExists(atPath: candidate) {
+                if ext.isEmpty {
+                    candidate = "\(base) (\(counter))"
+                } else {
+                    candidate = "\(base) (\(counter)).\(ext)"
+                }
+                counter += 1
+            }
+            return candidate
+        }
+
+        let existingFiles = Set(files)
         var counter = 1
-        let ext = (path as NSString).pathExtension
-        let base = (path as NSString).deletingPathExtension
-        while FileManager.default.fileExists(atPath: candidate) {
+        var candidateName = pathStr.lastPathComponent
+
+        while existingFiles.contains(candidateName) {
             if ext.isEmpty {
-                candidate = "\(base) (\(counter))"
+                candidateName = "\(baseName) (\(counter))"
             } else {
-                candidate = "\(base) (\(counter)).\(ext)"
+                candidateName = "\(baseName) (\(counter)).\(ext)"
             }
             counter += 1
         }
-        return candidate
+
+        return (dir as NSString).appendingPathComponent(candidateName)
     }
 
     /// Sanitize unsafe filename characters while preserving a readable base name.
