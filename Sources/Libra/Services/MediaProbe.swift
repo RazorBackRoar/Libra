@@ -74,48 +74,15 @@ enum MediaProbe {
         size: Int64,
         ffprobePath: String
     ) async -> VideoInfo {
-        let args = [
-            "-v", "quiet",
-            "-print_format", "json",
-            "-show_format",
-            "-show_streams",
-            filePath
-        ]
-
         do {
-            let output = try await ProcessRunner.run(executablePath: ffprobePath, arguments: args, timeout: 30)
-            let json = try JSONSerialization.jsonObject(with: output.stdout.data(using: .utf8) ?? Data()) as? [String: Any] ?? [:]
+            let json = try await runFfprobe(filePath: filePath, ffprobePath: ffprobePath)
 
             let format = json["format"] as? [String: Any] ?? [:]
             let streams = json["streams"] as? [[String: Any]] ?? []
             let videoStream = streams.first { ($0["codec_type"] as? String) == "video" } ?? [:]
 
-            let width = parseInt(videoStream["width"])
-            let height = parseInt(videoStream["height"])
-            let duration = parseDouble(format["duration"] as? String) ?? parseDouble(videoStream["duration"] as? String)
-            let fps = parseFps(videoStream["r_frame_rate"] as? String)
-            let codec = videoStream["codec_name"] as? String ?? ""
-            let container = format["format_name"] as? String ?? ""
-
-            let tags = videoStream["tags"] as? [String: Any] ?? [:]
-            let formatTags = format["tags"] as? [String: Any] ?? [:]
-            let mergedTags = tags.merging(formatTags) { current, _ in current }
-
-            let makeValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.makeKeys)
-            let modelValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.modelKeys)
-            // Also check exiftool-style fields if present in tags
-            let allMake = makeValues + stringValues(matching: mergedTags) { $0.lowercased().contains("make") }
-            let allModel = modelValues + stringValues(matching: mergedTags) { key in
-                let lower = key.lowercased()
-                return lower.contains("model") && !lower.contains("make")
-            }
-
-            let make = preferredValue(allMake)
-            let model = preferredValue(allModel)
-            let hasAppleMake = DeviceMetadata.hasAppleMake(in: allMake)
-            let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: allModel + allMake)
-            let creation = parseDate(tags["creation_time"] as? String) ?? parseDate(formatTags["creation_time"] as? String)
-            let hasGPS = mergedTags.keys.contains { $0.lowercased().contains("location") || $0.lowercased().contains("gps") }
+            let props = extractVideoProperties(format: format, videoStream: videoStream)
+            let meta = extractVideoMetadata(format: format, videoStream: videoStream)
 
             var info = VideoInfo(
                 path: filePath,
@@ -123,20 +90,20 @@ enum MediaProbe {
                 dir: dir,
                 ext: ext,
                 sizeBytes: size,
-                width: width,
-                height: height,
-                resolutionClass: resolutionClass(width: width, height: height),
-                orientation: orientation(width: width, height: height),
-                fps: fps,
-                durationSec: duration ?? 0,
-                codec: codec,
-                container: container,
-                make: make,
-                model: model,
-                hasAppleMake: hasAppleMake,
-                hasiPhoneModel: hasiPhoneModel,
-                hasGPS: hasGPS,
-                creationTime: creation,
+                width: props.width,
+                height: props.height,
+                resolutionClass: resolutionClass(width: props.width, height: props.height),
+                orientation: orientation(width: props.width, height: props.height),
+                fps: props.fps,
+                durationSec: props.duration,
+                codec: props.codec,
+                container: props.container,
+                make: meta.make,
+                model: meta.model,
+                hasAppleMake: meta.hasAppleMake,
+                hasiPhoneModel: meta.hasiPhoneModel,
+                hasGPS: meta.hasGPS,
+                creationTime: meta.creationTime,
                 error: nil
             )
 
@@ -146,29 +113,93 @@ enum MediaProbe {
             }
             return info
         } catch {
-            return VideoInfo(
-                path: filePath,
+            return failedVideoInfo(
+                filePath: filePath,
                 name: name,
                 dir: dir,
                 ext: ext,
-                sizeBytes: size,
-                width: 0,
-                height: 0,
-                resolutionClass: "Unknown",
-                orientation: "Unknown",
-                fps: 0,
-                durationSec: 0,
-                codec: "",
-                container: "",
-                make: "",
-                model: "",
-                hasAppleMake: false,
-                hasiPhoneModel: false,
-                hasGPS: false,
-                creationTime: nil,
+                size: size,
                 error: error.localizedDescription
             )
         }
+    }
+
+    private static func runFfprobe(filePath: String, ffprobePath: String) async throws -> [String: Any] {
+        let args = [
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_format",
+            "-show_streams",
+            filePath
+        ]
+        let output = try await ProcessRunner.run(executablePath: ffprobePath, arguments: args, timeout: 30)
+        return try JSONSerialization.jsonObject(with: output.stdout.data(using: .utf8) ?? Data()) as? [String: Any] ?? [:]
+    }
+
+    private static func extractVideoProperties(format: [String: Any], videoStream: [String: Any]) -> (width: Int, height: Int, duration: Double, fps: Double, codec: String, container: String) {
+        let width = parseInt(videoStream["width"])
+        let height = parseInt(videoStream["height"])
+        let duration = parseDouble(format["duration"] as? String) ?? parseDouble(videoStream["duration"] as? String) ?? 0
+        let fps = parseFps(videoStream["r_frame_rate"] as? String)
+        let codec = videoStream["codec_name"] as? String ?? ""
+        let container = format["format_name"] as? String ?? ""
+        return (width, height, duration, fps, codec, container)
+    }
+
+    private static func extractVideoMetadata(format: [String: Any], videoStream: [String: Any]) -> (make: String, model: String, hasAppleMake: Bool, hasiPhoneModel: Bool, hasGPS: Bool, creationTime: Date?) {
+        let tags = videoStream["tags"] as? [String: Any] ?? [:]
+        let formatTags = format["tags"] as? [String: Any] ?? [:]
+        let mergedTags = tags.merging(formatTags) { current, _ in current }
+
+        let makeValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.makeKeys)
+        let modelValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.modelKeys)
+        // Also check exiftool-style fields if present in tags
+        let allMake = makeValues + stringValues(matching: mergedTags) { $0.lowercased().contains("make") }
+        let allModel = modelValues + stringValues(matching: mergedTags) { key in
+            let lower = key.lowercased()
+            return lower.contains("model") && !lower.contains("make")
+        }
+
+        let make = preferredValue(allMake)
+        let model = preferredValue(allModel)
+        let hasAppleMake = DeviceMetadata.hasAppleMake(in: allMake)
+        let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: allModel + allMake)
+        let creation = parseDate(tags["creation_time"] as? String) ?? parseDate(formatTags["creation_time"] as? String)
+        let hasGPS = mergedTags.keys.contains { $0.lowercased().contains("location") || $0.lowercased().contains("gps") }
+
+        return (make, model, hasAppleMake, hasiPhoneModel, hasGPS, creation)
+    }
+
+    private static func failedVideoInfo(
+        filePath: String,
+        name: String,
+        dir: String,
+        ext: String,
+        size: Int64,
+        error: String
+    ) -> VideoInfo {
+        VideoInfo(
+            path: filePath,
+            name: name,
+            dir: dir,
+            ext: ext,
+            sizeBytes: size,
+            width: 0,
+            height: 0,
+            resolutionClass: "Unknown",
+            orientation: "Unknown",
+            fps: 0,
+            durationSec: 0,
+            codec: "",
+            container: "",
+            make: "",
+            model: "",
+            hasAppleMake: false,
+            hasiPhoneModel: false,
+            hasGPS: false,
+            creationTime: nil,
+            error: error
+        )
     }
 
     private static func probeImage(filePath: String, name: String, dir: String, ext: String, size: Int64) -> VideoInfo {
