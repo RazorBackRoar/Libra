@@ -45,7 +45,8 @@ final class AppState: ObservableObject {
 
     func installDependencies() {
         Task {
-            _ = try? await ProcessRunner.run(executablePath: "/usr/bin/env", arguments: ["bash", "-c", "brew install ffmpeg"], timeout: 600)
+            let brewPath = resolve(command: "brew", override: nil) ?? "/opt/homebrew/bin/brew"
+            _ = try? await ProcessRunner.run(executablePath: brewPath, arguments: ["install", "ffmpeg"], timeout: 600)
             resolveDependencies()
         }
     }
