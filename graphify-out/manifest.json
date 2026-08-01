@@ -1,0 +1,277 @@
+{
+  ".build/arm64-apple-macosx/debug/Libra.build/DerivedSources/resource_bundle_accessor.swift": {
+    "mtime": 1783723318.6893964,
+    "ast_hash": "1540568023a7d221e715e7bb989ce861",
+    "semantic_hash": "1540568023a7d221e715e7bb989ce861"
+  },
+  ".build/arm64-apple-macosx/debug/Libra.build/output-file-map.json": {
+    "mtime": 1785469115.0178745,
+    "ast_hash": "807e333c16553ed1a21176af3d9b1990",
+    "semantic_hash": "807e333c16553ed1a21176af3d9b1990"
+  },
+  ".build/arm64-apple-macosx/debug/LibraPackageTests.build/include/LibraPackageTests-Swift.h": {
+    "mtime": 1785469118.6750484,
+    "ast_hash": "d5a7d8101d256fff31dc91ac18df38c1",
+    "semantic_hash": "d5a7d8101d256fff31dc91ac18df38c1"
+  },
+  ".build/arm64-apple-macosx/debug/LibraPackageTests.build/output-file-map.json": {
+    "mtime": 1785469115.0185156,
+    "ast_hash": "0053eb790ecdfdc44924497c84f7a100",
+    "semantic_hash": "0053eb790ecdfdc44924497c84f7a100"
+  },
+  ".build/arm64-apple-macosx/debug/LibraPackageTests.derived/runner.swift": {
+    "mtime": 1785469115.02324,
+    "ast_hash": "5cbe2febc8bdd497ab1da333c5dedb17",
+    "semantic_hash": "5cbe2febc8bdd497ab1da333c5dedb17"
+  },
+  ".build/arm64-apple-macosx/debug/LibraTests.build/output-file-map.json": {
+    "mtime": 1785469115.018258,
+    "ast_hash": "717543b79bf63126ea1cccf93b8e4739",
+    "semantic_hash": "717543b79bf63126ea1cccf93b8e4739"
+  },
+  ".build/arm64-apple-macosx/debug/Libra_Libra.bundle/version.json": {
+    "mtime": 1783871889.9807985,
+    "ast_hash": "6ac8cfbda8e5d9e3a9ea56f1e749aa6b",
+    "semantic_hash": "6ac8cfbda8e5d9e3a9ea56f1e749aa6b"
+  },
+  ".build/arm64-apple-macosx/debug/Modules/Libra.abi.json": {
+    "mtime": 1785461448.4290507,
+    "ast_hash": "0a4af882c2c2f56d36e8540ae8c40bbf",
+    "semantic_hash": "0a4af882c2c2f56d36e8540ae8c40bbf"
+  },
+  ".build/arm64-apple-macosx/debug/Modules/LibraPackageTests.abi.json": {
+    "mtime": 1785469118.674868,
+    "ast_hash": "0a4af882c2c2f56d36e8540ae8c40bbf",
+    "semantic_hash": "0a4af882c2c2f56d36e8540ae8c40bbf"
+  },
+  ".build/arm64-apple-macosx/debug/Modules/LibraTests.abi.json": {
+    "mtime": 1785469118.1017573,
+    "ast_hash": "0a4af882c2c2f56d36e8540ae8c40bbf",
+    "semantic_hash": "0a4af882c2c2f56d36e8540ae8c40bbf"
+  },
+  ".build/arm64-apple-macosx/debug/description.json": {
+    "mtime": 1785469115.0206285,
+    "ast_hash": "a6c5f4973ad5466b09135f16393d965e",
+    "semantic_hash": "a6c5f4973ad5466b09135f16393d965e"
+  },
+  ".build/arm64-apple-macosx/debug/plugin-tools-description.json": {
+    "mtime": 1785469115.0162559,
+    "ast_hash": "a6c5f4973ad5466b09135f16393d965e",
+    "semantic_hash": "a6c5f4973ad5466b09135f16393d965e"
+  },
+  ".build/arm64-apple-macosx/release/Libra.build/DerivedSources/resource_bundle_accessor.swift": {
+    "mtime": 1783723468.5554345,
+    "ast_hash": "eb8899d98a085120f85856023ccb1574",
+    "semantic_hash": "eb8899d98a085120f85856023ccb1574"
+  },
+  ".build/arm64-apple-macosx/release/Libra.build/output-file-map.json": {
+    "mtime": 1784947620.281644,
+    "ast_hash": "d88214d2168e049b42a08fe273e1c60b",
+    "semantic_hash": "d88214d2168e049b42a08fe273e1c60b"
+  },
+  ".build/arm64-apple-macosx/release/Libra_Libra.bundle/version.json": {
+    "mtime": 1783871889.9807985,
+    "ast_hash": "6ac8cfbda8e5d9e3a9ea56f1e749aa6b",
+    "semantic_hash": "6ac8cfbda8e5d9e3a9ea56f1e749aa6b"
+  },
+  ".build/arm64-apple-macosx/release/Modules/Libra.abi.json": {
+    "mtime": 1784947621.916418,
+    "ast_hash": "0a4af882c2c2f56d36e8540ae8c40bbf",
+    "semantic_hash": "0a4af882c2c2f56d36e8540ae8c40bbf"
+  },
+  ".build/arm64-apple-macosx/release/description.json": {
+    "mtime": 1784947620.28325,
+    "ast_hash": "9179e25303a640c04b5918d4d86d55d7",
+    "semantic_hash": "9179e25303a640c04b5918d4d86d55d7"
+  },
+  ".build/arm64-apple-macosx/release/plugin-tools-description.json": {
+    "mtime": 1784947620.280393,
+    "ast_hash": "9179e25303a640c04b5918d4d86d55d7",
+    "semantic_hash": "9179e25303a640c04b5918d4d86d55d7"
+  },
+  ".build/workspace-state.json": {
+    "mtime": 1783723318.6855996,
+    "ast_hash": "2e5a5ad2a66d6697a649f98dcd8f1c38",
+    "semantic_hash": "2e5a5ad2a66d6697a649f98dcd8f1c38"
+  },
+  ".cursor/hooks/state/continual-learning.json": {
+    "mtime": 1784775479.4862976,
+    "ast_hash": "c855c51ee2b562d172b62b19b57d970a",
+    "semantic_hash": "c855c51ee2b562d172b62b19b57d970a"
+  },
+  ".jules/config.json": {
+    "mtime": 1785460605.6431904,
+    "ast_hash": "2dc66dc3785bea9c56b988a3356cbc41",
+    "semantic_hash": "2dc66dc3785bea9c56b988a3356cbc41"
+  },
+  ".mcp.json": {
+    "mtime": 1783262005.0,
+    "ast_hash": "39fcaa6fd7f6d4d670500978ca977562",
+    "semantic_hash": "39fcaa6fd7f6d4d670500978ca977562"
+  },
+  "Package.swift": {
+    "mtime": 1785459656.287603,
+    "ast_hash": "495100ee70b8f6c3978906bea1231d33",
+    "semantic_hash": "495100ee70b8f6c3978906bea1231d33"
+  },
+  "Sources/Libra/AppState.swift": {
+    "mtime": 1785459656.2883961,
+    "ast_hash": "77bf846ed23410cb627e244c265a5e05",
+    "semantic_hash": "77bf846ed23410cb627e244c265a5e05"
+  },
+  "Sources/Libra/LibraApp.swift": {
+    "mtime": 1783775298.49382,
+    "ast_hash": "2b2ae59fdd6041ac0ca086e438181f11",
+    "semantic_hash": "2b2ae59fdd6041ac0ca086e438181f11"
+  },
+  "Sources/Libra/Models.swift": {
+    "mtime": 1785453717.2291572,
+    "ast_hash": "0298acf31fef3f38e3e7558217c78fa4",
+    "semantic_hash": "0298acf31fef3f38e3e7558217c78fa4"
+  },
+  "Sources/Libra/Resources.swift": {
+    "mtime": 1783723019.5877972,
+    "ast_hash": "c2d040397a2a032a80d4785c64d299a2",
+    "semantic_hash": "c2d040397a2a032a80d4785c64d299a2"
+  },
+  "Sources/Libra/Resources/version.json": {
+    "mtime": 1783871889.9807985,
+    "ast_hash": "6ac8cfbda8e5d9e3a9ea56f1e749aa6b",
+    "semantic_hash": "6ac8cfbda8e5d9e3a9ea56f1e749aa6b"
+  },
+  "Sources/Libra/Services/FfmpegOps.swift": {
+    "mtime": 1783723570.648234,
+    "ast_hash": "a90eec54558dcaef45cf0b31556d62ad",
+    "semantic_hash": "a90eec54558dcaef45cf0b31556d62ad"
+  },
+  "Sources/Libra/Services/FileNaming.swift": {
+    "mtime": 1785453717.2292368,
+    "ast_hash": "07ef0fad36822a63d314ae73809f4770",
+    "semantic_hash": "07ef0fad36822a63d314ae73809f4770"
+  },
+  "Sources/Libra/Services/FileOps.swift": {
+    "mtime": 1785459656.2891004,
+    "ast_hash": "1c6cb7ac2ec5126447e59fed31da19eb",
+    "semantic_hash": "1c6cb7ac2ec5126447e59fed31da19eb"
+  },
+  "Sources/Libra/Services/IPhoneSortLogic.swift": {
+    "mtime": 1785453717.2291741,
+    "ast_hash": "7cbc41e8b69af4ab2eefc96eef1fa43f",
+    "semantic_hash": "7cbc41e8b69af4ab2eefc96eef1fa43f"
+  },
+  "Sources/Libra/Services/MediaProbe.swift": {
+    "mtime": 1785459656.28984,
+    "ast_hash": "e303d3ef9fdd1e6af571d72e9aa84e4e",
+    "semantic_hash": "e303d3ef9fdd1e6af571d72e9aa84e4e"
+  },
+  "Sources/Libra/Services/ProcessRunner.swift": {
+    "mtime": 1783722971.0081077,
+    "ast_hash": "ad65512d14371748341d084cda28ea82",
+    "semantic_hash": "ad65512d14371748341d084cda28ea82"
+  },
+  "Sources/Libra/Services/Scanner.swift": {
+    "mtime": 1783871844.528999,
+    "ast_hash": "5ce93ca09d4c0b9902fd2169f52f1395",
+    "semantic_hash": "5ce93ca09d4c0b9902fd2169f52f1395"
+  },
+  "Sources/Libra/ToolState.swift": {
+    "mtime": 1785459656.2909794,
+    "ast_hash": "3225be06ce9bdf698502f4a630cfcec6",
+    "semantic_hash": "3225be06ce9bdf698502f4a630cfcec6"
+  },
+  "Sources/Libra/Utilities/AppInfo.swift": {
+    "mtime": 1783722971.0100138,
+    "ast_hash": "63e8c084fcc17be04065db71ef1b9c81",
+    "semantic_hash": "63e8c084fcc17be04065db71ef1b9c81"
+  },
+  "Sources/Libra/Utilities/Brand.swift": {
+    "mtime": 1783780195.5238068,
+    "ast_hash": "75402d2b6b9e654a7b74bb684244889f",
+    "semantic_hash": "75402d2b6b9e654a7b74bb684244889f"
+  },
+  "Sources/Libra/Utilities/Logging.swift": {
+    "mtime": 1783723016.2379577,
+    "ast_hash": "341d54b6d704e9e09166bab568147dc2",
+    "semantic_hash": "341d54b6d704e9e09166bab568147dc2"
+  },
+  "Sources/Libra/Utilities/Paths.swift": {
+    "mtime": 1783722971.009735,
+    "ast_hash": "248a10cec94edb003875d280347d0041",
+    "semantic_hash": "248a10cec94edb003875d280347d0041"
+  },
+  "Sources/Libra/Utilities/Settings.swift": {
+    "mtime": 1783723364.5304496,
+    "ast_hash": "e179679c0d62ce29cdf6da6f7d6e710c",
+    "semantic_hash": "e179679c0d62ce29cdf6da6f7d6e710c"
+  },
+  "Sources/Libra/Utilities/Updates.swift": {
+    "mtime": 1783723021.456555,
+    "ast_hash": "b4acbdf25612f3862f2f2478437a2b45",
+    "semantic_hash": "b4acbdf25612f3862f2f2478437a2b45"
+  },
+  "Sources/Libra/Views/CountPills.swift": {
+    "mtime": 1783774728.605218,
+    "ast_hash": "3dc5da30c9a85852db9a4adbe7ee6da5",
+    "semantic_hash": "3dc5da30c9a85852db9a4adbe7ee6da5"
+  },
+  "Sources/Libra/Views/DropZone.swift": {
+    "mtime": 1783723250.0214,
+    "ast_hash": "108e30ccf9e5c6ae6f780f862f9db808",
+    "semantic_hash": "108e30ccf9e5c6ae6f780f862f9db808"
+  },
+  "Sources/Libra/Views/HomeView.swift": {
+    "mtime": 1783775298.3315442,
+    "ast_hash": "97afbdb704c37ec50f86029012f03dfa",
+    "semantic_hash": "97afbdb704c37ec50f86029012f03dfa"
+  },
+  "Sources/Libra/Views/LibraView.swift": {
+    "mtime": 1783723301.5596104,
+    "ast_hash": "608b01fcaf5fc65fdaba073df8aef72f",
+    "semantic_hash": "608b01fcaf5fc65fdaba073df8aef72f"
+  },
+  "Sources/Libra/Views/ResultsTable.swift": {
+    "mtime": 1785453717.229152,
+    "ast_hash": "10004ec24d8c5f05ba7be27761c21eb1",
+    "semantic_hash": "10004ec24d8c5f05ba7be27761c21eb1"
+  },
+  "Sources/Libra/Views/SettingsView.swift": {
+    "mtime": 1783723450.1898096,
+    "ast_hash": "801d3178461970732b1578e461938656",
+    "semantic_hash": "801d3178461970732b1578e461938656"
+  },
+  "Sources/Libra/Views/ToolPage.swift": {
+    "mtime": 1783734670.1095138,
+    "ast_hash": "ae486ec7f61e762a33394f2849c1c110",
+    "semantic_hash": "ae486ec7f61e762a33394f2849c1c110"
+  },
+  "Tests/LibraTests/FileOpsTests.swift": {
+    "mtime": 1785459656.291948,
+    "ast_hash": "8fd0253cf0bc61b0218d874842bac1b5",
+    "semantic_hash": "8fd0253cf0bc61b0218d874842bac1b5"
+  },
+  "Tests/LibraTests/MediaProbeTests.swift": {
+    "mtime": 1785459656.292225,
+    "ast_hash": "1d96f2a5b6eccef56726dc49640fc725",
+    "semantic_hash": "1d96f2a5b6eccef56726dc49640fc725"
+  },
+  "scripts/build-mac.sh": {
+    "mtime": 1784947662.510945,
+    "ast_hash": "dd2b8e5fbd630b59fc06d961403ccf05",
+    "semantic_hash": "dd2b8e5fbd630b59fc06d961403ccf05"
+  },
+  "scripts/generate-icon.py": {
+    "mtime": 1784947599.160917,
+    "ast_hash": "1c4a2843372b62b0281862cc2e2792eb",
+    "semantic_hash": "1c4a2843372b62b0281862cc2e2792eb"
+  },
+  "scripts/iphone_verify_main.swift": {
+    "mtime": 1785453717.2292447,
+    "ast_hash": "65a88043c971d66e38f3ae8bf88fc500",
+    "semantic_hash": "65a88043c971d66e38f3ae8bf88fc500"
+  },
+  "scripts/verify-iphone-sorter.sh": {
+    "mtime": 1783734670.1178524,
+    "ast_hash": "0d4fab3a7e05267e92ebbf755ef29147",
+    "semantic_hash": "0d4fab3a7e05267e92ebbf755ef29147"
+  }
+}
