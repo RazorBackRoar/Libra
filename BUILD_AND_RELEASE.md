@@ -25,9 +25,13 @@ Built artifact is a single `Libra.dmg`; the `.app` bundle is consumed during pac
 ```zsh
 # Xcode Command Line Tools (or full Xcode)
 xcode-select -p
+brew install ffmpeg   # required for most tools at runtime
 cd /path/to/Libra
 swift build
 ```
+
+Release packaging (`scripts/build-mac.sh`) expects a sibling `../../.razorcore`
+for shared branding and DMG layout. Standalone clones can still `swift build`.
 
 ## Development Build
 

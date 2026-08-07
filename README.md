@@ -32,7 +32,8 @@ Sort, rename, and tidy video libraries with GPS / iPhone-oriented helpers — al
 2. Open the DMG and drag **L!bra.app** to `/Applications`
 3. First launch — right-click → **Open** (ad-hoc signed build)
 
-Requires macOS on Apple Silicon.
+Requires macOS on Apple Silicon and **ffmpeg** (`brew install ffmpeg`) for most
+tools. L!bra can prompt to install dependencies from Settings on first run.
 
 ## Usage
 
@@ -65,6 +66,7 @@ Package a macOS `.app` + DMG (ad-hoc signed):
 
 ## Docs
 
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — tools, services, testing
 - [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)

@@ -33,6 +33,18 @@ workspace, `razor-autosync` may commit locally; publishing uses
 See [BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md) for prerequisites, build,
 packaging, and release steps for this repository.
 
+Architecture and tool catalog: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Testing
+
+```bash
+swift test   # requires full Xcode.app
+```
+
+iPhone Sorter verification: `./scripts/verify-iphone-sorter.sh`
+
+CI runs `swift build` on macOS; full XCTest requires Xcode locally.
+
 ## Pull Requests
 
 - Describe **why** the change is needed.
