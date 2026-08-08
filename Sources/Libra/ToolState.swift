@@ -128,6 +128,7 @@ final class ToolState: ObservableObject {
             activeTask = nil
         }
 
+        let priorCount = results.count
         let target = files
         progress = (0, target.count)
 
@@ -146,11 +147,17 @@ final class ToolState: ObservableObject {
             await sloMo(target: target, factor: slomoFactor, ffmpegPath: ffmpegPath)
         }
 
+        let runResults = Array(results.dropFirst(priorCount))
+        var summary: String
         if Task.isCancelled || cancelling {
-            message = "Cancelled after \(progress.done) of \(progress.total)."
+            summary = "Cancelled after \(progress.done) of \(progress.total)."
         } else {
-            message = "Finished \(progress.done) of \(progress.total)."
+            summary = "Finished \(progress.done) of \(progress.total)."
         }
+        if dryRun, let reportURL = DryRunReport.write(tool: tool, results: runResults) {
+            summary += " Report: \(reportURL.lastPathComponent)"
+        }
+        message = summary
     }
 
     private var usesPrefixField: Bool {

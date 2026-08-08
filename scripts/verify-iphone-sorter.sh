@@ -9,7 +9,7 @@ mkdir -p "$INPUT"
 
 echo "== Creating fixtures in $INPUT =="
 
-python3 - "$INPUT" <<'PY'
+/Users/home/.local/bin/python3.14 - "$INPUT" <<'PY'
 from pathlib import Path
 import struct, zlib, sys
 out = Path(sys.argv[1])
@@ -95,7 +95,7 @@ else
 fi
 
 echo "== Mode enum order check =="
-python3 - "$ROOT/Sources/Libra/Models.swift" <<'PY'
+/Users/home/.local/bin/python3.14 - "$ROOT/Sources/Libra/Models.swift" <<'PY'
 import re, sys
 text = open(sys.argv[1]).read()
 block = re.search(r'enum Tool:.*?\n\}', text, re.S).group(0)
@@ -109,7 +109,7 @@ print('PASS tool order', cases)
 PY
 
 echo "== Assert key destinations =="
-python3 - "$INPUT" <<'PY'
+/Users/home/.local/bin/python3.14 - "$INPUT" <<'PY'
 from pathlib import Path
 import sys
 root = Path(sys.argv[1])

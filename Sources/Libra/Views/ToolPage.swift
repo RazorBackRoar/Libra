@@ -23,13 +23,6 @@ struct ToolPage: View {
                     Text(tool.title)
                         .font(.system(size: 17, weight: .semibold))
                     Spacer()
-                    Text(tool.category)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.yellow)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color(.systemGray).opacity(0.2))
-                        .cornerRadius(4)
                 }
 
                 Text(tool.description)
