@@ -23,19 +23,8 @@ struct CategoryBrowserView: View {
                 HStack {
                     Button("← Back") { dismiss() }
                     Spacer()
-                    if files.count > 1 {
-                        HStack(spacing: 8) {
-                            Button("←") { move(-1) }
-                                .disabled(index <= 0)
-                            Text("\(index + 1) / \(files.count)")
-                                .font(.system(size: 12).monospacedDigit())
-                                .foregroundColor(.secondary)
-                                .frame(minWidth: 56)
-                            Button("→") { move(1) }
-                                .disabled(index >= files.count - 1)
-                        }
-                    } else if !files.isEmpty {
-                        Text("1 / 1")
+                    if !files.isEmpty {
+                        Text("\(index + 1) / \(files.count)")
                             .font(.system(size: 12).monospacedDigit())
                             .foregroundColor(.secondary)
                     }
@@ -44,30 +33,39 @@ struct CategoryBrowserView: View {
                     .font(.system(size: 17, weight: .semibold))
             }
 
-            if let file = current {
-                mediaPane(for: file)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGray).opacity(0.15))
-                    .cornerRadius(10)
-
-                Text("\(file.name).\(file.ext)")
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(1)
-
-                Text(file.path)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 2)
-            } else {
+            if files.isEmpty {
                 Spacer()
                 Text("No files in this category.")
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
                 Spacer()
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    fileList
+                        .frame(width: 280)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let file = current {
+                            mediaPane(for: file)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color(.systemGray).opacity(0.15))
+                                .cornerRadius(10)
+
+                            Text("\(file.name).\(file.ext)")
+                                .font(.system(size: 14, weight: .semibold))
+                                .lineLimit(1)
+
+                            Text(file.path)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineLimit(3)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
             }
         }
         .padding()
@@ -87,8 +85,7 @@ struct CategoryBrowserView: View {
         }
         .onDisappear {
             keys.stop()
-            player?.pause()
-            player = nil
+            tearDownPlayer()
         }
         .onKeyPress(.leftArrow) {
             move(-1)
@@ -98,7 +95,55 @@ struct CategoryBrowserView: View {
             move(1)
             return .handled
         }
+        .onKeyPress(.upArrow) {
+            move(-1)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            move(1)
+            return .handled
+        }
         .navigationBarBackButtonHidden(true)
+    }
+
+    private var fileList: some View {
+        List(selection: Binding(
+            get: { files.indices.contains(index) ? files[index].id : nil },
+            set: { newID in
+                if let newID, let i = files.firstIndex(where: { $0.id == newID }) {
+                    index = i
+                }
+            }
+        )) {
+            Section("\(title) · \(files.count)") {
+                ForEach(Array(files.enumerated()), id: \.element.id) { offset, file in
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("\(offset + 1).")
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                            .frame(width: 36, alignment: .trailing)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(file.name).\(file.ext)")
+                                .font(.system(size: 12, weight: .semibold))
+                                .lineLimit(1)
+                            if let error = file.error {
+                                Text(error)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.red)
+                                    .lineLimit(1)
+                            } else {
+                                Text(file.resolutionClass)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .tag(file.id)
+                    .padding(.vertical, 1)
+                }
+            }
+        }
+        .listStyle(.inset)
     }
 
     @ViewBuilder
@@ -114,7 +159,9 @@ struct CategoryBrowserView: View {
                 placeholder("Could not load image")
             }
         } else if let player {
-            VideoPlayer(player: player)
+            // Use AppKit AVPlayerView — SwiftUI VideoPlayer crashes on some macOS builds
+            // (_AVKit_SwiftUI metadata fatalError) when opening category browsers.
+            AppKitPlayerView(player: player)
                 .cornerRadius(8)
         } else {
             placeholder(file.error ?? "Preview unavailable")
@@ -141,21 +188,52 @@ struct CategoryBrowserView: View {
     }
 
     private func loadPlayer() {
-        player?.pause()
-        player = nil
+        tearDownPlayer()
         guard let file = current else { return }
         let imageExts = Set(AppSettings.default.imageExtensions)
         guard !imageExts.contains(file.ext.lowercased()) else { return }
         guard file.error == nil else { return }
         guard FileManager.default.fileExists(atPath: file.path) else { return }
-        let newPlayer = AVPlayer(url: URL(fileURLWithPath: file.path))
+
+        let url = URL(fileURLWithPath: file.path)
+        let newPlayer = AVPlayer(url: url)
         newPlayer.isMuted = true
         player = newPlayer
-        newPlayer.play()
+        // Do not autoplay — listing + path are the primary goal; play is user-controlled.
+    }
+
+    private func tearDownPlayer() {
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        player = nil
     }
 }
 
-/// Keeps ←/→ working when `VideoPlayer` steals key focus.
+/// AppKit-backed player avoids SwiftUI `VideoPlayer` / `_AVKit_SwiftUI` crashes.
+private struct AppKitPlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .inline
+        view.showsFullScreenToggleButton = true
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        if nsView.player !== player {
+            nsView.player = player
+        }
+    }
+
+    static func dismantleNSView(_ nsView: AVPlayerView, coordinator: ()) {
+        nsView.player?.pause()
+        nsView.player = nil
+    }
+}
+
+/// Keeps arrow keys working when the player view steals key focus.
 @MainActor
 private final class ArrowKeyMonitor: ObservableObject {
     var onLeft: (() -> Void)?
@@ -166,10 +244,10 @@ private final class ArrowKeyMonitor: ObservableObject {
         stop()
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             switch event.keyCode {
-            case 123:
+            case 123, 126: // left, up
                 DispatchQueue.main.async { self?.onLeft?() }
                 return nil
-            case 124:
+            case 124, 125: // right, down
                 DispatchQueue.main.async { self?.onRight?() }
                 return nil
             default:
@@ -185,11 +263,5 @@ private final class ArrowKeyMonitor: ObservableObject {
         }
         onLeft = nil
         onRight = nil
-    }
-
-    deinit {
-        if let monitor {
-            NSEvent.removeMonitor(monitor)
-        }
     }
 }
