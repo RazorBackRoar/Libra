@@ -43,6 +43,38 @@ final class GPSCoordinateParserTests: XCTestCase {
         XCTAssertEqual(clusters.map(\.files.count), [1, 1])
     }
 
+    func testMergeByPlaceName_combinesSameCityPins() {
+        let a = GPSLocationCluster(
+            id: "a",
+            latitude: 43.49,
+            longitude: -112.03,
+            files: [stub(path: "/tmp/a.mov", lat: 43.49, lon: -112.03)],
+            placeName: "Idaho Falls, ID"
+        )
+        let b = GPSLocationCluster(
+            id: "b",
+            latitude: 43.50,
+            longitude: -112.04,
+            files: [
+                stub(path: "/tmp/b.mov", lat: 43.50, lon: -112.04),
+                stub(path: "/tmp/c.mov", lat: 43.50, lon: -112.04)
+            ],
+            placeName: "Idaho Falls, ID"
+        )
+        let c = GPSLocationCluster(
+            id: "c",
+            latitude: 41.32,
+            longitude: -112.00,
+            files: [stub(path: "/tmp/d.mov", lat: 41.32, lon: -112.00)],
+            placeName: "Pleasant View, UT"
+        )
+        let merged = GPSMapClustering.mergeByPlaceName([a, b, c])
+        XCTAssertEqual(merged.count, 2)
+        let idaho = merged.first { $0.placeName == "Idaho Falls, ID" }
+        XCTAssertEqual(idaho?.files.count, 3)
+        XCTAssertEqual(merged.first { $0.placeName == "Pleasant View, UT" }?.files.count, 1)
+    }
+
     func testMediaCountLabel_alwaysPhotosAndVideos() {
         XCTAssertEqual(GPSMediaCounts.label(photos: 0, videos: 1), "0 photos, 1 video")
         XCTAssertEqual(GPSMediaCounts.label(photos: 2, videos: 133), "2 photos, 133 videos")

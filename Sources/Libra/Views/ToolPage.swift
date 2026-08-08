@@ -71,14 +71,19 @@ struct ToolPage: View {
                 browserFilter = filter
             }
 
-            // Same City/GPS map on every tool that works with scanned media.
-            GPSMapPanel(files: state.filteredFiles)
+            // Map only when media actually has coordinates (keeps empty tools clean).
+            if state.filteredFiles.contains(where: \.hasCoordinates) {
+                GPSMapPanel(files: state.filteredFiles)
+            }
 
             if tool == .provid || tool == .vidres || tool == .promax || tool == .maxvid {
                 TextField(tool == .provid ? "Prefix" : "Prefix (optional)", text: $state.prefix)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 300)
                     .disabled(state.running)
+                    .onChange(of: state.prefix) { _, _ in
+                        state.scheduleRerunAfterOptionsChange()
+                    }
             }
 
             if tool == .slomo {
@@ -88,6 +93,9 @@ struct ToolPage: View {
                 }
                 .pickerStyle(.segmented)
                 .disabled(state.running)
+                .onChange(of: state.slomoFactor) { _, _ in
+                    state.scheduleRerunAfterOptionsChange()
+                }
             }
 
             if tool == .oneMin {
@@ -97,8 +105,14 @@ struct ToolPage: View {
                 }
                 .pickerStyle(.segmented)
                 .disabled(state.running)
+                .onChange(of: state.oneMinMode) { _, _ in
+                    state.scheduleRerunAfterOptionsChange()
+                }
                 DatePicker("Start time", selection: $state.oneMinStart)
                     .disabled(state.running)
+                    .onChange(of: state.oneMinStart) { _, _ in
+                        state.scheduleRerunAfterOptionsChange()
+                    }
             }
 
             if state.running {
@@ -127,6 +141,9 @@ struct ToolPage: View {
                 .toggleStyle(.switch)
                 .tint(.yellow)
                 .disabled(state.running)
+                .onChange(of: state.dryRun) { _, _ in
+                    state.scheduleRerunAfterOptionsChange()
+                }
 
                 Spacer()
 

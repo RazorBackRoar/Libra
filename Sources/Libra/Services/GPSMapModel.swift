@@ -70,6 +70,8 @@ final class GPSMapModel: ObservableObject {
             copy.placeName = placeNameCache[cluster.id]
             return copy
         }
+        // Re-apply any city merges already known from prior geocodes.
+        clusters = GPSMapClustering.mergeByPlaceName(clusters)
         cameraPosition = GPSMapClustering.fittingPosition(for: clusters)
         if let selectedClusterID, !clusters.contains(where: { $0.id == selectedClusterID }) {
             self.selectedClusterID = nil
@@ -210,6 +212,46 @@ enum GPSMapClustering {
         return clusters
     }
 
+    /// Collapse pins that reverse-geocode to the same city (e.g. two 5-mi blobs in Boise).
+    static func mergeByPlaceName(_ input: [GPSLocationCluster]) -> [GPSLocationCluster] {
+        var unnamed: [GPSLocationCluster] = []
+        var byPlace: [String: [GPSLocationCluster]] = [:]
+        for cluster in input {
+            guard let place = cluster.placeName?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !place.isEmpty else {
+                unnamed.append(cluster)
+                continue
+            }
+            byPlace[place, default: []].append(cluster)
+        }
+
+        var merged: [GPSLocationCluster] = unnamed
+        for (place, group) in byPlace {
+            if group.count == 1 {
+                merged.append(group[0])
+                continue
+            }
+            let files = group.flatMap(\.files).sorted { $0.path < $1.path }
+            let weight = Double(max(files.count, 1))
+            let latitude = group.reduce(0.0) { $0 + $1.latitude * Double($1.files.count) } / weight
+            let longitude = group.reduce(0.0) { $0 + $1.longitude * Double($1.files.count) } / weight
+            merged.append(
+                GPSLocationCluster(
+                    id: "city:\(place)",
+                    latitude: latitude,
+                    longitude: longitude,
+                    files: files,
+                    placeName: place
+                )
+            )
+        }
+
+        return merged.sorted { lhs, rhs in
+            if lhs.files.count != rhs.files.count { return lhs.files.count > rhs.files.count }
+            return lhs.id < rhs.id
+        }
+    }
+
     static func fittingPosition(for clusters: [GPSLocationCluster]) -> MapCameraPosition {
         guard let first = clusters.first else { return .automatic }
         if clusters.count == 1 {
@@ -256,6 +298,16 @@ extension GPSMapModel {
                     if let index = self.clusters.firstIndex(where: { $0.id == cluster.id }) {
                         self.clusters[index].placeName = name
                     }
+                    // Same city name → one pin with a combined count.
+                    self.clusters = GPSMapClustering.mergeByPlaceName(self.clusters)
+                    for merged in self.clusters where merged.placeName != nil {
+                        self.placeNameCache[merged.id] = merged.placeName
+                    }
+                    if let selectedClusterID = self.selectedClusterID,
+                       !self.clusters.contains(where: { $0.id == selectedClusterID }) {
+                        self.selectedClusterID = nil
+                    }
+                    self.cameraPosition = GPSMapClustering.fittingPosition(for: self.clusters)
                 }
                 // Be gentle with Apple's geocoder.
                 try? await Task.sleep(nanoseconds: 250_000_000)

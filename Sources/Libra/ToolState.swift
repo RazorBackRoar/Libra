@@ -20,6 +20,7 @@ final class ToolState: ObservableObject {
     @Published var oneMinMode: String = "copies"
 
     private var activeTask: Task<Void, Never>?
+    private var rerunTask: Task<Void, Never>?
 
     init(tool: Tool) {
         self.tool = tool
@@ -30,6 +31,7 @@ final class ToolState: ObservableObject {
 
     func startScan(paths: [String], settings: AppSettings, ffmpegPath: String, ffprobePath: String) {
         guard !running else { return }
+        rerunTask?.cancel()
         running = true
         cancelling = false
         progress = (0, 0)
@@ -80,10 +82,26 @@ final class ToolState: ObservableObject {
         }
     }
 
+    /// Re-process after Prefix / Dry Run / tool options change (debounced).
+    func scheduleRerunAfterOptionsChange() {
+        guard !files.isEmpty, !running else { return }
+        rerunTask?.cancel()
+        rerunTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.startRun(
+                settings: AppState.shared.settings,
+                ffmpegPath: AppState.shared.ffmpegPath,
+                ffprobePath: AppState.shared.ffprobePath
+            )
+        }
+    }
+
     func cancelActiveWork() {
         guard running, !cancelling else { return }
         cancelling = true
         message = "Cancelling…"
+        rerunTask?.cancel()
         activeTask?.cancel()
     }
 

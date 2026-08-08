@@ -2,7 +2,8 @@ import Foundation
 
 enum DryRunReport {
     /// Writes a clean before/after listing to the Desktop as
-    /// `L!bra Dry Run 1.txt`, then `2`, `3`, … without overwriting existing files.
+    /// `L!bra ProVid Dry Run 1.txt` (tool title in the name), then `2`, `3`, …
+    /// without overwriting existing files.
     @discardableResult
     static func write(tool: Tool, results: [OperationResult]) -> URL? {
         let entries = results.compactMap { result -> (before: String, after: String, note: String?)? in
@@ -18,12 +19,12 @@ enum DryRunReport {
         }
         guard !entries.isEmpty else { return nil }
 
-        let url = nextReportURL()
+        let url = nextReportURL(tool: tool)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 
         var lines: [String] = [
-            "\(Brand.displayName) Dry Run",
+            "\(Brand.displayName) \(tool.title) Dry Run",
             "Tool: \(tool.title)",
             "Generated: \(formatter.string(from: Date()))",
             "Items: \(entries.count)",
@@ -51,12 +52,13 @@ enum DryRunReport {
         }
     }
 
-    private static func nextReportURL() -> URL {
+    private static func nextReportURL(tool: Tool) -> URL {
         let desktop = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Desktop", isDirectory: true)
+        let base = "\(Brand.displayName) \(tool.title) Dry Run"
         var number = 1
         while true {
-            let name = "\(Brand.displayName) Dry Run \(number).txt"
+            let name = "\(base) \(number).txt"
             let url = desktop.appendingPathComponent(name)
             if !FileManager.default.fileExists(atPath: url.path) {
                 return url

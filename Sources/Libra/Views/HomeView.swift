@@ -4,46 +4,47 @@ struct HomeView: View {
     @Binding var selectedTool: Tool?
     @ObservedObject private var appState = AppState.shared
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "film.stack")
+                    .font(.system(size: 28))
+                    .foregroundColor(.yellow)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("L!bra")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Local-first video organization toolkit")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+
+            if appState.missingDeps {
                 HStack {
-                    Image(systemName: "film.stack")
-                        .font(.system(size: 32))
-                        .foregroundColor(.yellow)
-                    VStack(alignment: .leading) {
-                        Text("L!bra")
-                            .font(.system(size: 22, weight: .bold))
-                        Text("Local-first video organization toolkit")
-                            .font(.system(size: 13))
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
+                    Text("ffmpeg or ffprobe missing.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.red)
+                    Button("Install") { appState.installDependencies() }
+                        .buttonStyle(LibraPrimaryButtonStyle())
                 }
+                .padding(10)
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(8)
+            }
 
-                if appState.missingDeps {
-                    HStack {
-                        Text("ffmpeg or ffprobe missing.")
-                            .font(.system(size: 13))
-                            .foregroundColor(.red)
-                        Button("Install") { appState.installDependencies() }
-                            .buttonStyle(LibraPrimaryButtonStyle())
-                    }
-                    .padding()
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(8)
-                }
-
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(Tool.allCases) { tool in
-                        ToolCard(tool: tool, onTap: { selectedTool = tool })
-                    }
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(Tool.allCases) { tool in
+                    ToolCard(tool: tool, onTap: { selectedTool = tool })
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
     }
@@ -55,10 +56,10 @@ struct ToolCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Image(systemName: tool.systemImage)
-                        .font(.system(size: 28))
+                        .font(.system(size: 22))
                         .foregroundColor(.yellow)
                     Spacer()
                     Text(tool.category)
@@ -66,16 +67,18 @@ struct ToolCard: View {
                         .foregroundColor(.secondary)
                 }
                 Text(tool.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
                 Text(tool.description)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
-            .padding()
-            .frame(maxWidth: .infinity, minHeight: 168, alignment: .topLeading)
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color(.systemGray).opacity(0.15))
             .cornerRadius(12)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))

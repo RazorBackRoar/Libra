@@ -22,7 +22,7 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 ## Features
 
 - **Drag-and-drop tools** — drop a folder; L!bra scans and processes automatically
-- **Dry Run first** — bright yellow Dry Run toggle; safe previews write Desktop reports
+- **Dry Run first** — bright yellow Dry Run toggle; safe previews write Desktop reports (`L!bra ProVid Dry Run 1.txt`, tool name swaps per mode)
 - **Sort & rename** — ProVid, VidRes, KeepName, ProMax, MaxVid with the standard filename format
 - **City / GPS Map** — MapKit pins clustered within **5 miles**, city labels, photo/video counts
 - **GPS & iPhone sorters** — GPS / No-GPS and iPhone / Not iPhone folders

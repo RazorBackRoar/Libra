@@ -2,6 +2,7 @@ import SwiftUI
 import MapKit
 
 /// Lightweight Apple Maps mini-map — native MapKit only.
+/// Caller should only present this when `files` contain coordinates.
 struct GPSMapPanel: View {
     let files: [VideoInfo]
     @StateObject private var model = GPSMapModel()
@@ -14,53 +15,41 @@ struct GPSMapPanel: View {
                 Text("City / GPS Map")
                     .font(.system(size: 18, weight: .bold))
                     .multilineTextAlignment(.center)
-                Text(summaryText(photos: totals.photos, videos: totals.videos, empty: coordinateFiles.isEmpty))
+                Text(summaryText(photos: totals.photos, videos: totals.videos))
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
 
-            if coordinateFiles.isEmpty {
-                Text(files.contains(where: \.hasGPS)
-                    ? "GPS tags were found, but no usable coordinates could be read yet."
-                    : "Drop media with GPS metadata to plot locations on Apple Maps.")
-                    .font(.system(size: 12))
+            Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
+                ForEach(model.clusters) { cluster in
+                    Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
+                        GPSMapPin(selected: model.selectedClusterID == cluster.id)
+                    }
+                    .tag(cluster.id)
+                }
+            }
+            .mapStyle(.standard)
+            .mapControls {
+                MapCompass()
+                MapScaleView()
+            }
+            .frame(height: 200)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+            )
+
+            if let selected = model.selectedCluster {
+                selectedClusterCard(selected)
+            } else {
+                Text("Click a yellow pin to see every photo and video at that city (5 mi + same city).")
+                    .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
-                    .background(Color(.systemGray).opacity(0.12))
-                    .cornerRadius(10)
-            } else {
-                Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
-                    ForEach(model.clusters) { cluster in
-                        Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
-                            GPSMapPin(selected: model.selectedClusterID == cluster.id)
-                        }
-                        .tag(cluster.id)
-                    }
-                }
-                .mapStyle(.standard)
-                .mapControls {
-                    MapCompass()
-                    MapScaleView()
-                }
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
-                )
-
-                if let selected = model.selectedCluster {
-                    selectedClusterCard(selected)
-                } else {
-                    Text("Click a yellow pin to see every photo and video within 5 miles.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                }
+                    .frame(maxWidth: .infinity)
             }
         }
         .padding(12)
@@ -72,10 +61,9 @@ struct GPSMapPanel: View {
         }
     }
 
-    private func summaryText(photos: Int, videos: Int, empty: Bool) -> String {
-        if empty { return "No mapped locations" }
+    private func summaryText(photos: Int, videos: Int) -> String {
         let places = model.clusters.count
-        return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi radius"
+        return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi / city"
     }
 
     @ViewBuilder
@@ -92,7 +80,7 @@ struct GPSMapPanel: View {
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
-            Text("All media within 5 miles of this pin")
+            Text("All media within 5 miles, merged by city when names match")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
             Text(String(format: "%.5f, %.5f", cluster.latitude, cluster.longitude))
