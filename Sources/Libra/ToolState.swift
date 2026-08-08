@@ -38,7 +38,27 @@ final class ToolState: ObservableObject {
         message = "Finding supported files…"
 
         activeTask = Task { [weak self] in
-            await self?.performScan(paths: paths, settings: settings, ffprobePath: ffprobePath)
+            guard let self else { return }
+            let shouldRun = await self.performScan(paths: paths, settings: settings, ffprobePath: ffprobePath)
+            // Drag-and-drop only: process automatically after a successful scan.
+            guard shouldRun else {
+                self.running = false
+                self.cancelling = false
+                self.activeTask = nil
+                return
+            }
+            guard let ffmpegPath = AppState.shared.ffmpegPath,
+                  AppState.shared.ffprobePath != nil else {
+                self.message = "ffmpeg and ffprobe are required."
+                self.running = false
+                self.cancelling = false
+                self.activeTask = nil
+                return
+            }
+            let priorSkips = self.results.filter { $0.status == .skipped }
+            self.results = priorSkips
+            self.message = nil
+            await self.performRun(ffmpegPath: ffmpegPath)
         }
     }
 
@@ -67,13 +87,8 @@ final class ToolState: ObservableObject {
         activeTask?.cancel()
     }
 
-    private func performScan(paths: [String], settings: AppSettings, ffprobePath: String) async {
-        defer {
-            running = false
-            cancelling = false
-            activeTask = nil
-        }
-
+    /// Returns `true` when the tool should auto-process after this scan.
+    private func performScan(paths: [String], settings: AppSettings, ffprobePath: String) async -> Bool {
         var exts = settings.videoExtensions
         if tool.acceptsImages {
             exts = Array(Set(exts + settings.imageExtensions))
@@ -96,6 +111,11 @@ final class ToolState: ObservableObject {
         files = outcome.supported
         results = outcome.unsupported
         applyScanSummary(outcome)
+
+        return outcome.terminal == .completed
+            && !outcome.supported.isEmpty
+            && !Task.isCancelled
+            && !cancelling
     }
 
     private func applyScanSummary(_ outcome: ScanOutcome) {

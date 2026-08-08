@@ -14,13 +14,24 @@ struct GPSLocationCluster: Identifiable, Hashable {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 
+    var photoCount: Int {
+        let images = Set(AppSettings.default.imageExtensions)
+        return files.filter { images.contains($0.ext.lowercased()) }.count
+    }
+
+    var videoCount: Int {
+        files.count - photoCount
+    }
+
+    var mediaCountLabel: String {
+        GPSMediaCounts.label(photos: photoCount, videos: videoCount)
+    }
+
     var pinTitle: String {
-        let count = files.count
-        let countText = count == 1 ? "1 file" : "\(count) files"
         if let placeName, !placeName.isEmpty {
-            return "\(placeName) · \(countText)"
+            return "\(placeName) · \(mediaCountLabel)"
         }
-        return countText
+        return mediaCountLabel
     }
 
     func hash(into hasher: inout Hasher) {
@@ -67,34 +78,136 @@ final class GPSMapModel: ObservableObject {
     }
 }
 
-enum GPSMapClustering {
-    static func cluster(files: [VideoInfo]) -> [GPSLocationCluster] {
-        var buckets: [String: GPSLocationCluster] = [:]
-        for file in files where file.hasCoordinates {
-            guard let lat = file.latitude, let lon = file.longitude else { continue }
-            let key = clusterKey(latitude: lat, longitude: lon)
-            if var existing = buckets[key] {
-                existing.files.append(file)
-                buckets[key] = existing
+enum GPSMediaCounts {
+    static func label(photos: Int, videos: Int) -> String {
+        let photoText = photos == 1 ? "1 photo" : "\(photos) photos"
+        let videoText = videos == 1 ? "1 video" : "\(videos) videos"
+        return "\(photoText), \(videoText)"
+    }
+
+    static func totals(in files: [VideoInfo]) -> (photos: Int, videos: Int) {
+        let images = Set(AppSettings.default.imageExtensions)
+        var photos = 0
+        var videos = 0
+        for file in files {
+            if images.contains(file.ext.lowercased()) {
+                photos += 1
             } else {
-                buckets[key] = GPSLocationCluster(
-                    id: key,
-                    latitude: (lat * 10_000).rounded() / 10_000,
-                    longitude: (lon * 10_000).rounded() / 10_000,
-                    files: [file],
-                    placeName: nil
-                )
+                videos += 1
             }
         }
-        return buckets.values.sorted { lhs, rhs in
+        return (photos, videos)
+    }
+}
+
+enum GPSMapClustering {
+    /// Pins within this radius share one map marker and one media count.
+    static let proximityMeters: CLLocationDistance = 5 * 1609.344
+
+    static func cluster(files: [VideoInfo]) -> [GPSLocationCluster] {
+        struct Point {
+            let file: VideoInfo
+            let location: CLLocation
+        }
+
+        let points: [Point] = files.compactMap { file in
+            guard file.hasCoordinates, let lat = file.latitude, let lon = file.longitude else { return nil }
+            return Point(file: file, location: CLLocation(latitude: lat, longitude: lon))
+        }
+        .sorted { $0.file.path < $1.file.path }
+
+        // Greedy assign each file to the nearest open cluster within 5 miles.
+        var working: [(latSum: Double, lonSum: Double, files: [VideoInfo])] = []
+        for point in points {
+            var bestIndex: Int?
+            var bestDistance = proximityMeters
+            for (index, cluster) in working.enumerated() {
+                let count = Double(cluster.files.count)
+                let centroid = CLLocation(
+                    latitude: cluster.latSum / count,
+                    longitude: cluster.lonSum / count
+                )
+                let distance = point.location.distance(from: centroid)
+                if distance <= proximityMeters, distance <= bestDistance {
+                    bestDistance = distance
+                    bestIndex = index
+                }
+            }
+            if let bestIndex {
+                working[bestIndex].latSum += point.location.coordinate.latitude
+                working[bestIndex].lonSum += point.location.coordinate.longitude
+                working[bestIndex].files.append(point.file)
+            } else {
+                working.append((
+                    latSum: point.location.coordinate.latitude,
+                    lonSum: point.location.coordinate.longitude,
+                    files: [point.file]
+                ))
+            }
+        }
+
+        // Merge any clusters whose centroids ended up within 5 miles of each other.
+        working = mergeNearbyClusters(working)
+
+        return working.map { cluster in
+            let count = Double(cluster.files.count)
+            let latitude = cluster.latSum / count
+            let longitude = cluster.lonSum / count
+            return GPSLocationCluster(
+                id: clusterID(latitude: latitude, longitude: longitude),
+                latitude: latitude,
+                longitude: longitude,
+                files: cluster.files.sorted { $0.path < $1.path },
+                placeName: nil
+            )
+        }
+        .sorted { lhs, rhs in
             if lhs.files.count != rhs.files.count { return lhs.files.count > rhs.files.count }
             return lhs.id < rhs.id
         }
     }
 
-    /// ~11 m grid — collapses near-duplicate pins from the same shoot.
+    /// Stable key for a cluster centroid (used by tests + geocode cache).
     static func clusterKey(latitude: Double, longitude: Double) -> String {
-        String(format: "%.4f,%.4f", latitude, longitude)
+        clusterID(latitude: latitude, longitude: longitude)
+    }
+
+    private static func clusterID(latitude: Double, longitude: Double) -> String {
+        // ~100 m precision — plenty for a 5-mile blob, stable across tiny centroid drift.
+        String(format: "%.3f,%.3f", latitude, longitude)
+    }
+
+    private static func mergeNearbyClusters(
+        _ input: [(latSum: Double, lonSum: Double, files: [VideoInfo])]
+    ) -> [(latSum: Double, lonSum: Double, files: [VideoInfo])] {
+        var clusters = input
+        var merged = true
+        while merged {
+            merged = false
+            outer: for i in 0..<clusters.count {
+                for j in (i + 1)..<clusters.count {
+                    let leftCount = Double(clusters[i].files.count)
+                    let rightCount = Double(clusters[j].files.count)
+                    let left = CLLocation(
+                        latitude: clusters[i].latSum / leftCount,
+                        longitude: clusters[i].lonSum / leftCount
+                    )
+                    let right = CLLocation(
+                        latitude: clusters[j].latSum / rightCount,
+                        longitude: clusters[j].lonSum / rightCount
+                    )
+                    if left.distance(from: right) <= proximityMeters {
+                        clusters[i].latSum += clusters[j].latSum
+                        clusters[i].lonSum += clusters[j].lonSum
+                        clusters[i].files.append(contentsOf: clusters[j].files)
+                        clusters.remove(at: j)
+                        merged = true
+                        break outer
+                    }
+                }
+            }
+        }
+        return clusters
     }
 
     static func fittingPosition(for clusters: [GPSLocationCluster]) -> MapCameraPosition {

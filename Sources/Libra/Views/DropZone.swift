@@ -11,15 +11,17 @@ struct DropZone: View {
     @State private var isDragging = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Image(systemName: "arrow.down.doc")
-                .font(.system(size: 40))
+                .font(.system(size: 32))
                 .foregroundColor(.yellow)
             Text(title)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 18, weight: .bold))
+                .multilineTextAlignment(.center)
             Text(subtitle)
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
             HStack(spacing: 12) {
                 Button("Open Folder…") { onBrowse() }
                     .buttonStyle(LibraPrimaryButtonStyle())
@@ -27,7 +29,8 @@ struct DropZone: View {
                     .buttonStyle(LibraSecondaryButtonStyle())
             }
         }
-        .padding(24)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
         .background(isDragging ? Color.yellow.opacity(0.1) : Color(.systemGray).opacity(0.1))
         .cornerRadius(12)

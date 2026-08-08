@@ -14,16 +14,17 @@ final class GPSCoordinateParserTests: XCTestCase {
         XCTAssertEqual(coords?.longitude ?? 0, -74.0060, accuracy: 0.0001)
     }
 
-    func testClusterKey_collapsesNearbyDuplicates() {
+    func testClusterKey_stableForTinyCentroidDrift() {
         let a = GPSMapClustering.clusterKey(latitude: 37.33491, longitude: -122.00904)
         let b = GPSMapClustering.clusterKey(latitude: 37.33494, longitude: -122.00901)
         XCTAssertEqual(a, b)
     }
 
-    func testCluster_groupsSameLocationFiles() {
+    func testCluster_groupsFilesWithinFiveMiles() {
+        // ~1.1 miles apart around Cupertino — must share one pin.
         let files = [
             stub(path: "/tmp/a.mov", lat: 37.3349, lon: -122.0090),
-            stub(path: "/tmp/b.mov", lat: 37.33492, lon: -122.00901),
+            stub(path: "/tmp/b.mov", lat: 37.3500, lon: -122.0090),
             stub(path: "/tmp/c.mov", lat: 40.0, lon: -74.0)
         ]
         let clusters = GPSMapClustering.cluster(files: files)
@@ -31,12 +32,36 @@ final class GPSCoordinateParserTests: XCTestCase {
         XCTAssertEqual(clusters.map(\.files.count).sorted(), [1, 2])
     }
 
-    private func stub(path: String, lat: Double, lon: Double) -> VideoInfo {
+    func testCluster_keepsSeparateBeyondFiveMiles() {
+        // ~10 miles apart on the same longitude — two pins.
+        let files = [
+            stub(path: "/tmp/a.mov", lat: 37.3349, lon: -122.0090),
+            stub(path: "/tmp/b.mov", lat: 37.4800, lon: -122.0090)
+        ]
+        let clusters = GPSMapClustering.cluster(files: files)
+        XCTAssertEqual(clusters.count, 2)
+        XCTAssertEqual(clusters.map(\.files.count), [1, 1])
+    }
+
+    func testMediaCountLabel_alwaysPhotosAndVideos() {
+        XCTAssertEqual(GPSMediaCounts.label(photos: 0, videos: 1), "0 photos, 1 video")
+        XCTAssertEqual(GPSMediaCounts.label(photos: 2, videos: 133), "2 photos, 133 videos")
+        let files = [
+            stub(path: "/tmp/a.mov", lat: 1, lon: 2),
+            stub(path: "/tmp/b.jpg", lat: 1, lon: 2, ext: "jpg")
+        ]
+        let totals = GPSMediaCounts.totals(in: files)
+        XCTAssertEqual(totals.photos, 1)
+        XCTAssertEqual(totals.videos, 1)
+        XCTAssertEqual(GPSMediaCounts.label(photos: totals.photos, videos: totals.videos), "1 photo, 1 video")
+    }
+
+    private func stub(path: String, lat: Double, lon: Double, ext: String = "mov") -> VideoInfo {
         VideoInfo(
             path: path,
             name: URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent,
             dir: "/tmp",
-            ext: "mov",
+            ext: ext,
             sizeBytes: 1,
             width: 1920,
             height: 1080,

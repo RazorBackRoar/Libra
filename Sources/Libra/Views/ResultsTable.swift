@@ -5,76 +5,83 @@ struct ResultsTable: View {
     let results: [OperationResult]
 
     var body: some View {
-        if files.isEmpty && results.isEmpty {
-            Text("No files yet. Drop a folder or files above.")
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-                .padding()
-        } else {
-            List {
-                if !files.isEmpty {
-                    Section("Scanned Files") {
-                        ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("\(index + 1).")
-                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                    .foregroundColor(.yellow)
-                                    .frame(width: numberColumnWidth, alignment: .trailing)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(file.name + "." + file.ext)
-                                        .font(.system(size: 13, weight: .semibold))
-                                    Text(detailLine(for: file))
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                    if let error = file.error {
-                                        Text(error)
+        Group {
+            if files.isEmpty && results.isEmpty {
+                Text("No files yet. Drop a folder or files above.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.vertical, 4)
+            } else {
+                List {
+                    if !files.isEmpty {
+                        Section("Scanned Files") {
+                            ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("\(index + 1).")
+                                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                        .foregroundColor(.yellow)
+                                        .frame(width: numberColumnWidth, alignment: .trailing)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(file.name + "." + file.ext)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text(detailLine(for: file))
                                             .font(.system(size: 11))
-                                            .foregroundColor(.red)
-                                    } else if let warning = file.warning {
-                                        Text(warning)
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.orange)
+                                            .foregroundColor(.secondary)
+                                        if let error = file.error {
+                                            Text(error)
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.red)
+                                        } else if let warning = file.warning {
+                                            Text(warning)
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.orange)
+                                        }
                                     }
                                 }
+                                .padding(.vertical, 2)
                             }
-                            .padding(.vertical, 2)
                         }
                     }
-                }
 
-                if !results.isEmpty {
-                    Section("Results") {
-                        ForEach(results) { result in
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text((result.path as NSString).lastPathComponent)
-                                        .font(.system(size: 12))
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Text(result.status.rawValue)
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(statusColor(result.status))
+                    if !results.isEmpty {
+                        Section("Results") {
+                            ForEach(results) { result in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack {
+                                        Text((result.path as NSString).lastPathComponent)
+                                            .font(.system(size: 12))
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Text(result.status.rawValue)
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(statusColor(result.status))
+                                    }
+                                    if let reason = result.reason {
+                                        Text(reason)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                    }
+                                    if let output = result.outputPath {
+                                        Text("→ \(output)")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                    }
                                 }
-                                if let reason = result.reason {
-                                    Text(reason)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                }
-                                if let output = result.outputPath {
-                                    Text("→ \(output)")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                }
+                                .padding(.vertical, 2)
                             }
-                            .padding(.vertical, 2)
                         }
                     }
                 }
+                .listStyle(.inset(alternatesRowBackgrounds: true))
+                .scrollContentBackground(.hidden)
+                .background(Color(.systemGray).opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .frame(minHeight: 240)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var numberColumnWidth: CGFloat {

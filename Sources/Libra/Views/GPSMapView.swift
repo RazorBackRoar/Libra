@@ -1,38 +1,43 @@
 import SwiftUI
 import MapKit
 
-/// Lightweight Apple Maps mini-map for GPS Sorter — native MapKit only.
+/// Lightweight Apple Maps mini-map — native MapKit only.
 struct GPSMapPanel: View {
     let files: [VideoInfo]
     @StateObject private var model = GPSMapModel()
 
     var body: some View {
-        let coordinateCount = files.filter(\.hasCoordinates).count
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        let coordinateFiles = files.filter(\.hasCoordinates)
+        let totals = GPSMediaCounts.totals(in: coordinateFiles)
+        VStack(spacing: 10) {
+            VStack(spacing: 4) {
                 Text("City / GPS Map")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Text(summaryText(coordinateCount: coordinateCount))
-                    .font(.system(size: 11))
+                    .font(.system(size: 18, weight: .bold))
+                    .multilineTextAlignment(.center)
+                Text(summaryText(photos: totals.photos, videos: totals.videos, empty: coordinateFiles.isEmpty))
+                    .font(.system(size: 12))
                     .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity)
 
-            if coordinateCount == 0 {
+            if coordinateFiles.isEmpty {
                 Text(files.contains(where: \.hasGPS)
                     ? "GPS tags were found, but no usable coordinates could be read yet."
                     : "Drop media with GPS metadata to plot locations on Apple Maps.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .center)
                     .background(Color(.systemGray).opacity(0.12))
                     .cornerRadius(10)
             } else {
                 Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
                     ForEach(model.clusters) { cluster in
-                        Marker(cluster.pinTitle, coordinate: cluster.coordinate)
-                            .tint(.yellow)
-                            .tag(cluster.id)
+                        Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
+                            GPSMapPin(selected: model.selectedClusterID == cluster.id)
+                        }
+                        .tag(cluster.id)
                     }
                 }
                 .mapStyle(.standard)
@@ -40,7 +45,7 @@ struct GPSMapPanel: View {
                     MapCompass()
                     MapScaleView()
                 }
-                .frame(height: 240)
+                .frame(height: 200)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
@@ -50,9 +55,11 @@ struct GPSMapPanel: View {
                 if let selected = model.selectedCluster {
                     selectedClusterCard(selected)
                 } else {
-                    Text("Click a yellow pin to see the city and files at that spot.")
+                    Text("Click a yellow pin to see every photo and video within 5 miles.")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
                 }
             }
         }
@@ -65,10 +72,10 @@ struct GPSMapPanel: View {
         }
     }
 
-    private func summaryText(coordinateCount: Int) -> String {
-        if coordinateCount == 0 { return "No mapped locations" }
+    private func summaryText(photos: Int, videos: Int, empty: Bool) -> String {
+        if empty { return "No mapped locations" }
         let places = model.clusters.count
-        return "\(coordinateCount) with coords · \(places) place\(places == 1 ? "" : "s")"
+        return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi radius"
     }
 
     @ViewBuilder
@@ -76,14 +83,18 @@ struct GPSMapPanel: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 14))
                     .foregroundColor(.yellow)
                 Text(cluster.placeName ?? "Resolving city…")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Text("\(cluster.files.count) file\(cluster.files.count == 1 ? "" : "s")")
+                Text(cluster.mediaCountLabel)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
+            Text("All media within 5 miles of this pin")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
             Text(String(format: "%.5f, %.5f", cluster.latitude, cluster.longitude))
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.secondary)
@@ -103,5 +114,28 @@ struct GPSMapPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.black.opacity(0.35))
         .cornerRadius(8)
+    }
+}
+
+/// Slimmer yellow map pin than the default MapKit Marker balloon.
+private struct GPSMapPin: View {
+    var selected: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Circle()
+                .fill(Color.yellow)
+                .frame(width: selected ? 12 : 10, height: selected ? 12 : 10)
+                .overlay(
+                    Circle()
+                        .stroke(Color.black.opacity(0.45), lineWidth: 0.8)
+                )
+                .shadow(color: .black.opacity(0.35), radius: selected ? 2 : 1, y: 1)
+            Capsule()
+                .fill(Color.yellow)
+                .frame(width: 2, height: 5)
+                .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
+        }
+        .accessibilityHidden(true)
     }
 }
