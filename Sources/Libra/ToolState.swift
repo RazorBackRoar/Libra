@@ -10,6 +10,7 @@ final class ToolState: ObservableObject {
     @Published var results: [OperationResult] = []
     @Published var progress: (done: Int, total: Int) = (0, 0)
     @Published var running = false
+    @Published var cancelling = false
     @Published var message: String?
 
     @Published var prefix: String = ""
@@ -18,6 +19,8 @@ final class ToolState: ObservableObject {
     @Published var oneMinStart: Date = Date()
     @Published var oneMinMode: String = "copies"
 
+    private var activeTask: Task<Void, Never>?
+
     init(tool: Tool) {
         self.tool = tool
         self.dryRun = AppState.shared.settings.dryRunDefault
@@ -25,41 +28,106 @@ final class ToolState: ObservableObject {
 
     var filteredFiles: [VideoInfo] { files }
 
-    func scan(paths: [String], settings: AppSettings, ffmpegPath: String, ffprobePath: String) async {
+    func startScan(paths: [String], settings: AppSettings, ffmpegPath: String, ffprobePath: String) {
+        guard !running else { return }
         running = true
+        cancelling = false
         progress = (0, 0)
         files = []
         results = []
+        message = "Finding supported files…"
+
+        activeTask = Task { [weak self] in
+            await self?.performScan(paths: paths, settings: settings, ffprobePath: ffprobePath)
+        }
+    }
+
+    func startRun(settings: AppSettings, ffmpegPath: String?, ffprobePath: String?) {
+        guard !running else { return }
+        guard let ffmpegPath = ffmpegPath, ffprobePath != nil else {
+            message = "ffmpeg and ffprobe are required."
+            return
+        }
+
+        running = true
+        cancelling = false
+        let priorSkips = results.filter { $0.status == .skipped }
+        results = priorSkips
+        message = nil
+
+        activeTask = Task { [weak self] in
+            await self?.performRun(ffmpegPath: ffmpegPath)
+        }
+    }
+
+    func cancelActiveWork() {
+        guard running, !cancelling else { return }
+        cancelling = true
+        message = "Cancelling…"
+        activeTask?.cancel()
+    }
+
+    private func performScan(paths: [String], settings: AppSettings, ffprobePath: String) async {
+        defer {
+            running = false
+            cancelling = false
+            activeTask = nil
+        }
+
         var exts = settings.videoExtensions
         if tool.acceptsImages {
             exts = Array(Set(exts + settings.imageExtensions))
         }
-        let scanned = await ScannerService.scan(paths: paths, extensions: exts, ffprobePath: ffprobePath) { done, total in
-            self.progress = (done, total)
-        }
-        files = scanned.supported
-        results = scanned.unsupported
-        let unsupportedCount = scanned.unsupported.count
-        if unsupportedCount > 0 {
-            message = "Scanned \(scanned.supported.count) files · \(unsupportedCount) unsupported skipped."
-        } else {
-            message = "Scanned \(scanned.supported.count) files."
-        }
-        running = false
+
+        let outcome = await ScannerService.scan(
+            paths: paths,
+            extensions: exts,
+            ffprobePath: ffprobePath,
+            progress: { done, total in
+                await MainActor.run {
+                    self.progress = (done, total)
+                }
+            }
+        )
+
+        files = outcome.supported
+        results = outcome.unsupported
+        applyScanSummary(outcome)
     }
 
-    func run(settings: AppSettings, ffmpegPath: String?, ffprobePath: String?) async {
-        guard let ffmpegPath = ffmpegPath, let _ = ffprobePath else {
-            message = "ffmpeg and ffprobe are required."
-            return
+    private func applyScanSummary(_ outcome: ScanOutcome) {
+        let failures = outcome.supported.filter { $0.error != nil }.count
+        let warnings = outcome.supported.filter { $0.warning != nil }.count
+        let unsupportedCount = outcome.unsupported.count
+
+        switch outcome.terminal {
+        case .cancelled:
+            message = "Cancelled after \(outcome.completedCount) of \(outcome.discoveredTotal)."
+        case .completed:
+            var parts: [String] = ["Scanned \(outcome.supported.count) files"]
+            if failures > 0 {
+                parts.append("\(failures) metadata failure\(failures == 1 ? "" : "s")")
+            }
+            if warnings > 0 {
+                parts.append("\(warnings) metadata warning\(warnings == 1 ? "" : "s")")
+            }
+            if unsupportedCount > 0 {
+                parts.append("\(unsupportedCount) unsupported skipped")
+            }
+            message = parts.joined(separator: " · ") + "."
         }
-        running = true
-        // Keep any prior unsupported skip results; replace operation results for this run
-        let priorSkips = results.filter { $0.status == .skipped }
-        results = priorSkips
-        defer { running = false }
+    }
+
+    private func performRun(ffmpegPath: String) async {
+        defer {
+            running = false
+            cancelling = false
+            activeTask = nil
+        }
 
         let target = files
+        progress = (0, target.count)
+
         switch tool {
         case .vidres, .promax, .maxvid, .keepName:
             await sort(target: target)
@@ -73,6 +141,12 @@ final class ToolState: ObservableObject {
             await oneMinAdjust(target: target, start: oneMinStart, mode: oneMinMode, ffmpegPath: ffmpegPath)
         case .slomo:
             await sloMo(target: target, factor: slomoFactor, ffmpegPath: ffmpegPath)
+        }
+
+        if Task.isCancelled || cancelling {
+            message = "Cancelled after \(progress.done) of \(progress.total)."
+        } else {
+            message = "Finished \(progress.done) of \(progress.total)."
         }
     }
 
@@ -89,13 +163,23 @@ final class ToolState: ObservableObject {
         usesPrefixField ? prefix : ""
     }
 
+    private func shouldStop() -> Bool {
+        Task.isCancelled || cancelling
+    }
+
+    private func advanceProgress() {
+        progress = (min(progress.done + 1, progress.total), progress.total)
+    }
+
     private func sort(target: [VideoInfo]) async {
         let eligible = target.filter { $0.error == nil }
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var index = 0
         for file in target {
+            if shouldStop() { return }
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                advanceProgress()
                 continue
             }
             index += 1
@@ -109,6 +193,7 @@ final class ToolState: ObservableObject {
             let dest = (folder as NSString).appendingPathComponent(filename)
             let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun)
             results.append(result)
+            advanceProgress()
         }
     }
 
@@ -117,8 +202,10 @@ final class ToolState: ObservableObject {
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var index = 0
         for file in target {
+            if shouldStop() { return }
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                advanceProgress()
                 continue
             }
             index += 1
@@ -131,6 +218,7 @@ final class ToolState: ObservableObject {
             let dest = (file.dir as NSString).appendingPathComponent(filename)
             let result = FileOps.renameFile(from: file.path, to: dest, dryRun: dryRun)
             results.append(result)
+            advanceProgress()
         }
     }
 
@@ -139,8 +227,10 @@ final class ToolState: ObservableObject {
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var index = 0
         for file in target {
+            if shouldStop() { return }
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                advanceProgress()
                 continue
             }
             index += 1
@@ -149,6 +239,7 @@ final class ToolState: ObservableObject {
             let dest = (folder as NSString).appendingPathComponent(filename)
             let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun)
             results.append(result)
+            advanceProgress()
         }
     }
 
@@ -159,12 +250,14 @@ final class ToolState: ObservableObject {
         var otherFiles: [ClassifiedFile] = []
 
         for file in ordered {
+            if shouldStop() { return }
             if let error = file.error {
                 results.append(OperationResult(
                     path: file.path,
                     status: .failed,
                     reason: "Metadata read failed: \(error)"
                 ))
+                advanceProgress()
                 continue
             }
             let classification = IPhoneSortLogic.classify(
@@ -186,6 +279,7 @@ final class ToolState: ObservableObject {
         var index = 0
 
         for item in iphoneFiles {
+            if shouldStop() { return }
             let file = item.file
             let classification = item.classification
             index += 1
@@ -203,9 +297,11 @@ final class ToolState: ObservableObject {
                 reason: result.reason ?? classification.note,
                 outputPath: result.outputPath
             ))
+            advanceProgress()
         }
 
         for item in otherFiles {
+            if shouldStop() { return }
             let file = item.file
             let classification = item.classification
             index += 1
@@ -223,6 +319,7 @@ final class ToolState: ObservableObject {
                 reason: result.reason ?? classification.note,
                 outputPath: result.outputPath
             ))
+            advanceProgress()
         }
     }
 
@@ -249,8 +346,10 @@ final class ToolState: ObservableObject {
         var current = start
         var index = 0
         for file in target {
+            if shouldStop() { return }
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                advanceProgress()
                 continue
             }
             index += 1
@@ -263,7 +362,13 @@ final class ToolState: ObservableObject {
             } else {
                 output = (file.dir as NSString).appendingPathComponent(filename)
             }
-            let result = await FfmpegOps.adjustTimestamp(filePath: file.path, outputPath: output, creationTime: current, ffmpegPath: ffmpegPath)
+            let result = await FfmpegOps.adjustTimestamp(
+                filePath: file.path,
+                outputPath: output,
+                creationTime: current,
+                ffmpegPath: ffmpegPath
+            )
+            // Never delete the source for cancelled/failed transforms.
             if mode != "copies",
                result.status == .success,
                output != file.path,
@@ -271,6 +376,8 @@ final class ToolState: ObservableObject {
                 try? FileManager.default.removeItem(atPath: file.path)
             }
             results.append(result)
+            advanceProgress()
+            if result.status == .cancelled { return }
             current = current.addingTimeInterval(60)
         }
     }
@@ -280,8 +387,10 @@ final class ToolState: ObservableObject {
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var index = 0
         for file in target {
+            if shouldStop() { return }
             if let error = file.error {
                 results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                advanceProgress()
                 continue
             }
             index += 1
@@ -289,8 +398,15 @@ final class ToolState: ObservableObject {
             try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let output = (dir as NSString).appendingPathComponent(filename)
-            let result = await FfmpegOps.sloMo(filePath: file.path, outputPath: output, factor: factor, ffmpegPath: ffmpegPath)
+            let result = await FfmpegOps.sloMo(
+                filePath: file.path,
+                outputPath: output,
+                factor: factor,
+                ffmpegPath: ffmpegPath
+            )
             results.append(result)
+            advanceProgress()
+            if result.status == .cancelled { return }
         }
     }
 

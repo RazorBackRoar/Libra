@@ -1,8 +1,8 @@
 import Foundation
 
-@MainActor
-final class ScannerService {
-    private init() {}
+enum ScannerService {
+    typealias ProbeHandler = @Sendable (String, String) async throws -> VideoInfo
+    typealias ProgressHandler = @Sendable (Int, Int) async -> Void
 
     /// macOS bundle-like directories that are apps/frameworks, not media folders.
     private static let bundleExtensions: Set<String> = [
@@ -13,13 +13,27 @@ final class ScannerService {
         paths: [String],
         extensions: [String],
         ffprobePath: String,
-        progress: @MainActor @escaping (Int, Int) -> Void
-    ) async -> (supported: [VideoInfo], unsupported: [OperationResult]) {
+        probe: ProbeHandler? = nil,
+        progress: ProgressHandler? = nil
+    ) async -> ScanOutcome {
+        let probeHandler = probe ?? { filePath, probePath in
+            try await MediaProbe.probe(filePath: filePath, ffprobePath: probePath)
+        }
+
         var files: [String] = []
         var unsupported: [OperationResult] = []
         let allowed = Set(extensions.map { $0.lowercased() })
 
         for path in paths {
+            if Task.isCancelled {
+                return cancelledOutcome(
+                    supported: [],
+                    unsupported: unsupported,
+                    discoveredTotal: 0,
+                    completedCount: 0
+                )
+            }
+
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
                 if isBundleDirectory(path) {
@@ -30,9 +44,21 @@ final class ScannerService {
                     ))
                     continue
                 }
-                let walked = walkDirectory(path, extensions: Array(allowed))
-                files.append(contentsOf: walked.supported)
-                unsupported.append(contentsOf: walked.unsupported)
+                do {
+                    let walked = try walkDirectory(path, extensions: Array(allowed))
+                    files.append(contentsOf: walked.supported)
+                    unsupported.append(contentsOf: walked.unsupported)
+                } catch is CancellationError {
+                    let deduped = Array(Set(files)).sorted()
+                    return cancelledOutcome(
+                        supported: [],
+                        unsupported: unsupported,
+                        discoveredTotal: deduped.count,
+                        completedCount: 0
+                    )
+                } catch {
+                    continue
+                }
             } else {
                 let ext = (path as NSString).pathExtension.lowercased()
                 if allowed.contains(ext) {
@@ -48,22 +74,105 @@ final class ScannerService {
         }
 
         let deduped = Array(Set(files)).sorted()
-        var results: [VideoInfo] = []
         let total = deduped.count
+        await progress?(0, total)
+
+        var results: [VideoInfo] = []
         for (index, file) in deduped.enumerated() {
-            let info = await MediaProbe.probe(filePath: file, ffprobePath: ffprobePath)
-            results.append(info)
-            progress(index + 1, total)
+            if Task.isCancelled {
+                return cancelledOutcome(
+                    supported: results,
+                    unsupported: unsupported,
+                    discoveredTotal: total,
+                    completedCount: results.count
+                )
+            }
+
+            do {
+                let info = try await probeHandler(file, ffprobePath)
+                results.append(info)
+            } catch is CancellationError {
+                return cancelledOutcome(
+                    supported: results,
+                    unsupported: unsupported,
+                    discoveredTotal: total,
+                    completedCount: results.count
+                )
+            } catch ProcessRunnerError.cancelled {
+                return cancelledOutcome(
+                    supported: results,
+                    unsupported: unsupported,
+                    discoveredTotal: total,
+                    completedCount: results.count
+                )
+            } catch {
+                results.append(
+                    VideoInfo(
+                        path: file,
+                        name: URL(fileURLWithPath: file).deletingPathExtension().lastPathComponent,
+                        dir: URL(fileURLWithPath: file).deletingLastPathComponent().path,
+                        ext: (file as NSString).pathExtension.lowercased(),
+                        sizeBytes: 0,
+                        width: 0,
+                        height: 0,
+                        resolutionClass: "Unknown",
+                        orientation: "Unknown",
+                        fps: 0,
+                        durationSec: 0,
+                        codec: "",
+                        container: "",
+                        make: "",
+                        model: "",
+                        hasAppleMake: false,
+                        hasiPhoneModel: false,
+                        hasGPS: false,
+                        creationTime: nil,
+                        error: "Could not read video metadata",
+                        warning: nil
+                    )
+                )
+            }
+
+            await progress?(index + 1, total)
         }
-        return (results, unsupported)
+
+        return ScanOutcome(
+            supported: results,
+            unsupported: unsupported,
+            discoveredTotal: total,
+            completedCount: results.count,
+            terminal: .completed
+        )
     }
 
-    private static func walkDirectory(_ path: String, extensions: [String]) -> (supported: [String], unsupported: [OperationResult]) {
+    private static func cancelledOutcome(
+        supported: [VideoInfo],
+        unsupported: [OperationResult],
+        discoveredTotal: Int,
+        completedCount: Int
+    ) -> ScanOutcome {
+        ScanOutcome(
+            supported: supported,
+            unsupported: unsupported,
+            discoveredTotal: discoveredTotal,
+            completedCount: completedCount,
+            terminal: .cancelled
+        )
+    }
+
+    private static func walkDirectory(
+        _ path: String,
+        extensions: [String]
+    ) throws -> (supported: [String], unsupported: [OperationResult]) {
         var found: [String] = []
         var unsupported: [OperationResult] = []
         let allowed = Set(extensions)
         let enumerator = FileManager.default.enumerator(atPath: path)
         while let item = enumerator?.nextObject() as? String {
+            if Task.isCancelled {
+                throw CancellationError()
+            }
+
             let full = (path as NSString).appendingPathComponent(item)
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: full, isDirectory: &isDir) else { continue }

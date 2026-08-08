@@ -25,6 +25,10 @@ struct ResultsTable: View {
                                     Text(error)
                                         .font(.system(size: 11))
                                         .foregroundColor(.red)
+                                } else if let warning = file.warning {
+                                    Text(warning)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.orange)
                                 }
                             }
                             .padding(.vertical, 2)
@@ -43,7 +47,7 @@ struct ResultsTable: View {
                                     Spacer()
                                     Text(result.status.rawValue)
                                         .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(result.status == .success ? .green : (result.status == .failed ? .red : .secondary))
+                                        .foregroundColor(statusColor(result.status))
                                 }
                                 if let reason = result.reason {
                                     Text(reason)
@@ -64,6 +68,19 @@ struct ResultsTable: View {
                 }
             }
             .frame(minHeight: 200)
+        }
+    }
+
+    private func statusColor(_ status: OperationStatus) -> Color {
+        switch status {
+        case .success:
+            return .green
+        case .failed:
+            return .red
+        case .cancelled:
+            return .orange
+        case .skipped, .pending:
+            return .secondary
         }
     }
 

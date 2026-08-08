@@ -22,6 +22,8 @@ struct VideoInfo: Identifiable, Equatable {
     var hasGPS: Bool
     var creationTime: Date?
     var error: String?
+    /// Nonfatal metadata enrichment issue (e.g. optional exiftool failure).
+    var warning: String?
     var unsupported: Bool = false
 
     var isApple: Bool { hasAppleMake || hasiPhoneModel }
@@ -108,7 +110,21 @@ enum OperationStatus: String, Equatable {
     case success = "Success"
     case failed = "Failed"
     case skipped = "Skipped"
+    case cancelled = "Cancelled"
     case pending = "Pending"
+}
+
+struct ScanOutcome {
+    enum TerminalState: Equatable {
+        case completed
+        case cancelled
+    }
+
+    var supported: [VideoInfo]
+    var unsupported: [OperationResult]
+    var discoveredTotal: Int
+    var completedCount: Int
+    var terminal: TerminalState
 }
 
 struct AppSettings: Codable {

@@ -17,10 +17,16 @@ enum FfmpegOps {
             if output.exitCode == 0 {
                 return OperationResult(path: filePath, status: .success, outputPath: outputPath)
             } else {
-                return OperationResult(path: filePath, status: .failed, reason: output.stderr)
+                return OperationResult(path: filePath, status: .failed, reason: "Processing failed")
             }
+        } catch ProcessRunnerError.cancelled {
+            return OperationResult(path: filePath, status: .cancelled, reason: "Cancelled")
+        } catch ProcessRunnerError.timeout {
+            return OperationResult(path: filePath, status: .failed, reason: "Processing timed out")
+        } catch is CancellationError {
+            return OperationResult(path: filePath, status: .cancelled, reason: "Cancelled")
         } catch {
-            return OperationResult(path: filePath, status: .failed, reason: error.localizedDescription)
+            return OperationResult(path: filePath, status: .failed, reason: "Processing failed")
         }
     }
 
@@ -40,10 +46,16 @@ enum FfmpegOps {
                 try? FileManager.default.setAttributes([.creationDate: creationTime], ofItemAtPath: outputPath)
                 return OperationResult(path: filePath, status: .success, outputPath: outputPath)
             } else {
-                return OperationResult(path: filePath, status: .failed, reason: output.stderr)
+                return OperationResult(path: filePath, status: .failed, reason: "Processing failed")
             }
+        } catch ProcessRunnerError.cancelled {
+            return OperationResult(path: filePath, status: .cancelled, reason: "Cancelled")
+        } catch ProcessRunnerError.timeout {
+            return OperationResult(path: filePath, status: .failed, reason: "Processing timed out")
+        } catch is CancellationError {
+            return OperationResult(path: filePath, status: .cancelled, reason: "Cancelled")
         } catch {
-            return OperationResult(path: filePath, status: .failed, reason: error.localizedDescription)
+            return OperationResult(path: filePath, status: .failed, reason: "Processing failed")
         }
     }
 }

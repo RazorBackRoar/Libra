@@ -56,18 +56,19 @@ struct ToolPage: View {
                         ? "Drop folders, photos, or video files to start."
                         : "Drop folders or video files to start.",
                     onDrop: { paths in
-                        Task {
-                            await state.scan(
-                                paths: paths,
-                                settings: appState.settings,
-                                ffmpegPath: appState.ffmpegPath ?? "",
-                                ffprobePath: appState.ffprobePath ?? ""
-                            )
-                        }
+                        guard !state.running else { return }
+                        state.startScan(
+                            paths: paths,
+                            settings: appState.settings,
+                            ffmpegPath: appState.ffmpegPath ?? "",
+                            ffprobePath: appState.ffprobePath ?? ""
+                        )
                     },
                     onBrowse: { browse() },
                     onSelectFiles: { selectFiles() }
                 )
+                .disabled(state.running)
+                .opacity(state.running ? 0.6 : 1)
 
                 CountPills(files: state.filteredFiles, tool: tool)
 
@@ -75,6 +76,7 @@ struct ToolPage: View {
                     TextField(tool == .provid ? "Prefix" : "Prefix (optional)", text: $state.prefix)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 300)
+                        .disabled(state.running)
                 }
 
                 if tool == .slomo {
@@ -83,6 +85,7 @@ struct ToolPage: View {
                         Text("0.25x").tag(0.25)
                     }
                     .pickerStyle(.segmented)
+                    .disabled(state.running)
                 }
 
                 if tool == .oneMin {
@@ -91,7 +94,9 @@ struct ToolPage: View {
                         Text("In place").tag("inplace")
                     }
                     .pickerStyle(.segmented)
+                    .disabled(state.running)
                     DatePicker("Start time", selection: $state.oneMinStart)
+                        .disabled(state.running)
                 }
 
                 if state.running {
@@ -121,7 +126,10 @@ struct ToolPage: View {
                         .disabled(state.running)
 
                     if state.running {
-                        Button("Cancel") { state.running = false }
+                        Button(state.cancelling ? "Cancelling…" : "Cancel") {
+                            state.cancelActiveWork()
+                        }
+                        .disabled(state.cancelling)
                     }
                 }
             }
@@ -133,6 +141,7 @@ struct ToolPage: View {
     }
 
     private func browse() {
+        guard !state.running else { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -140,18 +149,17 @@ struct ToolPage: View {
         panel.allowedContentTypes = []
         if panel.runModal() == .OK {
             let paths = panel.urls.map { $0.path }
-            Task {
-                await state.scan(
-                    paths: paths,
-                    settings: appState.settings,
-                    ffmpegPath: appState.ffmpegPath ?? "",
-                    ffprobePath: appState.ffprobePath ?? ""
-                )
-            }
+            state.startScan(
+                paths: paths,
+                settings: appState.settings,
+                ffmpegPath: appState.ffmpegPath ?? "",
+                ffprobePath: appState.ffprobePath ?? ""
+            )
         }
     }
 
     private func selectFiles() {
+        guard !state.running else { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -163,20 +171,20 @@ struct ToolPage: View {
         }
         if panel.runModal() == .OK {
             let paths = panel.urls.map { $0.path }
-            Task {
-                await state.scan(
-                    paths: paths,
-                    settings: appState.settings,
-                    ffmpegPath: appState.ffmpegPath ?? "",
-                    ffprobePath: appState.ffprobePath ?? ""
-                )
-            }
+            state.startScan(
+                paths: paths,
+                settings: appState.settings,
+                ffmpegPath: appState.ffmpegPath ?? "",
+                ffprobePath: appState.ffprobePath ?? ""
+            )
         }
     }
 
     private func run() {
-        Task {
-            await state.run(settings: appState.settings, ffmpegPath: appState.ffmpegPath, ffprobePath: appState.ffprobePath)
-        }
+        state.startRun(
+            settings: appState.settings,
+            ffmpegPath: appState.ffmpegPath,
+            ffprobePath: appState.ffprobePath
+        )
     }
 }

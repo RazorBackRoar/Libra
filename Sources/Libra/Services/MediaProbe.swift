@@ -41,9 +41,8 @@ enum DeviceMetadata {
     ]
 }
 
-@MainActor
 enum MediaProbe {
-    static func probe(filePath: String, ffprobePath: String) async -> VideoInfo {
+    static func probe(filePath: String, ffprobePath: String) async throws -> VideoInfo {
         let url = URL(fileURLWithPath: filePath)
         let name = url.deletingPathExtension().lastPathComponent
         let dir = url.deletingLastPathComponent().path
@@ -58,12 +57,17 @@ enum MediaProbe {
         let imageExts = Set(AppSettings.default.imageExtensions)
         if imageExts.contains(ext) {
             var info = probeImage(filePath: filePath, name: name, dir: dir, ext: ext, size: size)
-            if let enriched = await enrichWithExiftool(path: filePath, existing: info) {
-                info = enriched
-            }
+            info = try await enrichWithExiftool(path: filePath, existing: info)
             return info
         }
-        return await probeVideo(filePath: filePath, name: name, dir: dir, ext: ext, size: size, ffprobePath: ffprobePath)
+        return try await probeVideo(
+            filePath: filePath,
+            name: name,
+            dir: dir,
+            ext: ext,
+            size: size,
+            ffprobePath: ffprobePath
+        )
     }
 
     private static func probeVideo(
@@ -73,7 +77,7 @@ enum MediaProbe {
         ext: String,
         size: Int64,
         ffprobePath: String
-    ) async -> VideoInfo {
+    ) async throws -> VideoInfo {
         do {
             let json = try await runFfprobe(filePath: filePath, ffprobePath: ffprobePath)
 
@@ -104,14 +108,25 @@ enum MediaProbe {
                 hasiPhoneModel: meta.hasiPhoneModel,
                 hasGPS: meta.hasGPS,
                 creationTime: meta.creationTime,
-                error: nil
+                error: nil,
+                warning: nil
             )
 
-            // Enrich with exiftool when available (videos often store Make/Model there)
-            if let enriched = await enrichWithExiftool(path: filePath, existing: info) {
-                info = enriched
-            }
+            info = try await enrichWithExiftool(path: filePath, existing: info)
             return info
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch ProcessRunnerError.cancelled {
+            throw ProcessRunnerError.cancelled
+        } catch ProcessRunnerError.timeout {
+            return failedVideoInfo(
+                filePath: filePath,
+                name: name,
+                dir: dir,
+                ext: ext,
+                size: size,
+                error: "Metadata probe timed out"
+            )
         } catch {
             return failedVideoInfo(
                 filePath: filePath,
@@ -119,7 +134,7 @@ enum MediaProbe {
                 dir: dir,
                 ext: ext,
                 size: size,
-                error: error.localizedDescription
+                error: "Could not read video metadata"
             )
         }
     }
@@ -133,10 +148,16 @@ enum MediaProbe {
             filePath
         ]
         let output = try await ProcessRunner.run(executablePath: ffprobePath, arguments: args, timeout: 30)
+        guard output.exitCode == 0 else {
+            throw ProbeFailure.ffprobeFailed
+        }
         return try JSONSerialization.jsonObject(with: output.stdout.data(using: .utf8) ?? Data()) as? [String: Any] ?? [:]
     }
 
-    private static func extractVideoProperties(format: [String: Any], videoStream: [String: Any]) -> (width: Int, height: Int, duration: Double, fps: Double, codec: String, container: String) {
+    private static func extractVideoProperties(
+        format: [String: Any],
+        videoStream: [String: Any]
+    ) -> (width: Int, height: Int, duration: Double, fps: Double, codec: String, container: String) {
         let width = parseInt(videoStream["width"])
         let height = parseInt(videoStream["height"])
         let duration = parseDouble(format["duration"] as? String) ?? parseDouble(videoStream["duration"] as? String) ?? 0
@@ -146,14 +167,16 @@ enum MediaProbe {
         return (width, height, duration, fps, codec, container)
     }
 
-    private static func extractVideoMetadata(format: [String: Any], videoStream: [String: Any]) -> (make: String, model: String, hasAppleMake: Bool, hasiPhoneModel: Bool, hasGPS: Bool, creationTime: Date?) {
+    private static func extractVideoMetadata(
+        format: [String: Any],
+        videoStream: [String: Any]
+    ) -> (make: String, model: String, hasAppleMake: Bool, hasiPhoneModel: Bool, hasGPS: Bool, creationTime: Date?) {
         let tags = videoStream["tags"] as? [String: Any] ?? [:]
         let formatTags = format["tags"] as? [String: Any] ?? [:]
         let mergedTags = tags.merging(formatTags) { current, _ in current }
 
         let makeValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.makeKeys)
         let modelValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.modelKeys)
-        // Also check exiftool-style fields if present in tags
         let allMake = makeValues + stringValues(matching: mergedTags) { $0.lowercased().contains("make") }
         let allModel = modelValues + stringValues(matching: mergedTags) { key in
             let lower = key.lowercased()
@@ -198,7 +221,8 @@ enum MediaProbe {
             hasiPhoneModel: false,
             hasGPS: false,
             creationTime: nil,
-            error: error
+            error: error,
+            warning: nil
         )
     }
 
@@ -226,7 +250,8 @@ enum MediaProbe {
                 hasiPhoneModel: false,
                 hasGPS: false,
                 creationTime: nil,
-                error: message
+                error: message,
+                warning: nil
             )
         }
 
@@ -289,14 +314,15 @@ enum MediaProbe {
             hasiPhoneModel: hasiPhoneModel,
             hasGPS: hasGPS,
             creationTime: nil,
-            error: nil
+            error: nil,
+            warning: nil
         )
     }
 
-    private static func enrichWithExiftool(path: String, existing: VideoInfo) async -> VideoInfo? {
+    private static func enrichWithExiftool(path: String, existing: VideoInfo) async throws -> VideoInfo {
         let candidates = ["/opt/homebrew/bin/exiftool", "/usr/local/bin/exiftool"]
         guard let exiftool = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-            return nil
+            return existing
         }
         do {
             let output = try await ProcessRunner.run(
@@ -304,10 +330,15 @@ enum MediaProbe {
                 arguments: ["-json", "-n", "-Make", "-Model", "-DeviceModelName", "-CameraModelName", "-GPSLatitude", path],
                 timeout: 30
             )
-            guard let data = output.stdout.data(using: .utf8),
+            guard output.exitCode == 0,
+                  let data = output.stdout.data(using: .utf8),
                   let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
                   let first = array.first else {
-                return nil
+                var info = existing
+                if info.warning == nil {
+                    info.warning = "Optional metadata enrichment unavailable"
+                }
+                return info
             }
             var info = existing
             let make = (first["Make"] as? String) ?? info.make
@@ -325,8 +356,14 @@ enum MediaProbe {
                 info.hasGPS = true
             }
             return info
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch ProcessRunnerError.cancelled {
+            throw ProcessRunnerError.cancelled
         } catch {
-            return nil
+            var info = existing
+            info.warning = "Optional metadata enrichment unavailable"
+            return info
         }
     }
 
@@ -385,5 +422,9 @@ enum MediaProbe {
         if width > height { return "landscape" }
         if height > width { return "portrait" }
         return "square"
+    }
+
+    private enum ProbeFailure: Error {
+        case ffprobeFailed
     }
 }
