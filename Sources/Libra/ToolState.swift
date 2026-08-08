@@ -86,6 +86,9 @@ final class ToolState: ObservableObject {
             progress: { done, total in
                 await MainActor.run {
                     self.progress = (done, total)
+                    if total > 0, self.message == "Finding supported files…" {
+                        self.message = nil
+                    }
                 }
             }
         )

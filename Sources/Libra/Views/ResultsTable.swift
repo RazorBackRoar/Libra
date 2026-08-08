@@ -14,21 +14,27 @@ struct ResultsTable: View {
             List {
                 if !files.isEmpty {
                     Section("Scanned Files") {
-                        ForEach(files) { file in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(file.name + "." + file.ext)
-                                    .font(.system(size: 13, weight: .semibold))
-                                Text(detailLine(for: file))
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                                if let error = file.error {
-                                    Text(error)
+                        ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("\(index + 1).")
+                                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.yellow)
+                                    .frame(width: numberColumnWidth, alignment: .trailing)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(file.name + "." + file.ext)
+                                        .font(.system(size: 13, weight: .semibold))
+                                    Text(detailLine(for: file))
                                         .font(.system(size: 11))
-                                        .foregroundColor(.red)
-                                } else if let warning = file.warning {
-                                    Text(warning)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.orange)
+                                        .foregroundColor(.secondary)
+                                    if let error = file.error {
+                                        Text(error)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.red)
+                                    } else if let warning = file.warning {
+                                        Text(warning)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.orange)
+                                    }
                                 }
                             }
                             .padding(.vertical, 2)
@@ -67,7 +73,15 @@ struct ResultsTable: View {
                     }
                 }
             }
-            .frame(minHeight: 200)
+            .frame(minHeight: 240)
+        }
+    }
+
+    private var numberColumnWidth: CGFloat {
+        switch files.count {
+        case 0..<10: return 28
+        case 10..<100: return 36
+        default: return 48
         }
     }
 
@@ -93,7 +107,7 @@ struct ResultsTable: View {
             parts.append(file.orientation)
         }
         if !file.codec.isEmpty {
-            parts.append("\(file.codec) / \(file.container)")
+            parts.append(file.codec)
         }
         if file.durationSec > 0 {
             parts.append(formatDuration(file.durationSec))

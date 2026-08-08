@@ -7,6 +7,7 @@ struct ToolPage: View {
     @StateObject private var state: ToolState
     @ObservedObject private var appState = AppState.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var browserFilter: MediaBrowserFilter?
 
     init(tool: Tool) {
         self.tool = tool
@@ -70,7 +71,9 @@ struct ToolPage: View {
                 .disabled(state.running)
                 .opacity(state.running ? 0.6 : 1)
 
-                CountPills(files: state.filteredFiles, tool: tool)
+                CountPills(files: state.filteredFiles, tool: tool) { filter in
+                    browserFilter = filter
+                }
 
                 if tool == .provid || tool == .vidres || tool == .promax || tool == .maxvid {
                     TextField(tool == .provid ? "Prefix" : "Prefix (optional)", text: $state.prefix)
@@ -134,10 +137,17 @@ struct ToolPage: View {
                 }
             }
             .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color.black.ignoresSafeArea())
         .navigationTitle(tool.title)
         .navigationBarBackButtonHidden(true)
+        .navigationDestination(item: $browserFilter) { filter in
+            CategoryBrowserView(
+                title: filter.title,
+                files: state.filteredFiles.filter { filter.matches($0) }
+            )
+        }
     }
 
     private func browse() {
