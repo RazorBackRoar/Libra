@@ -106,7 +106,9 @@ enum MediaProbe {
                 model: meta.model,
                 hasAppleMake: meta.hasAppleMake,
                 hasiPhoneModel: meta.hasiPhoneModel,
-                hasGPS: meta.hasGPS,
+                hasGPS: meta.hasGPS || meta.latitude != nil,
+                latitude: meta.latitude,
+                longitude: meta.longitude,
                 creationTime: meta.creationTime,
                 error: nil,
                 warning: nil
@@ -170,7 +172,16 @@ enum MediaProbe {
     private static func extractVideoMetadata(
         format: [String: Any],
         videoStream: [String: Any]
-    ) -> (make: String, model: String, hasAppleMake: Bool, hasiPhoneModel: Bool, hasGPS: Bool, creationTime: Date?) {
+    ) -> (
+        make: String,
+        model: String,
+        hasAppleMake: Bool,
+        hasiPhoneModel: Bool,
+        hasGPS: Bool,
+        latitude: Double?,
+        longitude: Double?,
+        creationTime: Date?
+    ) {
         let tags = videoStream["tags"] as? [String: Any] ?? [:]
         let formatTags = format["tags"] as? [String: Any] ?? [:]
         let mergedTags = tags.merging(formatTags) { current, _ in current }
@@ -188,9 +199,11 @@ enum MediaProbe {
         let hasAppleMake = DeviceMetadata.hasAppleMake(in: allMake)
         let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: allModel + allMake)
         let creation = parseDate(tags["creation_time"] as? String) ?? parseDate(formatTags["creation_time"] as? String)
-        let hasGPS = mergedTags.keys.contains { $0.lowercased().contains("location") || $0.lowercased().contains("gps") }
+        let coords = GPSCoordinateParser.coordinates(fromFfprobeTags: mergedTags)
+        let hasGPS = coords != nil
+            || mergedTags.keys.contains { $0.lowercased().contains("location") || $0.lowercased().contains("gps") }
 
-        return (make, model, hasAppleMake, hasiPhoneModel, hasGPS, creation)
+        return (make, model, hasAppleMake, hasiPhoneModel, hasGPS, coords?.latitude, coords?.longitude, creation)
     }
 
     private static func failedVideoInfo(
@@ -272,7 +285,8 @@ enum MediaProbe {
 
         var makeValues: [String] = []
         var modelValues: [String] = []
-        var hasGPS = false
+        var latitude: Double?
+        var longitude: Double?
 
         if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
             if let make = tiff[kCGImagePropertyTIFFMake as String] as? String { makeValues.append(make) }
@@ -283,7 +297,10 @@ enum MediaProbe {
             modelValues.append(contentsOf: DeviceMetadata.collectStringValues(from: exif, keys: DeviceMetadata.modelKeys))
         }
         if let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any], !gps.isEmpty {
-            hasGPS = true
+            if let coords = GPSCoordinateParser.coordinates(fromImageIOGPS: gps) {
+                latitude = coords.latitude
+                longitude = coords.longitude
+            }
         }
 
         makeValues.append(contentsOf: DeviceMetadata.collectStringValues(from: properties, keys: DeviceMetadata.makeKeys))
@@ -293,6 +310,7 @@ enum MediaProbe {
         let model = preferredValue(modelValues)
         let hasAppleMake = DeviceMetadata.hasAppleMake(in: makeValues)
         let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues)
+        let hasGPS = latitude != nil
 
         return VideoInfo(
             path: filePath,
@@ -313,6 +331,8 @@ enum MediaProbe {
             hasAppleMake: hasAppleMake,
             hasiPhoneModel: hasiPhoneModel,
             hasGPS: hasGPS,
+            latitude: latitude,
+            longitude: longitude,
             creationTime: nil,
             error: nil,
             warning: nil
@@ -327,7 +347,12 @@ enum MediaProbe {
         do {
             let output = try await ProcessRunner.run(
                 executablePath: exiftool,
-                arguments: ["-json", "-n", "-Make", "-Model", "-DeviceModelName", "-CameraModelName", "-GPSLatitude", path],
+                arguments: [
+                    "-json", "-n",
+                    "-Make", "-Model", "-DeviceModelName", "-CameraModelName",
+                    "-GPSLatitude", "-GPSLongitude",
+                    path
+                ],
                 timeout: 30
             )
             guard output.exitCode == 0,
@@ -352,7 +377,11 @@ enum MediaProbe {
             info.model = preferredValue(modelValues)
             info.hasAppleMake = DeviceMetadata.hasAppleMake(in: makeValues)
             info.hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues)
-            if first["GPSLatitude"] != nil {
+            if let coords = GPSCoordinateParser.coordinates(fromExiftool: first) {
+                info.latitude = coords.latitude
+                info.longitude = coords.longitude
+                info.hasGPS = true
+            } else if first["GPSLatitude"] != nil {
                 info.hasGPS = true
             }
             return info

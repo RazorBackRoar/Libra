@@ -20,6 +20,9 @@ struct VideoInfo: Identifiable, Equatable {
     var hasAppleMake: Bool
     var hasiPhoneModel: Bool
     var hasGPS: Bool
+    /// Decimal degrees when available from media metadata.
+    var latitude: Double? = nil
+    var longitude: Double? = nil
     var creationTime: Date?
     var error: String?
     /// Nonfatal metadata enrichment issue (e.g. optional exiftool failure).
@@ -27,6 +30,11 @@ struct VideoInfo: Identifiable, Equatable {
     var unsupported: Bool = false
 
     var isApple: Bool { hasAppleMake || hasiPhoneModel }
+
+    var hasCoordinates: Bool {
+        guard let latitude, let longitude else { return false }
+        return (-90...90).contains(latitude) && (-180...180).contains(longitude)
+    }
 
     /// Canonical resolution bucket labels (contract order).
     static let resolutionClasses = ["4K", "FHD", "1080p", "HD", "720p", "SD"]

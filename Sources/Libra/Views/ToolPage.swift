@@ -68,6 +68,10 @@ struct ToolPage: View {
                     browserFilter = filter
                 }
 
+                if tool == .gps {
+                    GPSMapPanel(files: state.filteredFiles)
+                }
+
                 if tool == .provid || tool == .vidres || tool == .promax || tool == .maxvid {
                     TextField(tool == .provid ? "Prefix" : "Prefix (optional)", text: $state.prefix)
                         .textFieldStyle(.roundedBorder)
@@ -119,6 +123,7 @@ struct ToolPage: View {
 
                     Toggle("Dry Run", isOn: $state.dryRun)
                         .toggleStyle(.switch)
+                        .tint(.yellow)
                         .disabled(state.running)
 
                     if state.running {
