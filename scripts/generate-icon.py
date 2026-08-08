@@ -1,4 +1,4 @@
-#!/Users/home/.local/bin/python3.14
+#!/usr/bin/env python3.14
 """Build AppIcon.icns from Libra.png on the standard 824x824 macOS icon grid.
 
 Libra.png is a 1024x1024 RGBA export whose squircle body sits off-grid at
