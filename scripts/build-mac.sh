@@ -1,5 +1,7 @@
 #!/bin/bash
 set -e
+# Brand name contains `!` (L!bra). Disable history expansion so echo/printf stay literal.
+set +o histexpand
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR/.."

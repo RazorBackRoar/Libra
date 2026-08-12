@@ -78,15 +78,15 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
 
     var description: String {
         switch self {
-        case .iphoneSorter: return "Sort into iPhone / Not iPhone folders using the standard filename format."
+        case .iphoneSorter: return "Split photos and videos into iPhone / Not iPhone folders."
         case .provid: return "Rename videos in place with the standard filename format and optional prefix."
-        case .vidres: return "Sort into resolution folders with the standard filename format."
-        case .promax: return "Sort into resolution + orientation folders with the standard filename format."
-        case .maxvid: return "Sort into resolution + orientation + FPS folders with the standard filename format."
-        case .keepName: return "Sort into resolution folders with the standard filename format."
-        case .oneMin: return "Apply sequential 60-second timestamps and the standard filename format."
-        case .slomo: return "Create slow-motion copies with the standard filename format."
-        case .gps: return "Sort into GPS / No-GPS folders with the standard filename format."
+        case .vidres: return "Rename and sort into resolution folders (4K, 1080p, …)."
+        case .promax: return "Rename and sort into resolution + orientation folders."
+        case .maxvid: return "Rename and sort into resolution + orientation + FPS folders."
+        case .keepName: return "Sort into resolution folders, keeping the original filename."
+        case .oneMin: return "Stamp sequential 60-second creation times (copies or in place)."
+        case .slomo: return "Write slow-motion copies into a SloMo folder."
+        case .gps: return "Sort into city folders from GPS, or No-GPS when there are no coordinates."
         }
     }
 
@@ -102,7 +102,30 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
     }
 
     var acceptsImages: Bool {
-        self == .iphoneSorter
+        switch self {
+        case .iphoneSorter, .gps, .keepName:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var needsFfmpeg: Bool {
+        switch self {
+        case .slomo, .oneMin:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var supportsExtraFolders: Bool {
+        switch self {
+        case .vidres, .keepName, .promax, .maxvid, .gps:
+            return true
+        default:
+            return false
+        }
     }
 }
 
@@ -112,6 +135,17 @@ struct OperationResult: Identifiable, Equatable {
     var status: OperationStatus
     var reason: String?
     var outputPath: String?
+}
+
+struct UndoRecord: Equatable {
+    enum Kind: Equatable {
+        case moved
+        case createdCopy
+    }
+
+    var kind: Kind
+    var originalPath: String
+    var resultPath: String
 }
 
 enum OperationStatus: String, Equatable {
@@ -142,6 +176,10 @@ struct AppSettings: Codable {
     var imageExtensions: [String]
     var dryRunDefault: Bool
     var lastFolder: String?
+    var requireConfirmToWrite: Bool
+    var defaultPrefix: String
+    var sortByDate: Bool
+    var sortByCamera: Bool
 
     static let `default` = AppSettings(
         ffmpegPath: nil,
@@ -149,7 +187,11 @@ struct AppSettings: Codable {
         videoExtensions: ["mp4", "mov", "m4v", "mkv", "avi", "mts", "m2ts", "3gp", "webm"],
         imageExtensions: ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "webp"],
         dryRunDefault: true,
-        lastFolder: nil
+        lastFolder: nil,
+        requireConfirmToWrite: true,
+        defaultPrefix: "",
+        sortByDate: false,
+        sortByCamera: false
     )
 
     init(
@@ -158,7 +200,11 @@ struct AppSettings: Codable {
         videoExtensions: [String],
         imageExtensions: [String],
         dryRunDefault: Bool,
-        lastFolder: String?
+        lastFolder: String?,
+        requireConfirmToWrite: Bool,
+        defaultPrefix: String,
+        sortByDate: Bool,
+        sortByCamera: Bool
     ) {
         self.ffmpegPath = ffmpegPath
         self.ffprobePath = ffprobePath
@@ -166,6 +212,10 @@ struct AppSettings: Codable {
         self.imageExtensions = imageExtensions
         self.dryRunDefault = dryRunDefault
         self.lastFolder = lastFolder
+        self.requireConfirmToWrite = requireConfirmToWrite
+        self.defaultPrefix = defaultPrefix
+        self.sortByDate = sortByDate
+        self.sortByCamera = sortByCamera
     }
 
     init(from decoder: Decoder) throws {
@@ -176,5 +226,9 @@ struct AppSettings: Codable {
         imageExtensions = try container.decodeIfPresent([String].self, forKey: .imageExtensions) ?? Self.default.imageExtensions
         dryRunDefault = try container.decodeIfPresent(Bool.self, forKey: .dryRunDefault) ?? true
         lastFolder = try container.decodeIfPresent(String.self, forKey: .lastFolder)
+        requireConfirmToWrite = try container.decodeIfPresent(Bool.self, forKey: .requireConfirmToWrite) ?? true
+        defaultPrefix = try container.decodeIfPresent(String.self, forKey: .defaultPrefix) ?? ""
+        sortByDate = try container.decodeIfPresent(Bool.self, forKey: .sortByDate) ?? false
+        sortByCamera = try container.decodeIfPresent(Bool.self, forKey: .sortByCamera) ?? false
     }
 }

@@ -8,6 +8,7 @@ enum MediaBrowserFilter: Hashable, Identifiable {
     case iPhoneModel
     case appleDevice
     case both
+    case duplicates
 
     var id: String {
         switch self {
@@ -18,6 +19,7 @@ enum MediaBrowserFilter: Hashable, Identifiable {
         case .iPhoneModel: return "iphone-model"
         case .appleDevice: return "apple-device"
         case .both: return "both"
+        case .duplicates: return "duplicates"
         }
     }
 
@@ -29,10 +31,11 @@ enum MediaBrowserFilter: Hashable, Identifiable {
         case .appleMake: return "Apple"
         case .iPhoneModel, .appleDevice: return "iPhone"
         case .both: return "Both"
+        case .duplicates: return "Duplicates"
         }
     }
 
-    func matches(_ file: VideoInfo) -> Bool {
+    func matches(_ file: VideoInfo, duplicateExtras: Set<String> = []) -> Bool {
         switch self {
         case .all:
             return true
@@ -48,6 +51,8 @@ enum MediaBrowserFilter: Hashable, Identifiable {
             return file.isApple
         case .both:
             return file.hasAppleMake && file.hasiPhoneModel
+        case .duplicates:
+            return duplicateExtras.contains(file.path)
         }
     }
 }
@@ -75,6 +80,11 @@ struct CountPills: View {
                     }
                     pill(filter: .gps, label: "GPS", value: files.filter { $0.hasGPS }.count)
                     pill(filter: .appleDevice, label: "iPhone", value: files.filter { $0.isApple }.count)
+                    pill(
+                        filter: .duplicates,
+                        label: "Duplicates",
+                        value: DuplicateDetector.extraCount(in: files)
+                    )
                 }
             }
         }

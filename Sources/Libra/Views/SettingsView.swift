@@ -5,6 +5,7 @@ struct SettingsView: View {
     @State private var ffmpegPath: String = ""
     @State private var ffprobePath: String = ""
     @State private var extensions: String = ""
+    @State private var defaultPrefix: String = ""
 
     var body: some View {
         Form {
@@ -20,20 +21,35 @@ struct SettingsView: View {
             }
             Section("Defaults") {
                 Toggle("Dry-run by default", isOn: $store.settings.dryRunDefault)
+                Toggle("Confirm before writing files", isOn: $store.settings.requireConfirmToWrite)
+                TextField("Default prefix", text: $defaultPrefix)
+                Toggle("Date folders", isOn: $store.settings.sortByDate)
+                Toggle("Camera folders", isOn: $store.settings.sortByCamera)
+            }
+            Section("Last folder") {
+                Text(store.settings.lastFolder ?? "None yet")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .textSelection(.enabled)
             }
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 420, height: 260)
+        .frame(width: 460, height: 420)
         .onAppear {
             ffmpegPath = store.settings.ffmpegPath ?? ""
             ffprobePath = store.settings.ffprobePath ?? ""
             extensions = store.settings.videoExtensions.joined(separator: ", ")
+            defaultPrefix = store.settings.defaultPrefix
         }
         .onChange(of: ffmpegPath) { update() }
         .onChange(of: ffprobePath) { update() }
         .onChange(of: extensions) { update() }
+        .onChange(of: defaultPrefix) { update() }
         .onChange(of: store.settings.dryRunDefault) { store.save() }
+        .onChange(of: store.settings.requireConfirmToWrite) { store.save() }
+        .onChange(of: store.settings.sortByDate) { store.save() }
+        .onChange(of: store.settings.sortByCamera) { store.save() }
     }
 
     private func detect() {
@@ -56,6 +72,9 @@ struct SettingsView: View {
             settings.ffmpegPath = ffmpegPath.isEmpty ? nil : ffmpegPath
             settings.ffprobePath = ffprobePath.isEmpty ? nil : ffprobePath
             settings.videoExtensions = extensions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            settings.defaultPrefix = defaultPrefix
         }
+        AppState.shared.settings = store.settings
+        AppState.shared.resolveDependencies()
     }
 }

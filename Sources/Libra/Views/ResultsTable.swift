@@ -1,8 +1,18 @@
 import SwiftUI
+import AppKit
 
 struct ResultsTable: View {
     let files: [VideoInfo]
     let results: [OperationResult]
+
+    private var orderedResults: [OperationResult] {
+        results.sorted { lhs, rhs in
+            let left = statusRank(lhs.status)
+            let right = statusRank(rhs.status)
+            if left != right { return left < right }
+            return lhs.path < rhs.path
+        }
+    }
 
     var body: some View {
         Group {
@@ -17,36 +27,25 @@ struct ResultsTable: View {
                     if !files.isEmpty {
                         Section("Scanned Files") {
                             ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
-                                HStack(alignment: .top, spacing: 8) {
-                                    Text("\(index + 1).")
-                                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                                        .foregroundColor(.yellow)
-                                        .frame(width: numberColumnWidth, alignment: .trailing)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(file.name + "." + file.ext)
-                                            .font(.system(size: 13, weight: .semibold))
-                                        Text(detailLine(for: file))
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.secondary)
-                                        if let error = file.error {
-                                            Text(error)
-                                                .font(.system(size: 11))
-                                                .foregroundColor(.red)
-                                        } else if let warning = file.warning {
-                                            Text(warning)
-                                                .font(.system(size: 11))
-                                                .foregroundColor(.orange)
-                                        }
-                                    }
+                                resultRow(
+                                    index: index + 1,
+                                    title: file.name + "." + file.ext,
+                                    detail: detailLine(for: file),
+                                    error: file.error,
+                                    warning: file.warning
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture { reveal(file.path) }
+                                .contextMenu {
+                                    Button("Reveal in Finder") { reveal(file.path) }
                                 }
-                                .padding(.vertical, 2)
                             }
                         }
                     }
 
                     if !results.isEmpty {
                         Section("Results") {
-                            ForEach(results) { result in
+                            ForEach(orderedResults) { result in
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack {
                                         Text((result.path as NSString).lastPathComponent)
@@ -71,6 +70,11 @@ struct ResultsTable: View {
                                     }
                                 }
                                 .padding(.vertical, 2)
+                                .contentShape(Rectangle())
+                                .onTapGesture { reveal(result.outputPath ?? result.path) }
+                                .contextMenu {
+                                    Button("Reveal in Finder") { reveal(result.outputPath ?? result.path) }
+                                }
                             }
                         }
                     }
@@ -84,11 +88,52 @@ struct ResultsTable: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private func resultRow(
+        index: Int,
+        title: String,
+        detail: String,
+        error: String?,
+        warning: String?
+    ) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("\(index).")
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundColor(.yellow)
+                .frame(width: numberColumnWidth, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                if let error {
+                    Text(error)
+                        .font(.system(size: 11))
+                        .foregroundColor(.red)
+                } else if let warning {
+                    Text(warning)
+                        .font(.system(size: 11))
+                        .foregroundColor(.orange)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
     private var numberColumnWidth: CGFloat {
         switch files.count {
         case 0..<10: return 28
         case 10..<100: return 36
         default: return 48
+        }
+    }
+
+    private func statusRank(_ status: OperationStatus) -> Int {
+        switch status {
+        case .failed: return 0
+        case .cancelled: return 1
+        case .skipped, .pending: return 2
+        case .success: return 3
         }
     }
 
@@ -103,6 +148,10 @@ struct ResultsTable: View {
         case .skipped, .pending:
             return .secondary
         }
+    }
+
+    private func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 
     private func detailLine(for file: VideoInfo) -> String {

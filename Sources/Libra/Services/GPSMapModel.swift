@@ -291,7 +291,7 @@ extension GPSMapModel {
         geocodeTask = Task { [weak self] in
             for cluster in pending {
                 if Task.isCancelled { return }
-                let name = await Self.reverseGeocode(latitude: cluster.latitude, longitude: cluster.longitude)
+                let name = await GPSGeocoder.reverseGeocode(latitude: cluster.latitude, longitude: cluster.longitude)
                 guard let self, !Task.isCancelled else { return }
                 if let name {
                     self.placeNameCache[cluster.id] = name
@@ -312,34 +312,6 @@ extension GPSMapModel {
                 // Be gentle with Apple's geocoder.
                 try? await Task.sleep(nanoseconds: 250_000_000)
             }
-        }
-    }
-
-    private static func reverseGeocode(latitude: Double, longitude: Double) async -> String? {
-        let location = CLLocation(latitude: latitude, longitude: longitude)
-        do {
-            let placemarks = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[CLPlacemark], Error>) in
-                CLGeocoder().reverseGeocodeLocation(location) { placemarks, error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                    } else {
-                        continuation.resume(returning: placemarks ?? [])
-                    }
-                }
-            }
-            guard let place = placemarks.first else { return nil }
-            let parts = [place.locality, place.administrativeArea, place.country]
-                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            if let locality = place.locality, !locality.isEmpty {
-                if let area = place.administrativeArea, !area.isEmpty {
-                    return "\(locality), \(area)"
-                }
-                return locality
-            }
-            return parts.first
-        } catch {
-            return nil
         }
     }
 }

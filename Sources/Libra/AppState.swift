@@ -8,8 +8,11 @@ final class AppState: ObservableObject {
     @Published var settings = SettingsStore.shared.settings
     @Published var ffmpegPath: String?
     @Published var ffprobePath: String?
-    @Published var missingDeps = false
+    @Published var missingFfmpeg = false
+    @Published var missingFfprobe = false
     @Published var depMessage: String? = nil
+
+    var missingScanTools: Bool { missingFfprobe }
 
     private init() {
         resolveDependencies()
@@ -18,9 +21,12 @@ final class AppState: ObservableObject {
     func resolveDependencies() {
         ffmpegPath = resolve(command: "ffmpeg", override: settings.ffmpegPath)
         ffprobePath = resolve(command: "ffprobe", override: settings.ffprobePath)
-        missingDeps = (ffmpegPath == nil || ffprobePath == nil)
-        if missingDeps {
-            depMessage = "ffmpeg and ffprobe are required. Install with: brew install ffmpeg"
+        missingFfmpeg = ffmpegPath == nil
+        missingFfprobe = ffprobePath == nil
+        if missingFfprobe {
+            depMessage = "ffprobe is required to scan media. Install with: brew install ffmpeg"
+        } else if missingFfmpeg {
+            depMessage = "ffmpeg is required for Slo-Mo and 1MinVid. Install with: brew install ffmpeg"
         } else {
             depMessage = nil
         }
@@ -49,6 +55,15 @@ final class AppState: ObservableObject {
             _ = try? await ProcessRunner.run(executablePath: brewPath, arguments: ["install", "ffmpeg"], timeout: 600)
             resolveDependencies()
         }
+    }
+
+    func rememberLastFolder(from paths: [String]) {
+        guard let first = paths.first else { return }
+        var isDir: ObjCBool = false
+        FileManager.default.fileExists(atPath: first, isDirectory: &isDir)
+        let folder = isDir.boolValue ? first : (first as NSString).deletingLastPathComponent
+        SettingsStore.shared.update { $0.lastFolder = folder }
+        settings.lastFolder = folder
     }
 
     var settingsStore: SettingsStore { SettingsStore.shared }

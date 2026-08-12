@@ -88,6 +88,14 @@ final class GPSCoordinateParserTests: XCTestCase {
         XCTAssertEqual(GPSMediaCounts.label(photos: totals.photos, videos: totals.videos), "1 photo, 1 video")
     }
 
+    @MainActor
+    func testCityFolderName_sanitizesAndFallsBack() {
+        XCTAssertEqual(GPSGeocoder.folderName(for: "Idaho Falls, ID"), "Idaho Falls, ID")
+        XCTAssertEqual(GPSGeocoder.folderName(for: "A/B"), "A_B")
+        XCTAssertEqual(GPSGeocoder.folderName(for: "   "), "GPS")
+        XCTAssertEqual(GPSGeocoder.folderName(for: nil), "GPS")
+    }
+
     private func stub(path: String, lat: Double, lon: Double, ext: String = "mov") -> VideoInfo {
         VideoInfo(
             path: path,

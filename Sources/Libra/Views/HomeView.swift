@@ -22,9 +22,9 @@ struct HomeView: View {
                 Spacer()
             }
 
-            if appState.missingDeps {
+            if appState.missingScanTools {
                 HStack {
-                    Text("ffmpeg or ffprobe missing.")
+                    Text("ffprobe missing — scanning needs it. Install ffmpeg (includes ffprobe).")
                         .font(.system(size: 13))
                         .foregroundColor(.red)
                     Button("Install") { appState.installDependencies() }

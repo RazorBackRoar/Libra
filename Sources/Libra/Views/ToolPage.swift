@@ -6,6 +6,7 @@ struct ToolPage: View {
     let tool: Tool
     @StateObject private var state: ToolState
     @ObservedObject private var appState = AppState.shared
+    @ObservedObject private var settingsStore = SettingsStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var browserFilter: MediaBrowserFilter?
 
@@ -32,7 +33,7 @@ struct ToolPage: View {
                 Button("← Back") { dismiss() }
             }
 
-            if appState.missingDeps {
+            if appState.missingFfprobe || (tool.needsFfmpeg && appState.missingFfmpeg) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(appState.depMessage ?? "Dependencies missing.")
                         .font(.system(size: 13))
@@ -54,12 +55,7 @@ struct ToolPage: View {
                     : "Drop folders or video files to start.",
                 onDrop: { paths in
                     guard !state.running else { return }
-                    state.startScan(
-                        paths: paths,
-                        settings: appState.settings,
-                        ffmpegPath: appState.ffmpegPath ?? "",
-                        ffprobePath: appState.ffprobePath ?? ""
-                    )
+                    beginScan(paths)
                 },
                 onBrowse: { browse() },
                 onSelectFiles: { selectFiles() }
@@ -71,7 +67,6 @@ struct ToolPage: View {
                 browserFilter = filter
             }
 
-            // Map only when media actually has coordinates (keeps empty tools clean).
             if state.filteredFiles.contains(where: \.hasCoordinates) {
                 GPSMapPanel(files: state.filteredFiles)
             }
@@ -84,6 +79,23 @@ struct ToolPage: View {
                     .onChange(of: state.prefix) { _, _ in
                         state.scheduleRerunAfterOptionsChange()
                     }
+            }
+
+            if tool.supportsExtraFolders {
+                HStack(spacing: 16) {
+                    Toggle("Date folders", isOn: $settingsStore.settings.sortByDate)
+                    Toggle("Camera folders", isOn: $settingsStore.settings.sortByCamera)
+                }
+                .toggleStyle(.checkbox)
+                .disabled(state.running)
+                .onChange(of: settingsStore.settings.sortByDate) { _, _ in
+                    settingsStore.save()
+                    state.scheduleRerunAfterOptionsChange()
+                }
+                .onChange(of: settingsStore.settings.sortByCamera) { _, _ in
+                    settingsStore.save()
+                    state.scheduleRerunAfterOptionsChange()
+                }
             }
 
             if tool == .slomo {
@@ -122,36 +134,52 @@ struct ToolPage: View {
                     .foregroundColor(.secondary)
             }
 
-            if let message = state.message {
-                Text(message)
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-            }
-
-            // Only the numbered file list scrolls — chrome + Dry Run stay fixed.
             ResultsTable(files: state.filteredFiles, results: state.results)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-            HStack {
-                Toggle(isOn: $state.dryRun) {
-                    Text("Dry Run")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.yellow)
-                }
-                .toggleStyle(.switch)
-                .tint(.yellow)
-                .disabled(state.running)
-                .onChange(of: state.dryRun) { _, _ in
-                    state.scheduleRerunAfterOptionsChange()
+            VStack(alignment: .leading, spacing: 8) {
+                if let recap = state.recap ?? state.message {
+                    Text(recap)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.primary)
+                        .textSelection(.enabled)
                 }
 
-                Spacer()
-
-                if state.running {
-                    Button(state.cancelling ? "Cancelling…" : "Cancel") {
-                        state.cancelActiveWork()
+                HStack {
+                    Toggle(isOn: $state.dryRun) {
+                        Text("Dry Run")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.yellow)
                     }
-                    .disabled(state.cancelling)
+                    .toggleStyle(.switch)
+                    .tint(.yellow)
+                    .disabled(state.running)
+                    .onChange(of: state.dryRun) { _, isOn in
+                        if isOn {
+                            state.scheduleRerunAfterOptionsChange()
+                        } else if !state.files.isEmpty {
+                            state.needsWriteConfirm = true
+                        }
+                    }
+
+                    Text(state.dryRun ? "Preview only — nothing will be moved." : "Live — files will be renamed or moved.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(state.dryRun ? .yellow : .orange)
+
+                    Spacer()
+
+                    if state.canUndo {
+                        Button("Undo last run") {
+                            state.undoLastRun()
+                        }
+                    }
+
+                    if state.running {
+                        Button(state.cancelling ? "Cancelling…" : "Cancel") {
+                            state.cancelActiveWork()
+                        }
+                        .disabled(state.cancelling)
+                    }
                 }
             }
         }
@@ -161,34 +189,56 @@ struct ToolPage: View {
         .navigationTitle(tool.title)
         .navigationBarBackButtonHidden(true)
         .navigationDestination(item: $browserFilter) { filter in
+            let extras = DuplicateDetector.extraPaths(in: state.filteredFiles)
             CategoryBrowserView(
                 title: filter.title,
-                files: state.filteredFiles.filter { filter.matches($0) }
+                files: state.filteredFiles.filter { filter.matches($0, duplicateExtras: extras) }
             )
         }
+        .alert("Write files for real?", isPresented: $state.needsWriteConfirm) {
+            Button("Stay on Dry Run", role: .cancel) {
+                state.cancelLiveConfirm()
+            }
+            Button("Write files") {
+                state.confirmLiveRun()
+            }
+        } message: {
+            Text("Dry Run is off. \(tool.title) will rename or move files on disk. You can Undo last run after it finishes.")
+        }
+    }
+
+    private func beginScan(_ paths: [String]) {
+        state.startScan(
+            paths: paths,
+            settings: settingsStore.settings,
+            ffmpegPath: appState.ffmpegPath ?? "",
+            ffprobePath: appState.ffprobePath ?? ""
+        )
+    }
+
+    private func configuredPanel() -> NSOpenPanel {
+        let panel = NSOpenPanel()
+        if let last = settingsStore.settings.lastFolder {
+            panel.directoryURL = URL(fileURLWithPath: last)
+        }
+        return panel
     }
 
     private func browse() {
         guard !state.running else { return }
-        let panel = NSOpenPanel()
+        let panel = configuredPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         panel.allowedContentTypes = []
         if panel.runModal() == .OK {
-            let paths = panel.urls.map { $0.path }
-            state.startScan(
-                paths: paths,
-                settings: appState.settings,
-                ffmpegPath: appState.ffmpegPath ?? "",
-                ffprobePath: appState.ffprobePath ?? ""
-            )
+            beginScan(panel.urls.map(\.path))
         }
     }
 
     private func selectFiles() {
         guard !state.running else { return }
-        let panel = NSOpenPanel()
+        let panel = configuredPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
@@ -198,14 +248,7 @@ struct ToolPage: View {
             panel.allowedContentTypes = [UTType.movie, UTType.video, UTType.data]
         }
         if panel.runModal() == .OK {
-            let paths = panel.urls.map { $0.path }
-            state.startScan(
-                paths: paths,
-                settings: appState.settings,
-                ffmpegPath: appState.ffmpegPath ?? "",
-                ffprobePath: appState.ffprobePath ?? ""
-            )
+            beginScan(panel.urls.map(\.path))
         }
     }
-
 }

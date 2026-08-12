@@ -2,8 +2,8 @@ import Foundation
 
 @MainActor
 enum FileOps {
-    static func moveFile(from: String, to: String, dryRun: Bool) -> OperationResult {
-        let target = uniquePath(for: to)
+    static func moveFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
+        let target = uniquePath(for: to, reserved: reserved)
         if dryRun {
             return OperationResult(path: from, status: .success, reason: "Dry-run move to \(target)", outputPath: target)
         }
@@ -17,8 +17,8 @@ enum FileOps {
         }
     }
 
-    static func copyFile(from: String, to: String, dryRun: Bool) -> OperationResult {
-        let target = uniquePath(for: to)
+    static func copyFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
+        let target = uniquePath(for: to, reserved: reserved)
         if dryRun {
             return OperationResult(path: from, status: .success, reason: "Dry-run copy to \(target)", outputPath: target)
         }
@@ -32,19 +32,8 @@ enum FileOps {
         }
     }
 
-    static func renameFile(from: String, to: String, dryRun: Bool) -> OperationResult {
-        let target = uniquePath(for: to)
-        if dryRun {
-            return OperationResult(path: from, status: .success, reason: "Dry-run rename to \(target)", outputPath: target)
-        }
-        do {
-            let dir = (target as NSString).deletingLastPathComponent
-            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
-            try FileManager.default.moveItem(atPath: from, toPath: target)
-            return OperationResult(path: from, status: .success, outputPath: target)
-        } catch {
-            return OperationResult(path: from, status: .failed, reason: error.localizedDescription)
-        }
+    static func renameFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
+        moveFile(from: from, to: to, dryRun: dryRun, reserved: reserved)
     }
 
     static func deleteFile(_ path: String, dryRun: Bool) -> OperationResult {
@@ -59,46 +48,38 @@ enum FileOps {
         }
     }
 
-    static func uniquePath(for path: String) -> String {
+    /// Prefer incrementing a trailing padded index (`… 001` → `… 002`) instead of ` (1)`.
+    static func uniquePath(for path: String, reserved: Set<String> = []) -> String {
         let fileManager = FileManager.default
-        if !fileManager.fileExists(atPath: path) {
-            return path
+        func taken(_ candidate: String) -> Bool {
+            reserved.contains(candidate) || fileManager.fileExists(atPath: candidate)
         }
+        if !taken(path) { return path }
 
         let pathStr = path as NSString
         let dir = pathStr.deletingLastPathComponent
         let ext = pathStr.pathExtension
         let baseName = (pathStr.lastPathComponent as NSString).deletingPathExtension
 
-        guard let files = try? fileManager.contentsOfDirectory(atPath: dir) else {
+        if let parsed = trailingIndex(baseName) {
+            var number = parsed.number
             var candidate = path
-            var counter = 1
-            let base = pathStr.deletingPathExtension
-            while fileManager.fileExists(atPath: candidate) {
-                if ext.isEmpty {
-                    candidate = "\(base) (\(counter))"
-                } else {
-                    candidate = "\(base) (\(counter)).\(ext)"
-                }
-                counter += 1
+            while taken(candidate) {
+                number += 1
+                let stem = "\(parsed.prefix)\(pad(number, width: parsed.width))"
+                candidate = join(dir: dir, stem: stem, ext: ext)
             }
             return candidate
         }
 
-        let existingFiles = Set(files)
-        var counter = 1
-        var candidateName = pathStr.lastPathComponent
-
-        while existingFiles.contains(candidateName) {
-            if ext.isEmpty {
-                candidateName = "\(baseName) (\(counter))"
-            } else {
-                candidateName = "\(baseName) (\(counter)).\(ext)"
-            }
-            counter += 1
+        var number = 2
+        var candidate = path
+        while taken(candidate) {
+            let stem = "\(baseName) \(pad(number, width: 3))"
+            candidate = join(dir: dir, stem: stem, ext: ext)
+            number += 1
         }
-
-        return (dir as NSString).appendingPathComponent(candidateName)
+        return candidate
     }
 
     /// Sanitize unsafe filename characters while preserving a readable base name.
@@ -113,5 +94,24 @@ enum FileOps {
         if cleaned.isEmpty { return "file" }
         if cleaned == "." || cleaned == ".." { return "file" }
         return cleaned
+    }
+
+    private static func trailingIndex(_ baseName: String) -> (prefix: String, number: Int, width: Int)? {
+        guard let space = baseName.lastIndex(of: " ") else { return nil }
+        let token = String(baseName[baseName.index(after: space)...])
+        guard !token.isEmpty, token.allSatisfy(\.isNumber), let value = Int(token) else { return nil }
+        let prefix = String(baseName[...space])
+        return (prefix, value, max(token.count, 3))
+    }
+
+    private static func pad(_ number: Int, width: Int) -> String {
+        String(format: "%0\(width)d", number)
+    }
+
+    private static func join(dir: String, stem: String, ext: String) -> String {
+        if ext.isEmpty {
+            return (dir as NSString).appendingPathComponent(stem)
+        }
+        return (dir as NSString).appendingPathComponent("\(stem).\(ext)")
     }
 }
