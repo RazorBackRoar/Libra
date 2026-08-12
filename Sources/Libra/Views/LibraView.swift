@@ -1,14 +1,16 @@
 import SwiftUI
 
 struct LibraView: View {
-    @State private var selectedTool: Tool? = nil
+    @State private var selectedTool: Tool?
+    @State private var section: HomeSection = .video
 
     var body: some View {
-        NavigationStack {
-            HomeView(selectedTool: $selectedTool)
-                .navigationDestination(item: $selectedTool) { tool in
-                    ToolPage(tool: tool)
-                }
+        Group {
+            if let tool = selectedTool {
+                ToolPage(tool: tool, onBack: { selectedTool = nil })
+            } else {
+                HomeView(selectedTool: $selectedTool, section: $section)
+            }
         }
         .background(Color.black.ignoresSafeArea())
     }

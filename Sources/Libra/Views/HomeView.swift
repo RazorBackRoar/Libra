@@ -1,25 +1,32 @@
 import SwiftUI
 
+enum HomeSection: String, CaseIterable {
+    case video = "Video"
+    case photo = "Photo"
+}
+
 struct HomeView: View {
     @Binding var selectedTool: Tool?
+    @Binding var section: HomeSection
     @ObservedObject private var appState = AppState.shared
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+    private let tools = Array(Tool.allCases)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "film.stack")
-                    .font(.system(size: 28))
+                    .font(.system(size: 22, weight: .semibold))
                     .foregroundColor(.yellow)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text("L!bra")
-                        .font(.system(size: 20, weight: .bold))
-                    Text("Local-first video organization toolkit")
-                        .font(.system(size: 12))
+                        .font(.system(size: 18, weight: .bold))
+                    Text("Video organization toolkit")
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
-                Spacer()
+                Spacer(minLength: 12)
+                HomeTabBar(section: $section)
             }
 
             if appState.missingScanTools {
@@ -30,23 +37,59 @@ struct HomeView: View {
                     Button("Install") { appState.installDependencies() }
                         .buttonStyle(LibraPrimaryButtonStyle())
                 }
-                .padding(10)
+                .padding(8)
                 .background(Color.red.opacity(0.1))
                 .cornerRadius(8)
             }
 
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(Tool.allCases) { tool in
-                    ToolCard(tool: tool, onTap: { selectedTool = tool })
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+            if section == .video {
+                videoGrid
+            } else {
+                PhotoSweepView()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.ignoresSafeArea())
-        .navigationBarBackButtonHidden(true)
+    }
+
+    private var videoGrid: some View {
+        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+            ForEach(0..<3, id: \.self) { row in
+                GridRow {
+                    ForEach(0..<3, id: \.self) { col in
+                        let tool = tools[row * 3 + col]
+                        ToolCard(tool: tool, onTap: { selectedTool = tool })
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct HomeTabBar: View {
+    @Binding var section: HomeSection
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(HomeSection.allCases, id: \.self) { item in
+                Button {
+                    section = item
+                } label: {
+                    VStack(spacing: 5) {
+                        Text(item.rawValue)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(section == item ? .yellow : .secondary)
+                        Rectangle()
+                            .fill(section == item ? Color.yellow : Color.clear)
+                            .frame(height: 2)
+                    }
+                    .frame(width: 72)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }
 
@@ -56,10 +99,10 @@ struct ToolCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top) {
                     Image(systemName: tool.systemImage)
-                        .font(.system(size: 22))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.yellow)
                     Spacer()
                     Text(tool.category)
@@ -67,7 +110,7 @@ struct ToolCard: View {
                         .foregroundColor(.secondary)
                 }
                 Text(tool.title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                 Text(tool.description)
@@ -77,11 +120,14 @@ struct ToolCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
-            .padding(12)
+            .padding(14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color(.systemGray).opacity(0.15))
-            .cornerRadius(12)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            .background(Color.white.opacity(0.06))
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }

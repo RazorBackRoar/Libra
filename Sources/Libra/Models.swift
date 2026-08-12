@@ -29,6 +29,10 @@ struct VideoInfo: Identifiable, Equatable {
     var warning: String?
     var unsupported: Bool = false
 
+    var isImage: Bool {
+        AppSettings.default.imageExtensions.contains(ext.lowercased())
+    }
+
     var isApple: Bool { hasAppleMake || hasiPhoneModel }
 
     var hasCoordinates: Bool {
@@ -78,7 +82,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
 
     var description: String {
         switch self {
-        case .iphoneSorter: return "Split photos and videos into iPhone / Not iPhone folders."
+        case .iphoneSorter: return "Split videos into iPhone / Not iPhone folders."
         case .provid: return "Rename videos in place with the standard filename format and optional prefix."
         case .vidres: return "Rename and sort into resolution folders (4K, 1080p, …)."
         case .promax: return "Rename and sort into resolution + orientation folders."
@@ -101,14 +105,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var acceptsImages: Bool {
-        switch self {
-        case .iphoneSorter, .gps, .keepName:
-            return true
-        default:
-            return false
-        }
-    }
+    var acceptsImages: Bool { false }
 
     var needsFfmpeg: Bool {
         switch self {

@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import AppKit
 
 /// Lightweight Apple Maps mini-map — native MapKit only.
 /// Caller should only present this when `files` contain coordinates.
@@ -66,6 +67,14 @@ struct GPSMapPanel: View {
         return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi / city"
     }
 
+    private func openFile(_ path: String) {
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+
+    private func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
     @ViewBuilder
     private func selectedClusterCard(_ cluster: GPSLocationCluster) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -87,16 +96,28 @@ struct GPSMapPanel: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(.secondary)
 
-            ForEach(cluster.files.prefix(8)) { file in
-                Text("• \(file.name).\(file.ext)")
-                    .font(.system(size: 11))
-                    .lineLimit(1)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(cluster.files) { file in
+                        Button {
+                            openFile(file.path)
+                        } label: {
+                            Text(file.name + "." + file.ext)
+                                .font(.system(size: 11))
+                                .foregroundColor(.yellow)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open \(file.name).\(file.ext)")
+                        .contextMenu {
+                            Button("Open") { openFile(file.path) }
+                            Button("Reveal in Finder") { reveal(file.path) }
+                        }
+                    }
+                }
             }
-            if cluster.files.count > 8 {
-                Text("…and \(cluster.files.count - 8) more")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            }
+            .frame(maxHeight: 140)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)

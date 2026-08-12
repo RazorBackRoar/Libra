@@ -13,13 +13,13 @@ struct DropZone: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "arrow.down.doc")
-                .font(.system(size: 32))
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(.yellow)
             Text(title)
-                .font(.system(size: 18, weight: .bold))
+                .font(.system(size: 15, weight: .semibold))
                 .multilineTextAlignment(.center)
             Text(subtitle)
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             HStack(spacing: 12) {
@@ -29,14 +29,14 @@ struct DropZone: View {
                     .buttonStyle(LibraSecondaryButtonStyle())
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
-        .background(isDragging ? Color.yellow.opacity(0.1) : Color(.systemGray).opacity(0.1))
+        .background(isDragging ? Color.yellow.opacity(0.12) : Color.white.opacity(0.05))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isDragging ? Color.yellow : Color.gray.opacity(0.3), style: StrokeStyle(lineWidth: 2, dash: [8]))
+                .stroke(isDragging ? Color.yellow : Color.white.opacity(0.12), lineWidth: 1)
         )
         .onDrop(of: [.fileURL], isTargeted: $isDragging) { providers in
             return handleProviders(providers)

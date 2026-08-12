@@ -21,15 +21,16 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 
 ## Features
 
-- **Drag-and-drop tools** — drop a folder to scan; Dry Run previews automatically, live writes ask first
+- **Drag-and-drop tools** — drop a folder to scan; Dry Run previews automatically
 - **Undo last run** — put moved files back (or delete created copies)
 - **Dry Run first** — bright yellow toggle; Desktop reports named `L!bra ProVid Dry Run 1.txt` (tool name swaps per mode)
-- **Sort & rename** — ProVid, VidRes, ProMax, MaxVid; KeepName keeps original filenames
-- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city
-- **GPS Sorter** — city folders from coordinates, `No-GPS` when missing; photos welcome
+- **Video | Photo** — nine video tools stay video-only; the Photo tab moves stills out of mixed folders
+- **Sort & rename** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
+- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; click a filename to open the video
+- **GPS Sorter** — city folders from coordinates, `No-GPS` when missing
 - **Optional date / camera folders** — extra sort keys on the sort tools
 - **Duplicates** — likely extras (same size, duration, name) go in a Duplicates folder
-- **iPhone Sorter** — iPhone / Not iPhone, including photos
+- **iPhone Sorter** — iPhone / Not iPhone (videos)
 - **Transform** — Slo-Mo copies and 1MinVid sequential timestamps (these need ffmpeg)
 - **Resilient import** — cancelable scans; per-file probe failures don’t stall the batch
 - **Local-first** — nothing leaves your Mac
@@ -45,11 +46,11 @@ Requires macOS 14+ on Apple Silicon. ffmpeg / ffprobe via Homebrew when transfor
 
 ## Usage
 
-1. Open **L!bra** and pick a tool (ProVid, GPS Sorter, …)
+1. Open **L!bra** and pick a tool from the Video tab (or use Photo to move stills out)
 2. Drop a folder or video files (or use Open Folder / Select Files)
-3. Leave **Dry Run** on to preview; turn it off and confirm when you’re ready to write
+3. Leave **Dry Run** on to preview; turn it off to write
 4. Use **Undo last run** if a live pass wasn’t what you wanted
-5. Use the City / GPS Map pins to inspect locations (5-mile / city clusters)
+5. Use the City / GPS Map pins to inspect locations; click a filename to open the video
 6. Review results on disk — click a row to Reveal in Finder
 
 ## Development

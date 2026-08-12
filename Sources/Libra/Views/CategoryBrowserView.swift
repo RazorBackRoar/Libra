@@ -5,6 +5,7 @@ import AppKit
 struct CategoryBrowserView: View {
     let title: String
     let files: [VideoInfo]
+    var onBack: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var index = 0
@@ -21,7 +22,13 @@ struct CategoryBrowserView: View {
         VStack(alignment: .leading, spacing: 12) {
             ZStack {
                 HStack {
-                    Button("← Back") { dismiss() }
+                    Button("Back") {
+                        if let onBack {
+                            onBack()
+                        } else {
+                            dismiss()
+                        }
+                    }
                     Spacer()
                     if !files.isEmpty {
                         Text("\(index + 1) / \(files.count)")

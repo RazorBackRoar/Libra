@@ -4,6 +4,9 @@ import Foundation
 ///
 /// Format: `OriginalName Resolution V|WFPS [🍎][📱][🌍] NNN.ext`
 /// Example: `Vacation 4K W30 🍎📱🌍 001.mov`
+///
+/// A non-empty prefix replaces the original name (with a space after it):
+/// `katie 720p W30 002.mp4` — not `katie 1E8B0D0F-… 720p W30 002.mp4`.
 @MainActor
 enum FileNaming {
     static let resolutionClasses = ["4K", "FHD", "1080p", "HD", "720p", "SD"]
@@ -56,10 +59,12 @@ enum FileNaming {
     ) -> String {
         var parts: [String] = []
         let cleanedPrefix = FileOps.sanitizeFileName(prefix.trimmingCharacters(in: .whitespacesAndNewlines))
-        if !cleanedPrefix.isEmpty && cleanedPrefix != "file" {
+        let hasPrefix = !cleanedPrefix.isEmpty && cleanedPrefix != "file"
+        if hasPrefix {
             parts.append(cleanedPrefix)
+        } else {
+            parts.append(FileOps.sanitizeFileName(originalName))
         }
-        parts.append(FileOps.sanitizeFileName(originalName))
         parts.append(resolutionLabel(resolutionClass))
         parts.append("\(orientationCode(orientation))\(fpsBucket(fps))")
         let markers = metadataMarkers(

@@ -21,7 +21,6 @@ struct SettingsView: View {
             }
             Section("Defaults") {
                 Toggle("Dry-run by default", isOn: $store.settings.dryRunDefault)
-                Toggle("Confirm before writing files", isOn: $store.settings.requireConfirmToWrite)
                 TextField("Default prefix", text: $defaultPrefix)
                 Toggle("Date folders", isOn: $store.settings.sortByDate)
                 Toggle("Camera folders", isOn: $store.settings.sortByCamera)
@@ -47,7 +46,6 @@ struct SettingsView: View {
         .onChange(of: extensions) { update() }
         .onChange(of: defaultPrefix) { update() }
         .onChange(of: store.settings.dryRunDefault) { store.save() }
-        .onChange(of: store.settings.requireConfirmToWrite) { store.save() }
         .onChange(of: store.settings.sortByDate) { store.save() }
         .onChange(of: store.settings.sortByCamera) { store.save() }
     }

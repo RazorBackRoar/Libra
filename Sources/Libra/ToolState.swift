@@ -13,8 +13,8 @@ final class ToolState: ObservableObject {
     @Published var cancelling = false
     @Published var message: String?
     @Published var recap: String?
-    @Published var needsWriteConfirm = false
     @Published var undoRecords: [UndoRecord] = []
+    @Published var photos: [VideoInfo] = []
 
     @Published var prefix: String = ""
     @Published var dryRun: Bool = true
@@ -42,11 +42,11 @@ final class ToolState: ObservableObject {
     func startScan(paths: [String], settings: AppSettings, ffmpegPath: String, ffprobePath: String) {
         guard !running else { return }
         rerunTask?.cancel()
-        needsWriteConfirm = false
         running = true
         cancelling = false
         progress = (0, 0)
         files = []
+        photos = []
         results = []
         recap = nil
         message = "Finding supported files…"
@@ -61,22 +61,6 @@ final class ToolState: ObservableObject {
             }
             await self.continueAfterScan()
         }
-    }
-
-    func confirmLiveRun() {
-        needsWriteConfirm = false
-        dryRun = false
-        startRun(
-            settings: AppState.shared.settings,
-            ffmpegPath: AppState.shared.ffmpegPath,
-            ffprobePath: AppState.shared.ffprobePath
-        )
-    }
-
-    func cancelLiveConfirm() {
-        needsWriteConfirm = false
-        dryRun = true
-        scheduleRerunAfterOptionsChange()
     }
 
     func startRun(settings: AppSettings, ffmpegPath: String?, ffprobePath: String?) {
@@ -104,28 +88,17 @@ final class ToolState: ObservableObject {
     }
 
     /// Re-process after Prefix / Dry Run / tool options change (debounced).
-    /// Live writes never auto-start — they need a confirm.
     func scheduleRerunAfterOptionsChange() {
         guard !files.isEmpty, !running else { return }
         rerunTask?.cancel()
         rerunTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 450_000_000)
             guard let self, !Task.isCancelled else { return }
-            if self.dryRun {
-                self.startRun(
-                    settings: AppState.shared.settings,
-                    ffmpegPath: AppState.shared.ffmpegPath,
-                    ffprobePath: AppState.shared.ffprobePath
-                )
-            } else if SettingsStore.shared.settings.requireConfirmToWrite {
-                self.needsWriteConfirm = true
-            } else {
-                self.startRun(
-                    settings: AppState.shared.settings,
-                    ffmpegPath: AppState.shared.ffmpegPath,
-                    ffprobePath: AppState.shared.ffprobePath
-                )
-            }
+            self.startRun(
+                settings: AppState.shared.settings,
+                ffmpegPath: AppState.shared.ffmpegPath,
+                ffprobePath: AppState.shared.ffprobePath
+            )
         }
     }
 
@@ -135,6 +108,21 @@ final class ToolState: ObservableObject {
         message = "Cancelling…"
         rerunTask?.cancel()
         activeTask?.cancel()
+    }
+
+    func movePhotosOut(to destDir: String) {
+        guard !photos.isEmpty, !running else { return }
+        let moved = PhotoMover.move(photos, to: destDir, dryRun: dryRun)
+        results.append(contentsOf: moved)
+        let ok = moved.filter { $0.status == .success }.count
+        if dryRun {
+            recap = "Preview: \(ok) photo\(ok == 1 ? "" : "s") would move out."
+        } else {
+            recap = "Moved \(ok) photo\(ok == 1 ? "" : "s") out of the video folders."
+            let movedPaths = Set(moved.filter { $0.status == .success }.map(\.path))
+            photos.removeAll { movedPaths.contains($0.path) }
+        }
+        message = recap
     }
 
     func undoLastRun() {
@@ -163,21 +151,16 @@ final class ToolState: ObservableObject {
     }
 
     private func continueAfterScan() async {
-        if tool.needsFfmpeg, AppState.shared.ffmpegPath == nil {
-            message = "ffmpeg is required for \(tool.title)."
+        if files.isEmpty {
+            recap = photos.isEmpty
+                ? "No videos found."
+                : "No videos. \(photos.count) photo\(photos.count == 1 ? "" : "s") are in the Photos tab — move them out."
+            message = recap
             finishIdle()
             return
         }
-        if dryRun {
-            let priorSkips = results.filter { $0.status == .skipped }
-            results = priorSkips
-            await performRun(ffmpegPath: AppState.shared.ffmpegPath ?? "")
-            return
-        }
-        if SettingsStore.shared.settings.requireConfirmToWrite {
-            needsWriteConfirm = true
-            recap = "Scanned \(files.count) files. Confirm to write for real."
-            message = recap
+        if tool.needsFfmpeg, AppState.shared.ffmpegPath == nil {
+            message = "ffmpeg is required for \(tool.title)."
             finishIdle()
             return
         }
@@ -194,10 +177,8 @@ final class ToolState: ObservableObject {
 
     /// Returns `true` when the tool should auto-process after this scan.
     private func performScan(paths: [String], settings: AppSettings, ffprobePath: String) async -> Bool {
-        var exts = settings.videoExtensions
-        if tool.acceptsImages {
-            exts = Array(Set(exts + settings.imageExtensions))
-        }
+        let imageExts = Set(settings.imageExtensions.map { $0.lowercased() })
+        let exts = Array(Set(settings.videoExtensions + settings.imageExtensions))
 
         let outcome = await ScannerService.scan(
             paths: paths,
@@ -213,12 +194,14 @@ final class ToolState: ObservableObject {
             }
         )
 
-        files = outcome.supported
+        let videos = outcome.supported.filter { !imageExts.contains($0.ext.lowercased()) }
+        photos = outcome.supported.filter { imageExts.contains($0.ext.lowercased()) }
+        files = videos
         results = outcome.unsupported
         applyScanSummary(outcome)
 
         return outcome.terminal == .completed
-            && !outcome.supported.isEmpty
+            && (!videos.isEmpty || !photos.isEmpty)
             && !Task.isCancelled
             && !cancelling
     }
@@ -233,7 +216,10 @@ final class ToolState: ObservableObject {
         case .cancelled:
             recap = "Cancelled after \(outcome.completedCount) of \(outcome.discoveredTotal)."
         case .completed:
-            var parts: [String] = ["Scanned \(outcome.supported.count) files"]
+            var parts: [String] = ["Scanned \(files.count) video\(files.count == 1 ? "" : "s")"]
+            if !photos.isEmpty {
+                parts.append("\(photos.count) photo\(photos.count == 1 ? "" : "s") set aside")
+            }
             if failures > 0 {
                 parts.append("\(failures) metadata failure\(failures == 1 ? "" : "s")")
             }
