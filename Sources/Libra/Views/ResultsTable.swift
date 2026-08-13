@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct ResultsTable: View {
     let files: [VideoInfo]
@@ -35,9 +34,10 @@ struct ResultsTable: View {
                                     warning: file.warning
                                 )
                                 .contentShape(Rectangle())
-                                .onTapGesture { reveal(file.path) }
+                                .onTapGesture { MediaOpen.open(file.path) }
                                 .contextMenu {
-                                    Button("Reveal in Finder") { reveal(file.path) }
+                                    Button("Open") { MediaOpen.open(file.path) }
+                                    Button("Reveal in Finder") { MediaOpen.reveal(file.path) }
                                 }
                             }
                         }
@@ -71,9 +71,10 @@ struct ResultsTable: View {
                                 }
                                 .padding(.vertical, 2)
                                 .contentShape(Rectangle())
-                                .onTapGesture { reveal(result.outputPath ?? result.path) }
+                                .onTapGesture { MediaOpen.open(result.outputPath ?? result.path) }
                                 .contextMenu {
-                                    Button("Reveal in Finder") { reveal(result.outputPath ?? result.path) }
+                                    Button("Open") { MediaOpen.open(result.outputPath ?? result.path) }
+                                    Button("Reveal in Finder") { MediaOpen.reveal(result.outputPath ?? result.path) }
                                 }
                             }
                         }
@@ -148,10 +149,6 @@ struct ResultsTable: View {
         case .skipped, .pending:
             return .secondary
         }
-    }
-
-    private func reveal(_ path: String) {
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 
     private func detailLine(for file: VideoInfo) -> String {

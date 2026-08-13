@@ -48,7 +48,9 @@ struct ToolPage: View {
                         beginScan(paths)
                     },
                     onBrowse: { browse() },
-                    onSelectFiles: { selectFiles() }
+                    onSelectFiles: { selectFiles() },
+                    lastFolderTitle: lastFolderButtonTitle,
+                    onLastFolder: lastFolderButtonTitle == nil ? nil : { scanLastFolder() }
                 )
                 .disabled(state.running)
                 .opacity(state.running ? 0.6 : 1)
@@ -84,6 +86,10 @@ struct ToolPage: View {
         }
     }
 
+    private var usesPrefixField: Bool {
+        tool == .provid || tool == .vidres || tool == .promax || tool == .maxvid
+    }
+
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             Button("Back") { onBack() }
@@ -96,7 +102,17 @@ struct ToolPage: View {
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+            if usesPrefixField {
+                TextField("Prefix", text: $state.prefix)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+                    .disabled(state.running)
+                    .help("Replaces the original name: katie 720p W30 002.mp4")
+                    .onChange(of: state.prefix) { _, _ in
+                        state.scheduleRerunAfterOptionsChange()
+                    }
+            }
         }
     }
 
@@ -132,17 +148,7 @@ struct ToolPage: View {
         }
 
         if state.filteredFiles.contains(where: \.hasCoordinates) {
-            GPSMapPanel(files: state.filteredFiles)
-        }
-
-        if tool == .provid || tool == .vidres || tool == .promax || tool == .maxvid {
-            TextField(tool == .provid ? "Prefix" : "Prefix (optional)", text: $state.prefix)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 280)
-                .disabled(state.running)
-                .onChange(of: state.prefix) { _, _ in
-                    state.scheduleRerunAfterOptionsChange()
-                }
+            GPSMapPanel(files: state.filteredFiles, startsExpanded: tool == .gps)
         }
 
         if tool.supportsExtraFolders {
@@ -231,8 +237,10 @@ struct ToolPage: View {
                         }
                     }
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file.path)])
+                    .onTapGesture { MediaOpen.open(file.path) }
+                    .contextMenu {
+                        Button("Open") { MediaOpen.open(file.path) }
+                        Button("Reveal in Finder") { MediaOpen.reveal(file.path) }
                     }
                 }
             }
@@ -305,6 +313,18 @@ struct ToolPage: View {
         }
         guard panel.runModal() == .OK, let dest = panel.url?.path else { return }
         state.movePhotosOut(to: dest)
+    }
+
+    private var lastFolderButtonTitle: String? {
+        guard let last = settingsStore.settings.lastFolder, FileManager.default.fileExists(atPath: last) else {
+            return nil
+        }
+        return (last as NSString).lastPathComponent
+    }
+
+    private func scanLastFolder() {
+        guard !state.running, let last = settingsStore.settings.lastFolder else { return }
+        beginScan([last])
     }
 
     private func beginScan(_ paths: [String]) {

@@ -7,6 +7,8 @@ struct DropZone: View {
     let onDrop: ([String]) -> Void
     let onBrowse: () -> Void
     let onSelectFiles: () -> Void
+    var lastFolderTitle: String? = nil
+    var onLastFolder: (() -> Void)? = nil
 
     @State private var isDragging = false
 
@@ -27,6 +29,11 @@ struct DropZone: View {
                     .buttonStyle(LibraPrimaryButtonStyle())
                 Button("Select Files") { onSelectFiles() }
                     .buttonStyle(LibraSecondaryButtonStyle())
+                if let lastFolderTitle, let onLastFolder {
+                    Button("Last: \(lastFolderTitle)") { onLastFolder() }
+                        .buttonStyle(LibraSecondaryButtonStyle())
+                        .help("Scan the last folder you used")
+                }
             }
         }
         .padding(.horizontal, 16)

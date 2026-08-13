@@ -1,62 +1,78 @@
 import SwiftUI
 import MapKit
-import AppKit
 
 /// Lightweight Apple Maps mini-map — native MapKit only.
 /// Caller should only present this when `files` contain coordinates.
 struct GPSMapPanel: View {
     let files: [VideoInfo]
+    var startsExpanded: Bool = false
     @StateObject private var model = GPSMapModel()
+    @State private var expanded = false
 
     var body: some View {
         let coordinateFiles = files.filter(\.hasCoordinates)
         let totals = GPSMediaCounts.totals(in: coordinateFiles)
         VStack(spacing: 10) {
-            VStack(spacing: 4) {
-                Text("City / GPS Map")
-                    .font(.system(size: 18, weight: .bold))
-                    .multilineTextAlignment(.center)
-                Text(summaryText(photos: totals.photos, videos: totals.videos))
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-
-            Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
-                ForEach(model.clusters) { cluster in
-                    Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
-                        GPSMapPin(selected: model.selectedClusterID == cluster.id)
-                    }
-                    .tag(cluster.id)
+            Button {
+                expanded.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "map")
+                        .foregroundColor(.yellow)
+                    Text("City / GPS Map")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                    Spacer(minLength: 8)
+                    Text(summaryText(photos: totals.photos, videos: totals.videos))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
                 }
             }
-            .mapStyle(.standard)
-            .mapControls {
-                MapCompass()
-                MapScaleView()
-            }
-            .frame(height: 200)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
-            )
+            .buttonStyle(.plain)
 
-            if let selected = model.selectedCluster {
-                selectedClusterCard(selected)
-            } else {
-                Text("Click a yellow pin to see every photo and video at that city (5 mi + same city).")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
+            if expanded {
+                Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
+                    ForEach(model.clusters) { cluster in
+                        Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
+                            GPSMapPin(selected: model.selectedClusterID == cluster.id)
+                        }
+                        .tag(cluster.id)
+                    }
+                }
+                .mapStyle(.standard)
+                .mapControls {
+                    MapCompass()
+                    MapScaleView()
+                }
+                .frame(height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                )
+
+                if let selected = model.selectedCluster {
+                    selectedClusterCard(selected)
+                } else {
+                    Text("Click a yellow pin to see every video at that city (5 mi + same city).")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                }
             }
         }
         .padding(12)
         .background(Color(.systemGray).opacity(0.12))
         .cornerRadius(12)
-        .onAppear { model.update(files: files) }
+        .onAppear {
+            expanded = startsExpanded
+            model.update(files: files)
+        }
         .onChange(of: files.map(\.path)) { _, _ in
             model.update(files: files)
         }
@@ -65,14 +81,6 @@ struct GPSMapPanel: View {
     private func summaryText(photos: Int, videos: Int) -> String {
         let places = model.clusters.count
         return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi / city"
-    }
-
-    private func openFile(_ path: String) {
-        NSWorkspace.shared.open(URL(fileURLWithPath: path))
-    }
-
-    private func reveal(_ path: String) {
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 
     @ViewBuilder
@@ -100,7 +108,7 @@ struct GPSMapPanel: View {
                 VStack(alignment: .leading, spacing: 3) {
                     ForEach(cluster.files) { file in
                         Button {
-                            openFile(file.path)
+                            MediaOpen.open(file.path)
                         } label: {
                             Text(file.name + "." + file.ext)
                                 .font(.system(size: 11))
@@ -111,8 +119,8 @@ struct GPSMapPanel: View {
                         .buttonStyle(.plain)
                         .help("Open \(file.name).\(file.ext)")
                         .contextMenu {
-                            Button("Open") { openFile(file.path) }
-                            Button("Reveal in Finder") { reveal(file.path) }
+                            Button("Open") { MediaOpen.open(file.path) }
+                            Button("Reveal in Finder") { MediaOpen.reveal(file.path) }
                         }
                     }
                 }

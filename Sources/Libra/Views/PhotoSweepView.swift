@@ -93,7 +93,9 @@ struct PhotoSweepView: View {
                     state.startScan(paths: paths, ffprobePath: probe, settings: settingsStore.settings)
                 },
                 onBrowse: { browse(files: false) },
-                onSelectFiles: { browse(files: true) }
+                onSelectFiles: { browse(files: true) },
+                lastFolderTitle: lastFolderButtonTitle,
+                onLastFolder: lastFolderButtonTitle == nil ? nil : { scanLastFolder() }
             )
             .disabled(state.running)
 
@@ -126,8 +128,10 @@ struct PhotoSweepView: View {
                                 Spacer()
                             }
                             .contentShape(Rectangle())
-                            .onTapGesture {
-                                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file.path)])
+                            .onTapGesture { MediaOpen.open(file.path) }
+                            .contextMenu {
+                                Button("Open") { MediaOpen.open(file.path) }
+                                Button("Reveal in Finder") { MediaOpen.reveal(file.path) }
                             }
                         }
                     }
@@ -168,6 +172,18 @@ struct PhotoSweepView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var lastFolderButtonTitle: String? {
+        guard let last = settingsStore.settings.lastFolder, FileManager.default.fileExists(atPath: last) else {
+            return nil
+        }
+        return (last as NSString).lastPathComponent
+    }
+
+    private func scanLastFolder() {
+        guard let last = settingsStore.settings.lastFolder, let probe = appState.ffprobePath else { return }
+        state.startScan(paths: [last], ffprobePath: probe, settings: settingsStore.settings)
     }
 
     private func browse(files: Bool) {

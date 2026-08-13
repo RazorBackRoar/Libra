@@ -26,6 +26,13 @@ struct HomeView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer(minLength: 12)
+                if let last = appState.settings.lastFolder, FileManager.default.fileExists(atPath: last) {
+                    Button("Last: \((last as NSString).lastPathComponent)") {
+                        MediaOpen.reveal(last)
+                    }
+                    .buttonStyle(LibraSecondaryButtonStyle())
+                    .help(last)
+                }
                 HomeTabBar(section: $section)
             }
 
