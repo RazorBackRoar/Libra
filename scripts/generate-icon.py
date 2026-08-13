@@ -4,8 +4,9 @@
 Libra.png is a 1024x1024 RGBA export whose squircle body sits off-grid at
 ~779x777. This rescales the artwork (including its baked shadow) so the solid
 body lands at 824x824 centred at (100,100) — matching 4Charm / Looper /
-MetaBurn / Nexus / Rusty. The existing colours and shadow are preserved;
-nothing is re-graded.
+MetaBurn / Nexus / Rusty — then applies a small downward optical nudge so the
+gold lighting does not sit high next to the Applications folder in the DMG.
+The existing colours and shadow are preserved; nothing is re-graded.
 """
 from __future__ import annotations
 
@@ -23,6 +24,10 @@ ICNS_OUT = ROOT / "Sources/Libra/Resources/AppIcon.icns"
 CANVAS = 1024
 BODY = 824  # Apple's macOS grid: an 824x824 body inside a 1024 canvas.
 MARGIN = (CANVAS - BODY) // 2  # 100
+# Finder centers the 128px canvas, not the optical mass. Libra's gold lighting
+# sits high vs the Applications folder (and vs 4Charm's heavier glyph). Shift
+# the squircle down on the 1024 canvas — do not change shared DMG coordinates.
+OPTICAL_NUDGE_Y = 28
 
 
 def find_bbox(im: Image.Image, threshold: int) -> tuple[int, int, int, int]:
@@ -63,9 +68,9 @@ def master_from_source(path: Path) -> Image.Image:
     body_offset_x = (bx0 - ax0) * scale
     body_offset_y = (by0 - ay0) * scale
 
-    # Paste so the solid body lands at (MARGIN, MARGIN).
+    # Paste so the solid body lands at (MARGIN, MARGIN), then optically nudge.
     paste_x = round(MARGIN - body_offset_x)
-    paste_y = round(MARGIN - body_offset_y)
+    paste_y = round(MARGIN - body_offset_y) + OPTICAL_NUDGE_Y
 
     master = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
     master.paste(scaled, (paste_x, paste_y), scaled)

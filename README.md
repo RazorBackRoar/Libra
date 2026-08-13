@@ -47,7 +47,7 @@ Requires macOS 14+ on Apple Silicon. ffmpeg / ffprobe via Homebrew when transfor
 ## Usage
 
 1. Open **L!bra** and pick a tool from the Video tab (or use Photo to move stills out)
-2. Drop a folder or video files, or use **Last folder** / Open Folder / Select Files
+2. Drop a folder or video files, or use Open Folder / Select Files
 3. Leave **Dry Run** on to preview; turn it off to write
 4. Use **Undo last run** if a live pass wasn’t what you wanted
 5. Use the City / GPS Map pins to inspect locations; click a filename to open the video

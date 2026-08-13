@@ -53,9 +53,6 @@ final class PhotoSweepState: ObservableObject {
         panel.allowsMultipleSelection = false
         panel.prompt = "Move photos here"
         panel.message = "Choose a folder outside your video library."
-        if let last = SettingsStore.shared.settings.lastFolder {
-            panel.directoryURL = URL(fileURLWithPath: last)
-        }
         guard panel.runModal() == .OK, let dest = panel.url?.path else { return }
 
         running = true
@@ -93,9 +90,7 @@ struct PhotoSweepView: View {
                     state.startScan(paths: paths, ffprobePath: probe, settings: settingsStore.settings)
                 },
                 onBrowse: { browse(files: false) },
-                onSelectFiles: { browse(files: true) },
-                lastFolderTitle: lastFolderButtonTitle,
-                onLastFolder: lastFolderButtonTitle == nil ? nil : { scanLastFolder() }
+                onSelectFiles: { browse(files: true) }
             )
             .disabled(state.running)
 
@@ -174,18 +169,6 @@ struct PhotoSweepView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var lastFolderButtonTitle: String? {
-        guard let last = settingsStore.settings.lastFolder, FileManager.default.fileExists(atPath: last) else {
-            return nil
-        }
-        return (last as NSString).lastPathComponent
-    }
-
-    private func scanLastFolder() {
-        guard let last = settingsStore.settings.lastFolder, let probe = appState.ffprobePath else { return }
-        state.startScan(paths: [last], ffprobePath: probe, settings: settingsStore.settings)
-    }
-
     private func browse(files: Bool) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = files
@@ -193,9 +176,6 @@ struct PhotoSweepView: View {
         panel.allowsMultipleSelection = true
         if files {
             panel.allowedContentTypes = [.image, .data]
-        }
-        if let last = settingsStore.settings.lastFolder {
-            panel.directoryURL = URL(fileURLWithPath: last)
         }
         if panel.runModal() == .OK, let probe = appState.ffprobePath {
             state.startScan(

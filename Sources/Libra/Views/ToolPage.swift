@@ -48,9 +48,7 @@ struct ToolPage: View {
                         beginScan(paths)
                     },
                     onBrowse: { browse() },
-                    onSelectFiles: { selectFiles() },
-                    lastFolderTitle: lastFolderButtonTitle,
-                    onLastFolder: lastFolderButtonTitle == nil ? nil : { scanLastFolder() }
+                    onSelectFiles: { selectFiles() }
                 )
                 .disabled(state.running)
                 .opacity(state.running ? 0.6 : 1)
@@ -308,23 +306,8 @@ struct ToolPage: View {
         panel.allowsMultipleSelection = false
         panel.prompt = "Move photos here"
         panel.message = "Choose a folder outside your video library."
-        if let last = settingsStore.settings.lastFolder {
-            panel.directoryURL = URL(fileURLWithPath: last)
-        }
         guard panel.runModal() == .OK, let dest = panel.url?.path else { return }
         state.movePhotosOut(to: dest)
-    }
-
-    private var lastFolderButtonTitle: String? {
-        guard let last = settingsStore.settings.lastFolder, FileManager.default.fileExists(atPath: last) else {
-            return nil
-        }
-        return (last as NSString).lastPathComponent
-    }
-
-    private func scanLastFolder() {
-        guard !state.running, let last = settingsStore.settings.lastFolder else { return }
-        beginScan([last])
     }
 
     private func beginScan(_ paths: [String]) {
@@ -336,17 +319,9 @@ struct ToolPage: View {
         )
     }
 
-    private func configuredPanel() -> NSOpenPanel {
-        let panel = NSOpenPanel()
-        if let last = settingsStore.settings.lastFolder {
-            panel.directoryURL = URL(fileURLWithPath: last)
-        }
-        return panel
-    }
-
     private func browse() {
         guard !state.running else { return }
-        let panel = configuredPanel()
+        let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
@@ -358,7 +333,7 @@ struct ToolPage: View {
 
     private func selectFiles() {
         guard !state.running else { return }
-        let panel = configuredPanel()
+        let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true

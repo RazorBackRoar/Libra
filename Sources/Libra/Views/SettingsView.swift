@@ -25,12 +25,6 @@ struct SettingsView: View {
                 Toggle("Date folders", isOn: $store.settings.sortByDate)
                 Toggle("Camera folders", isOn: $store.settings.sortByCamera)
             }
-            Section("Last folder") {
-                Text(store.settings.lastFolder ?? "None yet")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                    .textSelection(.enabled)
-            }
         }
         .formStyle(.grouped)
         .padding()
