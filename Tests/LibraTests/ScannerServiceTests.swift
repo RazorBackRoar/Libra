@@ -17,8 +17,7 @@ final class ScannerServiceTests: XCTestCase {
         let outcome = await ScannerService.scan(
             paths: [root.path],
             extensions: ["mp4"],
-            ffprobePath: "/usr/bin/true",
-            probe: { filePath, _ in
+            probe: { filePath in
                 let name = URL(fileURLWithPath: filePath).deletingPathExtension().lastPathComponent
                 if name == failureName {
                     return Self.stubInfo(
@@ -77,8 +76,7 @@ final class ScannerServiceTests: XCTestCase {
             await ScannerService.scan(
                 paths: [root.path],
                 extensions: ["mp4"],
-                ffprobePath: "/usr/bin/true",
-                probe: { filePath, _ in
+                probe: { filePath in
                     try Task.checkCancellation()
                     return Self.stubInfo(path: filePath)
                 },

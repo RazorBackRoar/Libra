@@ -1,7 +1,7 @@
 import Foundation
 
 enum ScannerService {
-    typealias ProbeHandler = @Sendable (String, String) async throws -> VideoInfo
+    typealias ProbeHandler = @Sendable (String) async throws -> VideoInfo
     typealias ProgressHandler = @Sendable (Int, Int) async -> Void
 
     /// macOS bundle-like directories that are apps/frameworks, not media folders.
@@ -12,12 +12,11 @@ enum ScannerService {
     static func scan(
         paths: [String],
         extensions: [String],
-        ffprobePath: String,
         probe: ProbeHandler? = nil,
         progress: ProgressHandler? = nil
     ) async -> ScanOutcome {
-        let probeHandler = probe ?? { filePath, probePath in
-            try await MediaProbe.probe(filePath: filePath, ffprobePath: probePath)
+        let probeHandler = probe ?? { filePath in
+            try await MediaProbe.probe(filePath: filePath)
         }
 
         var files: [String] = []
@@ -89,7 +88,7 @@ enum ScannerService {
             }
 
             do {
-                let info = try await probeHandler(file, ffprobePath)
+                let info = try await probeHandler(file)
                 results.append(info)
             } catch is CancellationError {
                 return cancelledOutcome(

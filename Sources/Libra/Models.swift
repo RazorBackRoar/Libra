@@ -25,7 +25,7 @@ struct VideoInfo: Identifiable, Equatable {
     var longitude: Double? = nil
     var creationTime: Date?
     var error: String?
-    /// Nonfatal metadata enrichment issue (e.g. optional exiftool failure).
+    /// Nonfatal metadata issue that did not block the probe.
     var warning: String?
     var unsupported: Bool = false
 
@@ -64,16 +64,31 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
 
     var id: String { rawValue }
 
-    var title: String { rawValue }
+    var title: String {
+        switch self {
+        case .provid, .vidres, .keepName, .promax, .maxvid:
+            return "Sort & rename"
+        case .iphoneSorter: return "iPhone sort"
+        case .gps: return "GPS sort"
+        case .slomo: return "Slow motion"
+        case .oneMin: return "1-minute stamps"
+        }
+    }
+
+    /// Home Video tab destinations. The five sort modes share one card.
+    static let videoHomeTools: [Tool] = [.provid, .iphoneSorter, .gps, .slomo, .oneMin]
+
+    var isSortRenameFamily: Bool {
+        switch self {
+        case .provid, .vidres, .keepName, .promax, .maxvid: return true
+        default: return false
+        }
+    }
 
     var systemImage: String {
         switch self {
         case .iphoneSorter: return "iphone"
-        case .provid: return "text.badge.checkmark"
-        case .vidres: return "rectangle.split.3x3"
-        case .promax: return "rectangle.portrait.rotate"
-        case .maxvid: return "waveform"
-        case .keepName: return "doc.text"
+        case .provid, .vidres, .keepName, .promax, .maxvid: return "text.badge.checkmark"
         case .oneMin: return "clock.arrow.circlepath"
         case .slomo: return "slowmo"
         case .gps: return "location.circle"
@@ -82,24 +97,19 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
 
     var description: String {
         switch self {
-        case .iphoneSorter: return "Split videos into iPhone / Not iPhone folders."
-        case .provid: return "Rename videos in place with the standard filename format and optional prefix."
-        case .vidres: return "Rename and sort into resolution folders (4K, 1080p, …)."
-        case .promax: return "Rename and sort into resolution + orientation folders."
-        case .maxvid: return "Rename and sort into resolution + orientation + FPS folders."
-        case .keepName: return "Sort into resolution folders, keeping the original filename."
-        case .oneMin: return "Stamp sequential 60-second creation times (copies or in place)."
-        case .slomo: return "Write slow-motion copies into a SloMo folder."
-        case .gps: return "Sort into city folders from GPS, or No-GPS when there are no coordinates."
+        case .iphoneSorter: return "Split videos into iPhone and Not iPhone folders."
+        case .provid, .vidres, .keepName, .promax, .maxvid:
+            return "Rename files, or nest folders by resolution, orientation, and FPS."
+        case .oneMin: return "Stamp sequential 60-second creation times. Needs ffmpeg."
+        case .slomo: return "Write slowed copies into a SloMo folder. Needs ffmpeg."
+        case .gps: return "Sort into city folders from location, or No-GPS when location is missing."
         }
     }
 
     var category: String {
         switch self {
-        case .iphoneSorter, .gps:
-            return "Analyze"
-        case .provid, .vidres, .promax, .maxvid, .keepName:
-            return "Sort / Rename"
+        case .iphoneSorter, .gps, .provid, .vidres, .promax, .maxvid, .keepName:
+            return "Organize"
         case .oneMin, .slomo:
             return "Transform"
         }

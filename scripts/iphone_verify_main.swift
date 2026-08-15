@@ -2,7 +2,7 @@ import Foundation
 
 @main
 struct IPhoneVerifyMain {
-    static func main() async {
+    static func main() async throws {
         let root = CommandLine.arguments.count > 1
             ? CommandLine.arguments[1]
             : FileManager.default.temporaryDirectory.appendingPathComponent("libra-iphone-verify").path
@@ -14,9 +14,6 @@ struct IPhoneVerifyMain {
             fputs("Missing input directory at \(input)\n", stderr)
             exit(1)
         }
-
-        let ffprobe = ["/opt/homebrew/bin/ffprobe", "/usr/local/bin/ffprobe"]
-            .first { fm.isExecutableFile(atPath: $0) } ?? "ffprobe"
 
         let files = (try? fm.contentsOfDirectory(atPath: input)) ?? []
         var infos: [VideoInfo] = []
@@ -32,7 +29,7 @@ struct IPhoneVerifyMain {
                 results.append("Skipped\t\(name)\tUnsupported file type (.\(ext.isEmpty ? "?" : ext))\t")
                 continue
             }
-            let info = await MediaProbe.probe(filePath: path, ffprobePath: ffprobe)
+            let info = try await MediaProbe.probe(filePath: path)
             infos.append(info)
             print("PROBED\t\(name)\tmake=\(info.make)\tmodel=\(info.model)\tapple=\(info.hasAppleMake)\tiphone=\(info.hasiPhoneModel)\tgps=\(info.hasGPS)\terror=\(info.error ?? "")")
         }

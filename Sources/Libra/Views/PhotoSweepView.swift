@@ -14,7 +14,7 @@ final class PhotoSweepState: ObservableObject {
 
     private var task: Task<Void, Never>?
 
-    func startScan(paths: [String], ffprobePath: String, settings: AppSettings) {
+    func startScan(paths: [String], settings: AppSettings) {
         guard !running else { return }
         running = true
         recap = "Finding photos…"
@@ -26,7 +26,6 @@ final class PhotoSweepState: ObservableObject {
             let outcome = await ScannerService.scan(
                 paths: paths,
                 extensions: settings.imageExtensions,
-                ffprobePath: ffprobePath,
                 progress: { done, total in
                     await MainActor.run { self.progress = (done, total) }
                 }
@@ -73,12 +72,13 @@ final class PhotoSweepState: ObservableObject {
 
 struct PhotoSweepView: View {
     @StateObject private var state = PhotoSweepState()
-    @ObservedObject private var appState = AppState.shared
     @ObservedObject private var settingsStore = SettingsStore.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Pull stills out of a folder so they don’t sit with your videos.")
+            Text("Move photos out of video folders")
+                .font(.system(size: 15, weight: .semibold))
+            Text("Move photos out of video folders.")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
 
@@ -86,8 +86,7 @@ struct PhotoSweepView: View {
                 title: "Drop a folder",
                 subtitle: "We’ll list photos (JPG, HEIC, PNG, …) so you can move them out.",
                 onDrop: { paths in
-                    guard let probe = appState.ffprobePath else { return }
-                    state.startScan(paths: paths, ffprobePath: probe, settings: settingsStore.settings)
+                    state.startScan(paths: paths, settings: settingsStore.settings)
                 },
                 onBrowse: { browse(files: false) },
                 onSelectFiles: { browse(files: true) }
@@ -139,7 +138,7 @@ struct PhotoSweepView: View {
 
             HStack {
                 Toggle(isOn: $state.dryRun) {
-                    Text("Dry Run")
+                    Text("Preview only")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.yellow)
                 }
@@ -147,7 +146,7 @@ struct PhotoSweepView: View {
                 .tint(.yellow)
                 .disabled(state.running)
 
-                Text(state.dryRun ? "Preview only." : "Live — photos will move.")
+                Text(state.dryRun ? "Preview only — nothing will be changed." : "Live — photos will move.")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(state.dryRun ? .yellow : .orange)
 
@@ -177,10 +176,9 @@ struct PhotoSweepView: View {
         if files {
             panel.allowedContentTypes = [.image, .data]
         }
-        if panel.runModal() == .OK, let probe = appState.ffprobePath {
+        if panel.runModal() == .OK {
             state.startScan(
                 paths: panel.urls.map(\.path),
-                ffprobePath: probe,
                 settings: settingsStore.settings
             )
         }

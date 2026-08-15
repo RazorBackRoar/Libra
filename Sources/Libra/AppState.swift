@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 
 @MainActor
 final class AppState: ObservableObject {
@@ -12,8 +13,6 @@ final class AppState: ObservableObject {
     @Published var missingFfprobe = false
     @Published var depMessage: String? = nil
 
-    var missingScanTools: Bool { missingFfprobe }
-
     private init() {
         resolveDependencies()
     }
@@ -23,13 +22,9 @@ final class AppState: ObservableObject {
         ffprobePath = resolve(command: "ffprobe", override: settings.ffprobePath)
         missingFfmpeg = ffmpegPath == nil
         missingFfprobe = ffprobePath == nil
-        if missingFfprobe {
-            depMessage = "ffprobe is required to scan media. Install with: brew install ffmpeg"
-        } else if missingFfmpeg {
-            depMessage = "ffmpeg is required for Slo-Mo and 1MinVid. Install with: brew install ffmpeg"
-        } else {
-            depMessage = nil
-        }
+        depMessage = missingFfmpeg
+            ? "Needs ffmpeg to create transformed media."
+            : nil
     }
 
     private func resolve(command: String, override: String?) -> String? {
@@ -50,6 +45,19 @@ final class AppState: ObservableObject {
     }
 
     func installDependencies() {
+        let alert = NSAlert()
+        alert.messageText = "Install ffmpeg?"
+        alert.informativeText = """
+        L!bra will run Homebrew:
+
+        brew install ffmpeg
+
+        ffmpeg is only needed for Slow motion and 1-minute stamps. Organize tools do not require it.
+        """
+        alert.addButton(withTitle: "Install ffmpeg…")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
         Task {
             let brewPath = resolve(command: "brew", override: nil) ?? "/opt/homebrew/bin/brew"
             _ = try? await ProcessRunner.run(executablePath: brewPath, arguments: ["install", "ffmpeg"], timeout: 600)

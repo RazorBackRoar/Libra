@@ -12,9 +12,7 @@ final class ToolStateTests: XCTestCase {
 
         state.startScan(
             paths: ["/tmp/empty-scan"],
-            settings: .default,
-            ffmpegPath: "",
-            ffprobePath: ""
+            settings: .default
         )
 
         XCTAssertTrue(state.undoRecords.isEmpty)

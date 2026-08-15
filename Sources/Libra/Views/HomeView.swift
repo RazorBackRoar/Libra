@@ -2,15 +2,14 @@ import SwiftUI
 
 enum HomeSection: String, CaseIterable {
     case video = "Video"
-    case photo = "Photo"
+    case photos = "Photos"
 }
 
 struct HomeView: View {
     @Binding var selectedTool: Tool?
     @Binding var section: HomeSection
-    @ObservedObject private var appState = AppState.shared
 
-    private let tools = Array(Tool.allCases)
+    private let tools = Tool.videoHomeTools
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -29,19 +28,6 @@ struct HomeView: View {
                 HomeTabBar(section: $section)
             }
 
-            if appState.missingScanTools {
-                HStack {
-                    Text("ffprobe missing — scanning needs it. Install ffmpeg (includes ffprobe).")
-                        .font(.system(size: 13))
-                        .foregroundColor(.red)
-                    Button("Install") { appState.installDependencies() }
-                        .buttonStyle(LibraPrimaryButtonStyle())
-                }
-                .padding(8)
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
-            }
-
             if section == .video {
                 videoGrid
             } else {
@@ -55,11 +41,16 @@ struct HomeView: View {
 
     private var videoGrid: some View {
         Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-            ForEach(0..<3, id: \.self) { row in
+            ForEach(0..<2, id: \.self) { row in
                 GridRow {
                     ForEach(0..<3, id: \.self) { col in
-                        let tool = tools[row * 3 + col]
-                        ToolCard(tool: tool, onTap: { selectedTool = tool })
+                        let index = row * 3 + col
+                        if index < tools.count {
+                            ToolCard(tool: tools[index], onTap: { selectedTool = tools[index] })
+                        } else {
+                            Color.clear
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
                     }
                 }
             }

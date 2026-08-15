@@ -27,12 +27,12 @@ struct ToolPage: View {
             VStack(alignment: .leading, spacing: 10) {
                 header
 
-                if appState.missingFfprobe || (tool.needsFfmpeg && appState.missingFfmpeg) {
+                if tool.needsFfmpeg && appState.missingFfmpeg {
                     HStack {
-                        Text(appState.depMessage ?? "Dependencies missing.")
+                        Text(appState.depMessage ?? "Needs ffmpeg to create transformed media.")
                             .font(.system(size: 12))
                             .foregroundColor(.red)
-                        Button("Install") { appState.installDependencies() }
+                        Button("Install ffmpeg…") { appState.installDependencies() }
                             .buttonStyle(LibraPrimaryButtonStyle())
                     }
                     .padding(8)
@@ -85,7 +85,7 @@ struct ToolPage: View {
     }
 
     private var usesPrefixField: Bool {
-        tool == .provid || tool == .vidres || tool == .promax || tool == .maxvid
+        tool.isSortRenameFamily && state.filenameStyle == .libraFormat
     }
 
     private var header: some View {
@@ -149,10 +149,14 @@ struct ToolPage: View {
             GPSMapPanel(files: state.filteredFiles, startsExpanded: tool == .gps)
         }
 
-        if tool.supportsExtraFolders {
+        if tool.isSortRenameFamily {
+            sortRenameControls
+        }
+
+        if state.showsExtraFolderToggles {
             HStack(spacing: 16) {
-                Toggle("Date folders", isOn: $settingsStore.settings.sortByDate)
-                Toggle("Camera folders", isOn: $settingsStore.settings.sortByCamera)
+                Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
+                Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
             }
             .toggleStyle(.checkbox)
             .disabled(state.running)
@@ -167,9 +171,9 @@ struct ToolPage: View {
         }
 
         if tool == .slomo {
-            Picker("Factor", selection: $state.slomoFactor) {
-                Text("0.5x").tag(0.5)
-                Text("0.25x").tag(0.25)
+            Picker("Slow-down speed", selection: $state.slomoFactor) {
+                Text("Half speed (0.5x)").tag(0.5)
+                Text("Quarter speed (0.25x)").tag(0.25)
             }
             .pickerStyle(.segmented)
             .disabled(state.running)
@@ -179,16 +183,16 @@ struct ToolPage: View {
         }
 
         if tool == .oneMin {
-            Picker("Mode", selection: $state.oneMinMode) {
-                Text("Copies").tag("copies")
-                Text("In place").tag("inplace")
+            Picker("Output", selection: $state.oneMinMode) {
+                Text("New copies").tag("copies")
+                Text("Change originals").tag("inplace")
             }
             .pickerStyle(.segmented)
             .disabled(state.running)
             .onChange(of: state.oneMinMode) { _, _ in
                 state.scheduleRerunAfterOptionsChange()
             }
-            DatePicker("Start time", selection: $state.oneMinStart)
+            DatePicker("First timestamp", selection: $state.oneMinStart)
                 .disabled(state.running)
                 .onChange(of: state.oneMinStart) { _, _ in
                     state.scheduleRerunAfterOptionsChange()
@@ -204,6 +208,50 @@ struct ToolPage: View {
 
         ResultsTable(files: state.filteredFiles, results: state.results)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private var sortRenameControls: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Picker("Filename", selection: $state.filenameStyle) {
+                ForEach(FilenameStyle.allCases) { style in
+                    Text(style.label).tag(style)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: 280)
+            .disabled(state.running)
+            .onChange(of: state.filenameStyle) { _, _ in
+                state.scheduleRerunAfterOptionsChange()
+            }
+
+            Picker("Folders", selection: $state.folderDepth) {
+                ForEach(FolderDepth.allCases) { depth in
+                    Text(depth.label).tag(depth)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: 320)
+            .disabled(state.running)
+            .onChange(of: state.folderDepth) { _, _ in
+                state.scheduleRerunAfterOptionsChange()
+            }
+        }
+
+        if state.filenameStyle == .libraFormat {
+            Text("Example: \(libraFormatExample)")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+        }
+        Text(state.folderDepth.detail)
+            .font(.system(size: 11))
+            .foregroundColor(.secondary)
+    }
+
+    private var libraFormatExample: String {
+        let prefix = state.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+        let stem = prefix.isEmpty ? "katie" : prefix
+        return "\(stem) 720p W30 002.mp4"
     }
 
     @ViewBuilder
@@ -266,7 +314,7 @@ struct ToolPage: View {
 
             HStack {
                 Toggle(isOn: $state.dryRun) {
-                    Text("Dry Run")
+                    Text("Preview only")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.yellow)
                 }
@@ -277,7 +325,7 @@ struct ToolPage: View {
                     state.scheduleRerunAfterOptionsChange()
                 }
 
-                Text(state.dryRun ? "Preview only — nothing will be moved." : "Live — files will be renamed or moved.")
+                Text(state.previewLiveCaption)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(state.dryRun ? .yellow : .orange)
 
@@ -313,9 +361,7 @@ struct ToolPage: View {
     private func beginScan(_ paths: [String]) {
         state.startScan(
             paths: paths,
-            settings: settingsStore.settings,
-            ffmpegPath: appState.ffmpegPath ?? "",
-            ffprobePath: appState.ffprobePath ?? ""
+            settings: settingsStore.settings
         )
     }
 

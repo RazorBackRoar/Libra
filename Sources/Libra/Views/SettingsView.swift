@@ -3,27 +3,28 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject private var store = SettingsStore.shared
     @State private var ffmpegPath: String = ""
-    @State private var ffprobePath: String = ""
     @State private var extensions: String = ""
     @State private var defaultPrefix: String = ""
 
     var body: some View {
         Form {
-            Section("ffmpeg / ffprobe") {
+            Section("Media tools (ffmpeg)") {
+                Text("Needed only for Slow motion and 1-minute stamps. Organize tools scan with built-in macOS media APIs.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
                 TextField("ffmpeg path", text: $ffmpegPath)
-                TextField("ffprobe path", text: $ffprobePath)
-                Button("Auto-detect from Homebrew") {
+                Button("Find Homebrew installs") {
                     detect()
                 }
             }
-            Section("File Extensions") {
+            Section("Video extensions") {
                 TextField("mp4, mov, m4v, …", text: $extensions)
             }
             Section("Defaults") {
-                Toggle("Dry-run by default", isOn: $store.settings.dryRunDefault)
+                Toggle("Preview only by default", isOn: $store.settings.dryRunDefault)
                 TextField("Default prefix", text: $defaultPrefix)
-                Toggle("Date folders", isOn: $store.settings.sortByDate)
-                Toggle("Camera folders", isOn: $store.settings.sortByCamera)
+                Toggle("Also sort by date", isOn: $store.settings.sortByDate)
+                Toggle("Also sort by camera", isOn: $store.settings.sortByCamera)
             }
         }
         .formStyle(.grouped)
@@ -31,12 +32,10 @@ struct SettingsView: View {
         .frame(width: 460, height: 420)
         .onAppear {
             ffmpegPath = store.settings.ffmpegPath ?? ""
-            ffprobePath = store.settings.ffprobePath ?? ""
             extensions = store.settings.videoExtensions.joined(separator: ", ")
             defaultPrefix = store.settings.defaultPrefix
         }
         .onChange(of: ffmpegPath) { update() }
-        .onChange(of: ffprobePath) { update() }
         .onChange(of: extensions) { update() }
         .onChange(of: defaultPrefix) { update() }
         .onChange(of: store.settings.dryRunDefault) { store.save() }
@@ -47,14 +46,11 @@ struct SettingsView: View {
     private func detect() {
         let candidates = [
             "/opt/homebrew/bin/ffmpeg",
-            "/usr/local/bin/ffmpeg",
-            "/opt/homebrew/bin/ffprobe",
-            "/usr/local/bin/ffprobe"
+            "/usr/local/bin/ffmpeg"
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
-                if path.contains("ffmpeg") { ffmpegPath = path }
-                if path.contains("ffprobe") { ffprobePath = path }
+                ffmpegPath = path
             }
         }
     }
@@ -62,7 +58,6 @@ struct SettingsView: View {
     private func update() {
         store.update { settings in
             settings.ffmpegPath = ffmpegPath.isEmpty ? nil : ffmpegPath
-            settings.ffprobePath = ffprobePath.isEmpty ? nil : ffprobePath
             settings.videoExtensions = extensions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
             settings.defaultPrefix = defaultPrefix
         }

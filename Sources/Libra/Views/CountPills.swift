@@ -27,11 +27,12 @@ enum MediaBrowserFilter: Hashable, Identifiable {
         switch self {
         case .all: return "All Files"
         case .resolution(let label): return label
-        case .gps: return "GPS"
-        case .appleMake: return "Apple"
-        case .iPhoneModel, .appleDevice: return "iPhone"
-        case .both: return "Both"
-        case .duplicates: return "Duplicates"
+        case .gps: return "Has location"
+        case .appleMake: return "Apple make"
+        case .iPhoneModel: return "iPhone model"
+        case .appleDevice: return "Apple device"
+        case .both: return "Apple make + iPhone model"
+        case .duplicates: return "Likely duplicates"
         }
     }
 
@@ -67,9 +68,9 @@ struct CountPills: View {
             HStack(spacing: 8) {
                 pill(filter: .all, label: "Files", value: files.count)
                 if tool == .iphoneSorter {
-                    pill(filter: .appleMake, label: "Apple", value: files.filter { $0.hasAppleMake }.count)
-                    pill(filter: .iPhoneModel, label: "iPhone", value: files.filter { $0.hasiPhoneModel }.count)
-                    pill(filter: .both, label: "Both", value: files.filter { $0.hasAppleMake && $0.hasiPhoneModel }.count)
+                    pill(filter: .appleMake, label: "Apple make", value: files.filter { $0.hasAppleMake }.count)
+                    pill(filter: .iPhoneModel, label: "iPhone model", value: files.filter { $0.hasiPhoneModel }.count)
+                    pill(filter: .both, label: "Apple make + iPhone model", value: files.filter { $0.hasAppleMake && $0.hasiPhoneModel }.count)
                 } else {
                     ForEach(VideoInfo.resolutionClasses, id: \.self) { label in
                         pill(
@@ -78,11 +79,11 @@ struct CountPills: View {
                             value: files.filter { $0.resolutionClass == label }.count
                         )
                     }
-                    pill(filter: .gps, label: "GPS", value: files.filter { $0.hasGPS }.count)
-                    pill(filter: .appleDevice, label: "iPhone", value: files.filter { $0.isApple }.count)
+                    pill(filter: .gps, label: "Has location", value: files.filter { $0.hasGPS }.count)
+                    pill(filter: .appleDevice, label: "Apple device", value: files.filter { $0.isApple }.count)
                     pill(
                         filter: .duplicates,
-                        label: "Duplicates",
+                        label: "Likely duplicates",
                         value: DuplicateDetector.extraCount(in: files)
                     )
                 }

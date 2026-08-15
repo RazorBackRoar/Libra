@@ -1,6 +1,7 @@
+import AVFoundation
+import CoreMedia
 import Foundation
 import ImageIO
-import UniformTypeIdentifiers
 
 enum DeviceMetadata {
     static func hasAppleMake(in values: [String]) -> Bool {
@@ -42,7 +43,8 @@ enum DeviceMetadata {
 }
 
 enum MediaProbe {
-    static func probe(filePath: String, ffprobePath: String) async throws -> VideoInfo {
+    static func probe(filePath: String) async throws -> VideoInfo {
+        try Task.checkCancellation()
         let url = URL(fileURLWithPath: filePath)
         let name = url.deletingPathExtension().lastPathComponent
         let dir = url.deletingLastPathComponent().path
@@ -56,79 +58,202 @@ enum MediaProbe {
 
         let imageExts = Set(AppSettings.default.imageExtensions)
         if imageExts.contains(ext) {
-            var info = probeImage(filePath: filePath, name: name, dir: dir, ext: ext, size: size)
-            info = try await enrichWithExiftool(path: filePath, existing: info)
-            return info
+            return probeImage(filePath: filePath, name: name, dir: dir, ext: ext, size: size)
         }
-        return try await probeVideo(
+        return try await probeVideoWithTimeout(
             filePath: filePath,
+            url: url,
             name: name,
             dir: dir,
             ext: ext,
-            size: size,
-            ffprobePath: ffprobePath
+            size: size
         )
+    }
+
+    private static func probeVideoWithTimeout(
+        filePath: String,
+        url: URL,
+        name: String,
+        dir: String,
+        ext: String,
+        size: Int64
+    ) async throws -> VideoInfo {
+        try await withThrowingTaskGroup(of: VideoInfo.self) { group in
+            group.addTask {
+                try await probeVideo(
+                    filePath: filePath,
+                    url: url,
+                    name: name,
+                    dir: dir,
+                    ext: ext,
+                    size: size
+                )
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+                throw ProbeFailure.timedOut
+            }
+            do {
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            } catch is CancellationError {
+                group.cancelAll()
+                throw CancellationError()
+            } catch ProbeFailure.timedOut {
+                group.cancelAll()
+                return failedVideoInfo(
+                    filePath: filePath,
+                    name: name,
+                    dir: dir,
+                    ext: ext,
+                    size: size,
+                    error: "Metadata probe timed out"
+                )
+            } catch {
+                group.cancelAll()
+                return failedVideoInfo(
+                    filePath: filePath,
+                    name: name,
+                    dir: dir,
+                    ext: ext,
+                    size: size,
+                    error: "Could not read video metadata"
+                )
+            }
+        }
     }
 
     private static func probeVideo(
         filePath: String,
+        url: URL,
         name: String,
         dir: String,
         ext: String,
-        size: Int64,
-        ffprobePath: String
+        size: Int64
     ) async throws -> VideoInfo {
         do {
-            let json = try await runFfprobe(filePath: filePath, ffprobePath: ffprobePath)
+            try Task.checkCancellation()
+            let asset = AVURLAsset(url: url)
+            let tracks = try await asset.loadTracks(withMediaType: .video)
+            guard let track = tracks.first else {
+                return failedVideoInfo(
+                    filePath: filePath,
+                    name: name,
+                    dir: dir,
+                    ext: ext,
+                    size: size,
+                    error: "Could not read video metadata"
+                )
+            }
 
-            let format = json["format"] as? [String: Any] ?? [:]
-            let streams = json["streams"] as? [[String: Any]] ?? []
-            let videoStream = streams.first { ($0["codec_type"] as? String) == "video" } ?? [:]
+            let naturalSize = try await track.load(.naturalSize)
+            let transform = try await track.load(.preferredTransform)
+            let displayed = MediaClassification.displayedSize(
+                naturalWidth: naturalSize.width,
+                naturalHeight: naturalSize.height,
+                transform: transform
+            )
+            let fps = Double(try await track.load(.nominalFrameRate))
+            let duration = try await asset.load(.duration)
+            let durationSec = duration.isNumeric ? CMTimeGetSeconds(duration) : 0
+            let formatDescriptions = try await track.load(.formatDescriptions)
+            let codec = codecName(from: formatDescriptions.first)
 
-            let props = extractVideoProperties(format: format, videoStream: videoStream)
-            let meta = extractVideoMetadata(format: format, videoStream: videoStream)
+            var makeValues: [String] = []
+            var modelValues: [String] = []
+            var locationStrings: [String] = []
+            var creation: Date?
 
-            var info = VideoInfo(
+            let metadataGroups = try await loadMetadata(from: asset)
+            for item in metadataGroups {
+                try Task.checkCancellation()
+                let identifier = item.identifier?.rawValue.lowercased() ?? ""
+                let common = item.commonKey?.rawValue.lowercased() ?? ""
+                let string = await metadataString(item)
+                let date = await metadataDate(item)
+
+                if creation == nil, let date {
+                    creation = date
+                } else if creation == nil, identifier.contains("creation") || common.contains("creation") {
+                    creation = parseDate(string)
+                }
+
+                if !string.isEmpty {
+                    if identifier.contains("make") || common == "make" || identifier.hasSuffix(".make") {
+                        makeValues.append(string)
+                    }
+                    if identifier.contains("model") || common == "model" {
+                        modelValues.append(string)
+                    }
+                    if identifier.contains("location") || identifier.contains("iso6709") || common.contains("location") {
+                        locationStrings.append(string)
+                    }
+                }
+            }
+
+            if let make = await metadataString(metadataGroups, identifier: .quickTimeMetadataMake) {
+                makeValues.insert(make, at: 0)
+            }
+            if let model = await metadataString(metadataGroups, identifier: .quickTimeMetadataModel) {
+                modelValues.insert(model, at: 0)
+            }
+            if let loc = await metadataString(metadataGroups, identifier: .quickTimeMetadataLocationISO6709) {
+                locationStrings.insert(loc, at: 0)
+            }
+            if creation == nil {
+                creation = await metadataDate(metadataGroups, identifier: .commonIdentifierCreationDate)
+            }
+            if creation == nil {
+                creation = await metadataDate(metadataGroups, identifier: .quickTimeMetadataCreationDate)
+            }
+
+            var latitude: Double?
+            var longitude: Double?
+            for raw in locationStrings {
+                if let coords = GPSCoordinateParser.parseISO6709(raw) {
+                    latitude = coords.latitude
+                    longitude = coords.longitude
+                    break
+                }
+            }
+
+            if creation == nil {
+                creation = fileSystemCreationDate(filePath)
+            }
+
+            let make = preferredValue(makeValues)
+            let model = preferredValue(modelValues)
+            let hasAppleMake = DeviceMetadata.hasAppleMake(in: makeValues)
+            let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues + makeValues)
+
+            return VideoInfo(
                 path: filePath,
                 name: name,
                 dir: dir,
                 ext: ext,
                 sizeBytes: size,
-                width: props.width,
-                height: props.height,
-                resolutionClass: resolutionClass(width: props.width, height: props.height),
-                orientation: orientation(width: props.width, height: props.height),
-                fps: props.fps,
-                durationSec: props.duration,
-                codec: props.codec,
-                container: props.container,
-                make: meta.make,
-                model: meta.model,
-                hasAppleMake: meta.hasAppleMake,
-                hasiPhoneModel: meta.hasiPhoneModel,
-                hasGPS: meta.hasGPS || meta.latitude != nil,
-                latitude: meta.latitude,
-                longitude: meta.longitude,
-                creationTime: meta.creationTime,
+                width: displayed.width,
+                height: displayed.height,
+                resolutionClass: MediaClassification.resolutionClass(width: displayed.width, height: displayed.height),
+                orientation: MediaClassification.orientation(width: displayed.width, height: displayed.height),
+                fps: fps,
+                durationSec: durationSec.isFinite ? durationSec : 0,
+                codec: codec,
+                container: ext,
+                make: make,
+                model: model,
+                hasAppleMake: hasAppleMake,
+                hasiPhoneModel: hasiPhoneModel,
+                hasGPS: latitude != nil,
+                latitude: latitude,
+                longitude: longitude,
+                creationTime: creation,
                 error: nil,
                 warning: nil
             )
-
-            info = try await enrichWithExiftool(path: filePath, existing: info)
-            return info
         } catch is CancellationError {
             throw CancellationError()
-        } catch ProcessRunnerError.cancelled {
-            throw ProcessRunnerError.cancelled
-        } catch ProcessRunnerError.timeout {
-            return failedVideoInfo(
-                filePath: filePath,
-                name: name,
-                dir: dir,
-                ext: ext,
-                size: size,
-                error: "Metadata probe timed out"
-            )
         } catch {
             return failedVideoInfo(
                 filePath: filePath,
@@ -141,69 +266,69 @@ enum MediaProbe {
         }
     }
 
-    private static func runFfprobe(filePath: String, ffprobePath: String) async throws -> [String: Any] {
-        let args = [
-            "-v", "quiet",
-            "-print_format", "json",
-            "-show_format",
-            "-show_streams",
-            filePath
+    private static func loadMetadata(from asset: AVURLAsset) async throws -> [AVMetadataItem] {
+        var items: [AVMetadataItem] = []
+        items.append(contentsOf: (try? await asset.load(.metadata)) ?? [])
+        items.append(contentsOf: (try? await asset.loadMetadata(for: .quickTimeMetadata)) ?? [])
+        items.append(contentsOf: (try? await asset.loadMetadata(for: .iTunesMetadata)) ?? [])
+        items.append(contentsOf: (try? await asset.loadMetadata(for: .isoUserData)) ?? [])
+        return items
+    }
+
+    private static func metadataString(_ items: [AVMetadataItem], identifier: AVMetadataIdentifier) async -> String? {
+        let matches = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: identifier)
+        for item in matches {
+            let value = await metadataString(item)
+            if !value.isEmpty { return value }
+        }
+        return nil
+    }
+
+    private static func metadataDate(_ items: [AVMetadataItem], identifier: AVMetadataIdentifier) async -> Date? {
+        let matches = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: identifier)
+        for item in matches {
+            if let date = await metadataDate(item) { return date }
+        }
+        return nil
+    }
+
+    private static func metadataString(_ item: AVMetadataItem) async -> String {
+        (try? await item.load(.stringValue)) ?? ""
+    }
+
+    private static func metadataDate(_ item: AVMetadataItem) async -> Date? {
+        if let loaded = try? await item.load(.dateValue) {
+            return loaded
+        }
+        let string = await metadataString(item)
+        if !string.isEmpty {
+            return parseDate(string)
+        }
+        return nil
+    }
+
+    private static func codecName(from description: CMFormatDescription?) -> String {
+        guard let description else { return "" }
+        let fourCC = CMFormatDescriptionGetMediaSubType(description)
+        let raw = fourCCString(fourCC).lowercased()
+        switch raw {
+        case "avc1", "avc3": return "h264"
+        case "hvc1", "hev1": return "hevc"
+        case "mp4v": return "mpeg4"
+        case "vp09": return "vp9"
+        case "av01": return "av1"
+        default: return raw
+        }
+    }
+
+    private static func fourCCString(_ value: FourCharCode) -> String {
+        let bytes: [UInt8] = [
+            UInt8((value >> 24) & 0xff),
+            UInt8((value >> 16) & 0xff),
+            UInt8((value >> 8) & 0xff),
+            UInt8(value & 0xff)
         ]
-        let output = try await ProcessRunner.run(executablePath: ffprobePath, arguments: args, timeout: 30)
-        guard output.exitCode == 0 else {
-            throw ProbeFailure.ffprobeFailed
-        }
-        return try JSONSerialization.jsonObject(with: output.stdout.data(using: .utf8) ?? Data()) as? [String: Any] ?? [:]
-    }
-
-    private static func extractVideoProperties(
-        format: [String: Any],
-        videoStream: [String: Any]
-    ) -> (width: Int, height: Int, duration: Double, fps: Double, codec: String, container: String) {
-        let width = parseInt(videoStream["width"])
-        let height = parseInt(videoStream["height"])
-        let duration = parseDouble(format["duration"] as? String) ?? parseDouble(videoStream["duration"] as? String) ?? 0
-        let fps = parseFps(videoStream["r_frame_rate"] as? String)
-        let codec = videoStream["codec_name"] as? String ?? ""
-        let container = format["format_name"] as? String ?? ""
-        return (width, height, duration, fps, codec, container)
-    }
-
-    private static func extractVideoMetadata(
-        format: [String: Any],
-        videoStream: [String: Any]
-    ) -> (
-        make: String,
-        model: String,
-        hasAppleMake: Bool,
-        hasiPhoneModel: Bool,
-        hasGPS: Bool,
-        latitude: Double?,
-        longitude: Double?,
-        creationTime: Date?
-    ) {
-        let tags = videoStream["tags"] as? [String: Any] ?? [:]
-        let formatTags = format["tags"] as? [String: Any] ?? [:]
-        let mergedTags = tags.merging(formatTags) { current, _ in current }
-
-        let makeValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.makeKeys)
-        let modelValues = DeviceMetadata.collectStringValues(from: mergedTags, keys: DeviceMetadata.modelKeys)
-        let allMake = makeValues + stringValues(matching: mergedTags) { $0.lowercased().contains("make") }
-        let allModel = modelValues + stringValues(matching: mergedTags) { key in
-            let lower = key.lowercased()
-            return lower.contains("model") && !lower.contains("make")
-        }
-
-        let make = preferredValue(allMake)
-        let model = preferredValue(allModel)
-        let hasAppleMake = DeviceMetadata.hasAppleMake(in: allMake)
-        let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: allModel + allMake)
-        let creation = parseDate(tags["creation_time"] as? String) ?? parseDate(formatTags["creation_time"] as? String)
-        let coords = GPSCoordinateParser.coordinates(fromFfprobeTags: mergedTags)
-        let hasGPS = coords != nil
-            || mergedTags.keys.contains { $0.lowercased().contains("location") || $0.lowercased().contains("gps") }
-
-        return (make, model, hasAppleMake, hasiPhoneModel, hasGPS, coords?.latitude, coords?.longitude, creation)
+        return String(bytes: bytes, encoding: .ascii)?.trimmingCharacters(in: .whitespaces) ?? ""
     }
 
     private static func failedVideoInfo(
@@ -262,7 +387,7 @@ enum MediaProbe {
                 hasAppleMake: false,
                 hasiPhoneModel: false,
                 hasGPS: false,
-                creationTime: nil,
+                creationTime: fileSystemCreationDate(filePath),
                 error: message,
                 warning: nil
             )
@@ -310,7 +435,6 @@ enum MediaProbe {
         let model = preferredValue(modelValues)
         let hasAppleMake = DeviceMetadata.hasAppleMake(in: makeValues)
         let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues)
-        let hasGPS = latitude != nil
 
         return VideoInfo(
             path: filePath,
@@ -320,8 +444,8 @@ enum MediaProbe {
             sizeBytes: size,
             width: pixelWidth,
             height: pixelHeight,
-            resolutionClass: resolutionClass(width: pixelWidth, height: pixelHeight),
-            orientation: orientation(width: pixelWidth, height: pixelHeight),
+            resolutionClass: MediaClassification.resolutionClass(width: pixelWidth, height: pixelHeight),
+            orientation: MediaClassification.orientation(width: pixelWidth, height: pixelHeight),
             fps: 0,
             durationSec: 0,
             codec: "",
@@ -330,81 +454,36 @@ enum MediaProbe {
             model: model,
             hasAppleMake: hasAppleMake,
             hasiPhoneModel: hasiPhoneModel,
-            hasGPS: hasGPS,
+            hasGPS: latitude != nil,
             latitude: latitude,
             longitude: longitude,
-            creationTime: nil,
+            creationTime: imageCreationDate(properties: properties, filePath: filePath),
             error: nil,
             warning: nil
         )
     }
 
-    private static func enrichWithExiftool(path: String, existing: VideoInfo) async throws -> VideoInfo {
-        let candidates = ["/opt/homebrew/bin/exiftool", "/usr/local/bin/exiftool"]
-        guard let exiftool = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-            return existing
+    private static func imageCreationDate(properties: [String: Any], filePath: String) -> Date? {
+        if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+           let raw = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
+           let date = parseExifDate(raw) {
+            return date
         }
-        do {
-            let output = try await ProcessRunner.run(
-                executablePath: exiftool,
-                arguments: [
-                    "-json", "-n",
-                    "-Make", "-Model", "-DeviceModelName", "-CameraModelName",
-                    "-GPSLatitude", "-GPSLongitude",
-                    path
-                ],
-                timeout: 30
-            )
-            guard output.exitCode == 0,
-                  let data = output.stdout.data(using: .utf8),
-                  let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
-                  let first = array.first else {
-                var info = existing
-                if info.warning == nil {
-                    info.warning = "Optional metadata enrichment unavailable"
-                }
-                return info
-            }
-            var info = existing
-            let make = (first["Make"] as? String) ?? info.make
-            let model = (first["Model"] as? String)
-                ?? (first["DeviceModelName"] as? String)
-                ?? (first["CameraModelName"] as? String)
-                ?? info.model
-            let makeValues = [make, info.make].filter { !$0.isEmpty }
-            let modelValues = [model, info.model].filter { !$0.isEmpty }
-            info.make = preferredValue(makeValues)
-            info.model = preferredValue(modelValues)
-            info.hasAppleMake = DeviceMetadata.hasAppleMake(in: makeValues)
-            info.hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues)
-            if let coords = GPSCoordinateParser.coordinates(fromExiftool: first) {
-                info.latitude = coords.latitude
-                info.longitude = coords.longitude
-                info.hasGPS = true
-            } else if first["GPSLatitude"] != nil {
-                info.hasGPS = true
-            }
-            return info
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch ProcessRunnerError.cancelled {
-            throw ProcessRunnerError.cancelled
-        } catch {
-            var info = existing
-            info.warning = "Optional metadata enrichment unavailable"
-            return info
+        if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any],
+           let raw = tiff[kCGImagePropertyTIFFDateTime as String] as? String,
+           let date = parseExifDate(raw) {
+            return date
         }
+        return fileSystemCreationDate(filePath)
+    }
+
+    private static func fileSystemCreationDate(_ path: String) -> Date? {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+        return attrs?[.creationDate] as? Date
     }
 
     private static func preferredValue(_ values: [String]) -> String {
         values.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? ""
-    }
-
-    private static func stringValues(matching tags: [String: Any], where predicate: (String) -> Bool) -> [String] {
-        tags.compactMap { key, value in
-            guard predicate(key), let string = value as? String, !string.isEmpty else { return nil }
-            return string
-        }
     }
 
     private static func parseInt(_ value: Any?) -> Int {
@@ -414,46 +493,25 @@ enum MediaProbe {
         return 0
     }
 
-    private static func parseDouble(_ value: String?) -> Double? {
-        guard let value = value else { return nil }
-        return Double(value)
+    private static func parseDate(_ value: String) -> Date? {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: value) { return date }
+        iso.formatOptions = [.withInternetDateTime]
+        if let date = iso.date(from: value) { return date }
+        return parseExifDate(value)
     }
 
-    private static func parseFps(_ value: String?) -> Double {
-        guard let value = value, value.contains("/") else { return 0 }
-        let parts = value.split(separator: "/")
-        guard parts.count == 2,
-              let n = Double(parts[0]),
-              let d = Double(parts[1]), d != 0 else { return 0 }
-        return n / d
-    }
-
-    private static func parseDate(_ value: String?) -> Date? {
-        guard let value = value else { return nil }
-        let formatter = ISO8601DateFormatter()
-        return formatter.date(from: value)
-    }
-
-    /// Six-tier buckets from the L!bra contract. First match wins on `long = max(w, h)`:
-    /// 4K (≥3840) → 1080p (±2 of 1920) → 720p (±2 of 1280) → FHD (>1920) → HD (>720) → SD.
-    private static func resolutionClass(width: Int, height: Int) -> String {
-        guard width > 0, height > 0 else { return "Unknown" }
-        let long = max(width, height)
-        if long >= 3840 { return "4K" }
-        if abs(long - 1920) <= 2 { return "1080p" }
-        if abs(long - 1280) <= 2 { return "720p" }
-        if long > 1920 { return "FHD" }
-        if long > 720 { return "HD" }
-        return "SD"
-    }
-
-    private static func orientation(width: Int, height: Int) -> String {
-        if width > height { return "landscape" }
-        if height > width { return "portrait" }
-        return "square"
+    private static func parseExifDate(_ raw: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        if let date = formatter.date(from: raw) { return date }
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: raw)
     }
 
     private enum ProbeFailure: Error {
-        case ffprobeFailed
+        case timedOut
     }
 }

@@ -21,6 +21,8 @@ final class ToolState: ObservableObject {
     @Published var slomoFactor: Double = 0.5
     @Published var oneMinStart: Date = Date()
     @Published var oneMinMode: String = "copies"
+    @Published var filenameStyle: FilenameStyle
+    @Published var folderDepth: FolderDepth
 
     private var activeTask: Task<Void, Never>?
     private var rerunTask: Task<Void, Never>?
@@ -28,18 +30,39 @@ final class ToolState: ObservableObject {
 
     var canUndo: Bool { !undoRecords.isEmpty && !running }
 
+    var showsExtraFolderToggles: Bool {
+        if tool == .gps { return true }
+        return tool.isSortRenameFamily && folderDepth != .none
+    }
+
+    var previewLiveCaption: String {
+        if dryRun { return "Preview only — nothing will be changed." }
+        switch tool {
+        case .slomo:
+            return "Live — new slowed copies will be written."
+        case .oneMin:
+            return oneMinMode == "copies"
+                ? "Live — new timestamped copies will be written."
+                : "Live — originals will be changed."
+        default:
+            return "Live — files will be renamed, moved, or copied."
+        }
+    }
+
     init(tool: Tool) {
         self.tool = tool
+        self.filenameStyle = OrganizeLayout.filenameStyle(for: tool)
+        self.folderDepth = OrganizeLayout.folderDepth(for: tool)
         let settings = SettingsStore.shared.settings
         self.dryRun = settings.dryRunDefault
-        if usesPrefixField {
+        if tool.isSortRenameFamily, filenameStyle == .libraFormat {
             self.prefix = settings.defaultPrefix
         }
     }
 
     var filteredFiles: [VideoInfo] { files }
 
-    func startScan(paths: [String], settings: AppSettings, ffmpegPath: String, ffprobePath: String) {
+    func startScan(paths: [String], settings: AppSettings) {
         guard !running else { return }
         rerunTask?.cancel()
         running = true
@@ -55,7 +78,7 @@ final class ToolState: ObservableObject {
 
         activeTask = Task { [weak self] in
             guard let self else { return }
-            let shouldContinue = await self.performScan(paths: paths, settings: settings, ffprobePath: ffprobePath)
+            let shouldContinue = await self.performScan(paths: paths, settings: settings)
             guard shouldContinue else {
                 self.finishIdle()
                 return
@@ -64,14 +87,10 @@ final class ToolState: ObservableObject {
         }
     }
 
-    func startRun(settings: AppSettings, ffmpegPath: String?, ffprobePath: String?) {
+    func startRun(settings: AppSettings, ffmpegPath: String?) {
         guard !running else { return }
-        guard AppState.shared.ffprobePath != nil || ffprobePath != nil else {
-            message = "ffprobe is required to scan media."
-            return
-        }
         if tool.needsFfmpeg, (ffmpegPath ?? AppState.shared.ffmpegPath) == nil {
-            message = "ffmpeg is required for \(tool.title)."
+            message = "Needs ffmpeg to create transformed media."
             return
         }
 
@@ -88,7 +107,7 @@ final class ToolState: ObservableObject {
         }
     }
 
-    /// Re-process after Prefix / Dry Run / tool options change (debounced).
+    /// Re-process after Prefix / Preview / tool options change (debounced).
     /// Live writes never auto-re-run — scan paths go stale after moves/copies.
     func scheduleRerunAfterOptionsChange() {
         guard !files.isEmpty, !running, dryRun else { return }
@@ -98,8 +117,7 @@ final class ToolState: ObservableObject {
             guard let self, !Task.isCancelled else { return }
             self.startRun(
                 settings: AppState.shared.settings,
-                ffmpegPath: AppState.shared.ffmpegPath,
-                ffprobePath: AppState.shared.ffprobePath
+                ffmpegPath: AppState.shared.ffmpegPath
             )
         }
     }
@@ -162,7 +180,7 @@ final class ToolState: ObservableObject {
             return
         }
         if tool.needsFfmpeg, AppState.shared.ffmpegPath == nil {
-            message = "ffmpeg is required for \(tool.title)."
+            message = "Needs ffmpeg to create transformed media."
             finishIdle()
             return
         }
@@ -178,14 +196,13 @@ final class ToolState: ObservableObject {
     }
 
     /// Returns `true` when the tool should auto-process after this scan.
-    private func performScan(paths: [String], settings: AppSettings, ffprobePath: String) async -> Bool {
+    private func performScan(paths: [String], settings: AppSettings) async -> Bool {
         let imageExts = Set(settings.imageExtensions.map { $0.lowercased() })
         let exts = Array(Set(settings.videoExtensions + settings.imageExtensions))
 
         let outcome = await ScannerService.scan(
             paths: paths,
             extensions: exts,
-            ffprobePath: ffprobePath,
             progress: { done, total in
                 await MainActor.run {
                     self.progress = (done, total)
@@ -248,10 +265,12 @@ final class ToolState: ObservableObject {
         progress = (0, target.count)
 
         switch tool {
-        case .vidres, .promax, .maxvid, .keepName:
-            await sort(target: target)
-        case .provid:
-            await rename(target: target, prefix: prefix)
+        case .provid, .vidres, .promax, .maxvid, .keepName:
+            if folderDepth == .none {
+                await rename(target: target, prefix: namingPrefix())
+            } else {
+                await sort(target: target)
+            }
         case .gps:
             await gpsSort(target: target)
         case .iphoneSorter:
@@ -296,12 +315,7 @@ final class ToolState: ObservableObject {
     }
 
     private var usesPrefixField: Bool {
-        switch tool {
-        case .provid, .vidres, .promax, .maxvid:
-            return true
-        case .keepName, .iphoneSorter, .oneMin, .slomo, .gps:
-            return false
-        }
+        tool.isSortRenameFamily && filenameStyle == .libraFormat
     }
 
     private func namingPrefix() -> String {
@@ -341,7 +355,7 @@ final class ToolState: ObservableObject {
             }
             index += 1
             let folder = destinationFolder(for: file, duplicateExtra: extras.contains(file.path))
-            let filename = tool == .keepName
+            let filename = filenameStyle == .keepOriginal
                 ? keepNameFileName(for: file)
                 : FileNaming.standardFileName(
                     for: file,
@@ -375,12 +389,14 @@ final class ToolState: ObservableObject {
                 continue
             }
             index += 1
-            let filename = FileNaming.standardFileName(
-                for: file,
-                prefix: prefix,
-                index: index,
-                padWidth: padWidth
-            )
+            let filename = filenameStyle == .keepOriginal
+                ? keepNameFileName(for: file)
+                : FileNaming.standardFileName(
+                    for: file,
+                    prefix: prefix,
+                    index: index,
+                    padWidth: padWidth
+                )
             let dest = FileOps.uniquePath(
                 for: (file.dir as NSString).appendingPathComponent(filename),
                 reserved: reserved
@@ -648,22 +664,15 @@ final class ToolState: ObservableObject {
         }
         if let gpsCity {
             parts.append(gpsCity)
-        } else {
-            switch tool {
-            case .vidres, .keepName:
-                parts.append(file.resolutionClass)
-            case .promax:
-                parts.append(file.resolutionClass)
-                parts.append(file.orientation.capitalized)
-            case .maxvid:
-                parts.append(file.resolutionClass)
-                parts.append(file.orientation.capitalized)
-                parts.append("\(FileNaming.fpsBucket(file.fps))fps")
-            case .iphoneSorter, .provid, .oneMin, .slomo, .gps:
-                break
-            }
+        } else if tool.isSortRenameFamily {
+            parts.append(contentsOf: OrganizeLayout.folderComponents(
+                depth: folderDepth,
+                resolutionClass: file.resolutionClass,
+                orientation: file.orientation,
+                fpsBucket: FileNaming.fpsBucket(file.fps)
+            ))
         }
-        if tool.supportsExtraFolders {
+        if showsExtraFolderToggles {
             parts.append(contentsOf: extraFolderParts(for: file))
         }
         return parts.reduce(file.dir) { ($0 as NSString).appendingPathComponent($1) }
