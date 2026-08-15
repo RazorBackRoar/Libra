@@ -92,9 +92,12 @@ Jules reads this repository-root `AGENTS.md` when it clones the repository. Pare
 
 ## Learned User Preferences
 - Count labels should say photos and videos, never generic "files".
-- Dry-run reports go to the Desktop as incrementing `L!bra <Tool> Dry Run N.txt` files; do not overwrite earlier reports.
+- User-facing preview is labeled Preview only; Desktop reports stay incrementing `L!bra <Tool> Dry Run N.txt` files and must not overwrite earlier reports.
+- After a drop, only preview; writing requires an explicit Write action. Turning Preview off must not start a write.
 - Do not show container format (mov, mp4, …) in identification rows; the filename already includes it.
 - Prefer taller layouts that avoid window scrollbars; numbered file lists (1, 2, 3…) may scroll in a small pane.
 
 ## Learned Workspace Facts
 - Organization, rename, and sort tools must not require Homebrew ffmpeg; ffmpeg is optional for transform tools only.
+- L!bra is used on local disks only; iCloud and file-provider locations are out of scope.
+- iPhone sort uses three folders: iPhone, Other Apple, and Not Apple.
