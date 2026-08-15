@@ -49,6 +49,7 @@ final class ToolState: ObservableObject {
         photos = []
         results = []
         recap = nil
+        undoRecords = []
         message = "Finding supported files…"
         AppState.shared.rememberLastFolder(from: paths)
 
@@ -88,8 +89,9 @@ final class ToolState: ObservableObject {
     }
 
     /// Re-process after Prefix / Dry Run / tool options change (debounced).
+    /// Live writes never auto-re-run — scan paths go stale after moves/copies.
     func scheduleRerunAfterOptionsChange() {
-        guard !files.isEmpty, !running else { return }
+        guard !files.isEmpty, !running, dryRun else { return }
         rerunTask?.cancel()
         rerunTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 450_000_000)
@@ -262,7 +264,7 @@ final class ToolState: ObservableObject {
 
         let runResults = Array(results.dropFirst(priorCount))
         applyRunRecap(runResults)
-        if !dryRun {
+        if !dryRun, !pendingUndo.isEmpty {
             undoRecords = pendingUndo
         }
         pendingUndo = []
