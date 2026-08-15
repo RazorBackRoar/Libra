@@ -89,3 +89,12 @@ Jules reads this repository-root `AGENTS.md` when it clones the repository. Pare
 ### Jules Autonomous Execution Rules
 - **Auto-Approve Plans**: Automatically approve execution plans for background suggestions (testing, code health, performance). Do not pause or wait for human plan approval on routine refactoring.
 - **Batching**: Group related unit tests or code health fixes into a single PR rather than creating endless single-function PRs.
+
+## Learned User Preferences
+- Count labels should say photos and videos, never generic "files".
+- Dry-run reports go to the Desktop as incrementing `L!bra <Tool> Dry Run N.txt` files; do not overwrite earlier reports.
+- Do not show container format (mov, mp4, …) in identification rows; the filename already includes it.
+- Prefer taller layouts that avoid window scrollbars; numbered file lists (1, 2, 3…) may scroll in a small pane.
+
+## Learned Workspace Facts
+- Organization, rename, and sort tools must not require Homebrew ffmpeg; ffmpeg is optional for transform tools only.

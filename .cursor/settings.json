@@ -1,7 +1,1 @@
-{
-  "plugins": {
-    "agentmail": {
-      "enabled": true
-    }
-  }
-}
+{}
