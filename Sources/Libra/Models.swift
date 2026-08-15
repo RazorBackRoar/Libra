@@ -41,7 +41,7 @@ struct VideoInfo: Identifiable, Equatable {
     }
 
     /// Canonical resolution bucket labels (contract order).
-    static let resolutionClasses = ["8K", "4K", "FHD", "1080p", "HD", "720p", "SD"]
+    static let resolutionClasses = FileNaming.resolutionClasses
 
     var resolutionFolder: String { resolutionClass }
     var orientationFolder: String { orientation.capitalized }

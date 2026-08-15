@@ -31,11 +31,14 @@ struct SettingsView: View {
                 Toggle("Also sort by date", isOn: $store.settings.sortByDate)
                 Toggle("Also sort by camera", isOn: $store.settings.sortByCamera)
                 Toggle("Put extras in Duplicates", isOn: $store.settings.sortDuplicatesIntoFolder)
+                Text("Duplicates match size, duration, and video format — not a byte-for-byte hash.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 460, height: 520)
+        .frame(width: 460, height: 560)
         .onAppear {
             ffmpegPath = store.settings.ffmpegPath ?? ""
             extensions = store.settings.videoExtensions.joined(separator: ", ")

@@ -13,6 +13,15 @@ final class ScanSafetyTests: XCTestCase {
         XCTAssertFalse(ScanSafety.isVolumeRoot("/Volumes/SSD/Movies"))
     }
 
+    func testFileCountWarning_thresholdAndTestFolder() {
+        XCTAssertNil(ScanSafety.fileCountWarning(count: 499))
+        XCTAssertNotNil(ScanSafety.fileCountWarning(count: 500))
+        XCTAssertNil(ScanSafety.fileCountWarning(
+            count: 800,
+            paths: ["/Users/home/Desktop/MetaBurn & L!bra Test/videos"]
+        ))
+    }
+
     func testDestinationInsideSource() {
         XCTAssertTrue(ScanSafety.destinationIsInsideSource(dest: "/Trip/Photos", sourceRoot: "/Trip"))
         XCTAssertFalse(ScanSafety.destinationIsInsideSource(dest: "/Photos", sourceRoot: "/Trip"))

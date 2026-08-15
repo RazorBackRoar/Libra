@@ -1,7 +1,19 @@
 import Foundation
 
 enum FileOps {
+    /// True when `path` itself is a symlink or Finder alias (does not follow the target).
+    static func isSymlinkOrAlias(_ path: String) -> Bool {
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: path)) != nil {
+            return true
+        }
+        let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isAliasFileKey])
+        return values?.isAliasFile == true
+    }
+
     static func moveFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
+        if isSymlinkOrAlias(from) {
+            return OperationResult(path: from, status: .skipped, reason: "Skipped symlink or alias")
+        }
         let target = uniquePath(for: to, reserved: reserved)
         if dryRun {
             return OperationResult(path: from, status: .success, reason: "Dry-run move to \(target)", outputPath: target)
@@ -17,6 +29,9 @@ enum FileOps {
     }
 
     static func copyFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
+        if isSymlinkOrAlias(from) {
+            return OperationResult(path: from, status: .skipped, reason: "Skipped symlink or alias")
+        }
         let target = uniquePath(for: to, reserved: reserved)
         if dryRun {
             return OperationResult(path: from, status: .success, reason: "Dry-run copy to \(target)", outputPath: target)

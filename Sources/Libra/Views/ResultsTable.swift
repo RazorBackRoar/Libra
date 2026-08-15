@@ -3,6 +3,7 @@ import SwiftUI
 struct ResultsTable: View {
     let files: [VideoInfo]
     let results: [OperationResult]
+    @State private var selectedKey: String?
 
     private var orderedResults: [OperationResult] {
         results.sorted { lhs, rhs in
@@ -22,10 +23,10 @@ struct ResultsTable: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(.vertical, 4)
             } else {
-                List {
+                List(selection: $selectedKey) {
                     if !files.isEmpty {
                         Section("Scanned Files") {
-                            ForEach(Array(files.enumerated()), id: \.element.id) { index, file in
+                            ForEach(Array(files.enumerated()), id: \.element.path) { index, file in
                                 resultRow(
                                     index: index + 1,
                                     title: file.name + "." + file.ext,
@@ -33,6 +34,7 @@ struct ResultsTable: View {
                                     error: file.error,
                                     warning: file.warning
                                 )
+                                .tag(Self.fileKey(file.path))
                                 .contentShape(Rectangle())
                                 .onTapGesture { MediaOpen.open(file.path) }
                                 .contextMenu {
@@ -45,7 +47,7 @@ struct ResultsTable: View {
 
                     if !results.isEmpty {
                         Section("Results") {
-                            ForEach(orderedResults) { result in
+                            ForEach(orderedResults, id: \.path) { result in
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack {
                                         Text((result.path as NSString).lastPathComponent)
@@ -69,6 +71,7 @@ struct ResultsTable: View {
                                             .lineLimit(2)
                                     }
                                 }
+                                .tag(Self.resultKey(result.path))
                                 .padding(.vertical, 2)
                                 .contentShape(Rectangle())
                                 .onTapGesture { MediaOpen.open(result.outputPath ?? result.path) }
@@ -87,6 +90,30 @@ struct ResultsTable: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .focusable()
+        .onKeyPress(.space) {
+            guard selectedKey != nil else { return .ignored }
+            openSelected()
+            return .handled
+        }
+        .help("Space opens the selected video")
+    }
+
+    private static func fileKey(_ path: String) -> String { "file:\(path)" }
+    private static func resultKey(_ path: String) -> String { "result:\(path)" }
+
+    private func openSelected() {
+        guard let selectedKey else { return }
+        if selectedKey.hasPrefix("result:") {
+            let path = String(selectedKey.dropFirst("result:".count))
+            if let result = orderedResults.first(where: { $0.path == path }) {
+                MediaOpen.open(result.outputPath ?? result.path)
+            }
+            return
+        }
+        if selectedKey.hasPrefix("file:") {
+            MediaOpen.open(String(selectedKey.dropFirst("file:".count)))
+        }
     }
 
     private func resultRow(

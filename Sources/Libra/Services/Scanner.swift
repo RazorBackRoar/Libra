@@ -13,7 +13,8 @@ enum ScannerService {
         paths: [String],
         extensions: [String],
         probe: ProbeHandler? = nil,
-        progress: ProgressHandler? = nil
+        progress: ProgressHandler? = nil,
+        confirmDiscover: (@Sendable (Int) async -> Bool)? = nil
     ) async -> ScanOutcome {
         let probeHandler = probe ?? { filePath in
             try await MediaProbe.probe(filePath: filePath)
@@ -31,6 +32,15 @@ enum ScannerService {
                     discoveredTotal: 0,
                     completedCount: 0
                 )
+            }
+
+            if FileOps.isSymlinkOrAlias(path) {
+                unsupported.append(OperationResult(
+                    path: path,
+                    status: .skipped,
+                    reason: "Skipped symlink or alias"
+                ))
+                continue
             }
 
             var isDir: ObjCBool = false
@@ -79,6 +89,14 @@ enum ScannerService {
 
         let deduped = Array(Set(files)).sorted()
         let total = deduped.count
+        if let confirmDiscover, !(await confirmDiscover(total)) {
+            return cancelledOutcome(
+                supported: [],
+                unsupported: unsupported,
+                discoveredTotal: total,
+                completedCount: 0
+            )
+        }
         await progress?(0, total)
 
         var slotResults: [Int: VideoInfo] = [:]
@@ -210,6 +228,18 @@ enum ScannerService {
             let full = (path as NSString).appendingPathComponent(item)
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: full, isDirectory: &isDir) else { continue }
+
+            if FileOps.isSymlinkOrAlias(full) {
+                if isDir.boolValue {
+                    enumerator?.skipDescendants()
+                }
+                unsupported.append(OperationResult(
+                    path: full,
+                    status: .skipped,
+                    reason: "Skipped symlink or alias"
+                ))
+                continue
+            }
 
             if isDir.boolValue {
                 if isBundleDirectory(full) {

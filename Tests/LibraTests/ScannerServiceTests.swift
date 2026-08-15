@@ -103,6 +103,33 @@ final class ScannerServiceTests: XCTestCase {
         XCTAssertFalse(outcome.supported.contains { $0.error?.contains(root.path) == true })
     }
 
+    func testScanSkipsSymlinkAndHonorsConfirmDiscover() async throws {
+        let root = try makeFixtureFolder(fileCount: 2)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let real = root.appendingPathComponent("clip_000.mp4").path
+        let link = root.appendingPathComponent("linked.mp4").path
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: real)
+
+        let skipped = await ScannerService.scan(
+            paths: [root.path],
+            extensions: ["mp4"],
+            probe: { filePath in Self.stubInfo(path: filePath) }
+        )
+        XCTAssertEqual(skipped.supported.count, 2)
+        XCTAssertTrue(skipped.unsupported.contains { $0.path == link && $0.status == .skipped })
+
+        let refused = await ScannerService.scan(
+            paths: [root.path],
+            extensions: ["mp4"],
+            probe: { filePath in Self.stubInfo(path: filePath) },
+            confirmDiscover: { _ in false }
+        )
+        XCTAssertEqual(refused.terminal, .cancelled)
+        XCTAssertTrue(refused.supported.isEmpty)
+        XCTAssertEqual(refused.discoveredTotal, 2)
+    }
+
     private func makeFixtureFolder(fileCount: Int) throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("libra-scan-\(UUID().uuidString)", isDirectory: true)

@@ -136,6 +136,26 @@ final class FileOpsTests: XCTestCase {
         XCTAssertEqual((r2.outputPath as NSString?)?.lastPathComponent, "Vacation 4K W30 002.mov")
     }
 
+    func testMoveFile_skipsSymlink() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("libra-link-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let target = dir.appendingPathComponent("real.mov").path
+        let link = dir.appendingPathComponent("alias.mov").path
+        FileManager.default.createFile(atPath: target, contents: Data("keep".utf8))
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: target)
+        XCTAssertTrue(FileOps.isSymlinkOrAlias(link))
+        XCTAssertFalse(FileOps.isSymlinkOrAlias(target))
+
+        let dest = dir.appendingPathComponent("out.mov").path
+        let result = FileOps.moveFile(from: link, to: dest, dryRun: false)
+        XCTAssertEqual(result.status, .skipped)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: target))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dest))
+    }
+
     func testIsPath_insideAncestor() {
         XCTAssertTrue(FileOps.isPath("/Trip/1080p/clip.mov", inside: "/Trip"))
         XCTAssertTrue(FileOps.isPath("/Trip", inside: "/Trip"))

@@ -160,6 +160,7 @@ struct ToolPage: View {
                 Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
                 Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
                 Toggle("Put extras in Duplicates", isOn: $settingsStore.settings.sortDuplicatesIntoFolder)
+                    .help("Same size, duration, and video format — not a byte-for-byte match")
             }
             .toggleStyle(.checkbox)
             .disabled(state.running)
@@ -446,10 +447,28 @@ struct ToolPage: View {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+        state.confirmDiscover = { count in
+            await MainActor.run {
+                confirmFileCount(count, paths: paths)
+            }
+        }
         state.startScan(
             paths: paths,
             settings: settingsStore.settings
         )
+    }
+
+    private func confirmFileCount(_ count: Int, paths: [String]) -> Bool {
+        guard let warning = ScanSafety.fileCountWarning(count: count, paths: paths) else {
+            return true
+        }
+        let alert = NSAlert()
+        alert.messageText = "Scan this many items?"
+        alert.informativeText = warning
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Scan")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     private func browse() {

@@ -23,15 +23,38 @@ final class DuplicateDetectorTests: XCTestCase {
         XCTAssertTrue(DuplicateDetector.extraPaths(in: files).isEmpty)
     }
 
-    private func stub(path: String, name: String, size: Int64, duration: Double) -> VideoInfo {
+    func testExtraPaths_ignoresDifferentResolution() {
+        let files = [
+            stub(path: "/tmp/a.mov", name: "Clip", size: 100, duration: 12, width: 1920, height: 1080),
+            stub(path: "/tmp/b.mov", name: "Clip", size: 100, duration: 12, width: 2560, height: 1440)
+        ]
+        XCTAssertTrue(DuplicateDetector.extraPaths(in: files).isEmpty)
+    }
+
+    func testExtraPaths_matchesDifferentStemsWithSameFormat() {
+        let files = [
+            stub(path: "/tmp/IMG_001.mov", name: "IMG_001", size: 100, duration: 12),
+            stub(path: "/tmp/IMG_001 (1).mov", name: "IMG_001 (1)", size: 100, duration: 12)
+        ]
+        XCTAssertEqual(DuplicateDetector.extraPaths(in: files), ["/tmp/IMG_001.mov"])
+    }
+
+    private func stub(
+        path: String,
+        name: String,
+        size: Int64,
+        duration: Double,
+        width: Int = 1920,
+        height: Int = 1080
+    ) -> VideoInfo {
         VideoInfo(
             path: path,
             name: name,
             dir: "/tmp",
             ext: "mov",
             sizeBytes: size,
-            width: 1920,
-            height: 1080,
+            width: width,
+            height: height,
             resolutionClass: "1080p",
             orientation: "landscape",
             fps: 30,

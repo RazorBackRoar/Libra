@@ -7,7 +7,8 @@ final class MediaClassificationTests: XCTestCase {
         XCTAssertEqual(MediaClassification.resolutionClass(width: 1920, height: 1080), "1080p")
         XCTAssertEqual(MediaClassification.resolutionClass(width: 1080, height: 1920), "1080p")
         XCTAssertEqual(MediaClassification.resolutionClass(width: 1918, height: 1080), "1080p")
-        XCTAssertEqual(MediaClassification.resolutionClass(width: 2560, height: 1440), "FHD")
+        XCTAssertEqual(MediaClassification.resolutionClass(width: 2560, height: 1440), "1440p")
+        XCTAssertEqual(MediaClassification.resolutionClass(width: 1440, height: 2560), "1440p")
         XCTAssertEqual(MediaClassification.resolutionClass(width: 2048, height: 1080), "FHD")
     }
 

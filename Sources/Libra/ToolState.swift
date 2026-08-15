@@ -29,6 +29,7 @@ final class ToolState: ObservableObject {
     private var rerunTask: Task<Void, Never>?
     private var pendingUndo: [UndoRecord] = []
     private var previewPass = true
+    var confirmDiscover: (@Sendable (Int) async -> Bool)?
 
     var canUndo: Bool { !undoRecords.isEmpty && !running }
 
@@ -192,18 +193,9 @@ final class ToolState: ObservableObject {
         message = "Undoing last run…"
         let records = undoRecords
         undoRecords = []
-        var restored = 0
-        var failed = 0
-        for record in records.reversed() {
-            switch record.kind {
-            case .moved:
-                let result = FileOps.moveFile(from: record.resultPath, to: record.originalPath, dryRun: false)
-                if result.status == .success { restored += 1 } else { failed += 1 }
-            case .createdCopy:
-                let result = FileOps.deleteFile(record.resultPath, dryRun: false)
-                if result.status == .success { restored += 1 } else { failed += 1 }
-            }
-        }
+        let outcome = UndoApply.apply(records)
+        let restored = outcome.restored
+        let failed = outcome.failed
         running = false
         recap = failed == 0
             ? "Undid \(restored) change\(restored == 1 ? "" : "s")."
@@ -255,7 +247,8 @@ final class ToolState: ObservableObject {
                         self.message = nil
                     }
                 }
-            }
+            },
+            confirmDiscover: confirmDiscover
         )
 
         let videos = outcome.supported.filter { !imageExts.contains($0.ext.lowercased()) }
@@ -294,7 +287,7 @@ final class ToolState: ObservableObject {
                 parts.append("\(unsupportedCount) unsupported skipped")
             }
             if dupes > 0 {
-                parts.append("\(dupes) likely duplicate\(dupes == 1 ? "" : "s")")
+                parts.append("\(dupes) likely duplicate\(dupes == 1 ? "" : "s") (same size, duration, format)")
             }
             recap = parts.joined(separator: " · ") + "."
         }
@@ -342,20 +335,15 @@ final class ToolState: ObservableObject {
         let success = runResults.filter { $0.status == .success }.count
         let failed = runResults.filter { $0.status == .failed }.count
         let skipped = runResults.filter { $0.status == .skipped }.count
-        var summary: String
-        if Task.isCancelled || cancelling {
-            summary = "Cancelled after \(progress.done) of \(progress.total)."
-        } else if previewPass {
-            summary = "Preview: \(success) would change"
-            if failed > 0 { summary += ", \(failed) failed" }
-            if skipped > 0 { summary += ", \(skipped) skipped" }
-            summary += "."
-        } else {
-            summary = "Wrote \(success) of \(progress.total)"
-            if failed > 0 { summary += ", \(failed) failed" }
-            if skipped > 0 { summary += ", \(skipped) skipped" }
-            summary += "."
-        }
+        var summary = RunRecap.summary(
+            previewPass: previewPass,
+            cancelled: Task.isCancelled || cancelling,
+            success: success,
+            failed: failed,
+            skipped: skipped,
+            done: progress.done,
+            total: progress.total
+        )
         if previewPass, let reportURL = DryRunReport.write(tool: tool, results: runResults) {
             summary += " Report: \(reportURL.lastPathComponent)"
         }

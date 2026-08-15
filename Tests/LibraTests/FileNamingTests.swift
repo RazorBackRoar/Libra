@@ -76,4 +76,25 @@ final class FileNamingTests: XCTestCase {
         )
         XCTAssertEqual(name, "Cinema 8K W24 001.mov")
     }
+
+    func testSquareAnd1440p() {
+        XCTAssertEqual(FileNaming.orientationCode("square"), "S")
+        XCTAssertEqual(FileNaming.orientationCode("portrait"), "V")
+        XCTAssertEqual(FileNaming.orientationCode("landscape"), "W")
+        XCTAssertEqual(FileNaming.resolutionLabel("1440p"), "1440p")
+        let name = FileNaming.standardFileName(
+            originalName: "Clip",
+            prefix: "",
+            resolutionClass: "1440p",
+            orientation: "square",
+            fps: 30,
+            hasAppleMake: false,
+            hasiPhoneModel: false,
+            hasGPS: false,
+            index: 1,
+            padWidth: 3,
+            ext: "mov"
+        )
+        XCTAssertEqual(name, "Clip 1440p S30 001.mov")
+    }
 }

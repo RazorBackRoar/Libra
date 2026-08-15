@@ -1,11 +1,12 @@
 import Foundation
 
 enum DuplicateDetector {
-    /// Same size + rounded duration + lowercase original stem → likely duplicate.
+    /// Same size, duration, pixel size, frame rate, and codec — not a byte hash.
     static func key(for file: VideoInfo) -> String {
-        let stem = file.name.lowercased()
         let duration = Int(file.durationSec.rounded())
-        return "\(file.sizeBytes)|\(duration)|\(stem)"
+        let fps = Int(file.fps.rounded())
+        let codec = file.codec.lowercased()
+        return "\(file.sizeBytes)|\(duration)|\(file.width)x\(file.height)|\(fps)|\(codec)"
     }
 
     /// Paths that are extras in a duplicate group (everything after the first, sorted by path).

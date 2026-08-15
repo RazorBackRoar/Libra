@@ -2,6 +2,7 @@ import Foundation
 
 enum ScanSafety {
     static let testFolderMarker = "MetaBurn & L!bra Test"
+    static let largeScanThreshold = 500
 
     /// Warning before walking a huge or accidental root. Nil means proceed.
     static func warning(for paths: [String]) -> String? {
@@ -24,6 +25,13 @@ enum ScanSafety {
             }
         }
         return nil
+    }
+
+    /// Warning after discover, before metadata probe. Nil means proceed.
+    static func fileCountWarning(count: Int, paths: [String] = []) -> String? {
+        guard count >= largeScanThreshold else { return nil }
+        if paths.contains(where: { $0.contains(testFolderMarker) }) { return nil }
+        return "This folder has \(count) videos and photos. L!bra will read metadata for each one."
     }
 
     static func isVolumeRoot(_ path: String) -> Bool {

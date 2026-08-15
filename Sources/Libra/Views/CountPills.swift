@@ -38,7 +38,7 @@ enum MediaBrowserFilter: Hashable, Identifiable {
         case .both: return "Apple make + iPhone model"
         case .otherApple: return "Other Apple"
         case .notApple: return "Not Apple"
-        case .duplicates: return "Likely duplicates"
+        case .duplicates: return "Likely duplicates (same size, duration, format)"
         }
     }
 
@@ -94,7 +94,8 @@ struct CountPills: View {
                     pill(
                         filter: .duplicates,
                         label: "Likely duplicates",
-                        value: DuplicateDetector.extraCount(in: files)
+                        value: DuplicateDetector.extraCount(in: files),
+                        help: "Same size, duration, and video format — not a byte-for-byte match"
                     )
                 }
             }
@@ -102,8 +103,8 @@ struct CountPills: View {
     }
 
     @ViewBuilder
-    private func pill(filter: MediaBrowserFilter, label: String, value: Int) -> some View {
-        CountPill(label: label, value: value) {
+    private func pill(filter: MediaBrowserFilter, label: String, value: Int, help: String? = nil) -> some View {
+        CountPill(label: label, value: value, helpText: help) {
             guard value > 0 else { return }
             onSelect?(filter)
         }
@@ -113,6 +114,7 @@ struct CountPills: View {
 struct CountPill: View {
     let label: String
     let value: Int
+    var helpText: String? = nil
     var action: (() -> Void)? = nil
 
     var body: some View {
@@ -135,7 +137,7 @@ struct CountPill: View {
         .buttonStyle(.plain)
         .disabled(value == 0 || action == nil)
         .opacity(value == 0 ? 0.55 : 1)
-        .help(value == 0 ? "No \(label.lowercased()) videos" : "Browse \(label.lowercased()) videos")
+        .help(helpText ?? (value == 0 ? "No \(label.lowercased()) videos" : "Browse \(label.lowercased()) videos"))
         .accessibilityLabel("\(value) \(label)")
     }
 }
