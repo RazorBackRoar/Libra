@@ -19,5 +19,6 @@ Libra.png
 tmp/*
 swift-6.0.3-RELEASE-ubuntu24.04/
 
-# Cursor hook runtime (continual-learning transcript index, last-run stamps)
+# Cursor local runtime (hook stamps/index; empty project plugin UI)
 .cursor/hooks/state/
+.cursor/settings.json
