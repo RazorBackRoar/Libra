@@ -30,10 +30,10 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 - **GPS Sorter** — city folders from coordinates, `No-GPS` when missing
 - **Optional date / camera folders** — extra sort keys on the sort tools
 - **Duplicates** — likely extras (same size, duration, name) go in a Duplicates folder
-- **iPhone Sorter** — iPhone / Not iPhone (videos)
+- **iPhone Sorter** — iPhone / Other Apple / Not Apple (videos)
 - **Transform** — Slo-Mo copies and 1MinVid sequential timestamps (these need ffmpeg)
 - **Resilient import** — cancelable scans; per-file probe failures don’t stall the batch
-- **Local-first** — nothing leaves your Mac
+- **Local-first organize** — sort, rename, and file moves stay on your Mac. City names on the GPS map use Apple reverse-geocode when you open the map (or run GPS Sorter). Check for Updates talks to GitHub when you ask.
 - **Native SwiftUI** — Apple Silicon macOS app, ad-hoc signed DMG
 
 ## Install
@@ -48,7 +48,7 @@ Requires macOS 14+ on Apple Silicon. ffmpeg / ffprobe via Homebrew when transfor
 
 1. Open **L!bra** and pick a tool from the Video tab (or use Photo to move stills out)
 2. Drop a folder or video files, or use Open Folder / Select Files
-3. Leave **Dry Run** on to preview; turn it off to write
+3. Leave **Preview only** on to plan the run; turn it off and press **Write** to change files (confirm first)
 4. Use **Undo last run** if a live pass wasn’t what you wanted
 5. Use the City / GPS Map pins to inspect locations; click a filename to open the video
 6. Click a row to open the file; right-click to Reveal in Finder

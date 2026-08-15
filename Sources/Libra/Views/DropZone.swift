@@ -25,8 +25,10 @@ struct DropZone: View {
             HStack(spacing: 12) {
                 Button("Open Folder…") { onBrowse() }
                     .buttonStyle(LibraPrimaryButtonStyle())
+                    .accessibilityLabel("Open Folder")
                 Button("Select Files") { onSelectFiles() }
                     .buttonStyle(LibraSecondaryButtonStyle())
+                    .accessibilityLabel("Select Files")
             }
         }
         .padding(.horizontal, 16)
@@ -44,21 +46,25 @@ struct DropZone: View {
     }
 
     private func handleProviders(_ providers: [NSItemProvider]) -> Bool {
-        var urls: [URL] = []
-        let group = DispatchGroup()
-        for provider in providers {
-            group.enter()
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
-                    urls.append(url)
-                } else if let url = item as? URL {
+        Task { @MainActor in
+            var urls: [URL] = []
+            for provider in providers {
+                let url: URL? = await withCheckedContinuation { continuation in
+                    provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                        if let data = item as? Data, let loaded = URL(dataRepresentation: data, relativeTo: nil) {
+                            continuation.resume(returning: loaded)
+                        } else if let loaded = item as? URL {
+                            continuation.resume(returning: loaded)
+                        } else {
+                            continuation.resume(returning: nil)
+                        }
+                    }
+                }
+                if let url {
                     urls.append(url)
                 }
-                group.leave()
             }
-        }
-        group.notify(queue: .main) {
-            onDrop(urls.map { $0.path })
+            onDrop(urls.map(\.path))
         }
         return true
     }

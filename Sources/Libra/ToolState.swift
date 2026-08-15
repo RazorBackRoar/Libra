@@ -9,6 +9,7 @@ final class ToolState: ObservableObject {
     @Published var selected: Set<String> = []
     @Published var results: [OperationResult] = []
     @Published var progress: (done: Int, total: Int) = (0, 0)
+    @Published var progressName: String = ""
     @Published var running = false
     @Published var cancelling = false
     @Published var message: String?
@@ -27,8 +28,18 @@ final class ToolState: ObservableObject {
     private var activeTask: Task<Void, Never>?
     private var rerunTask: Task<Void, Never>?
     private var pendingUndo: [UndoRecord] = []
+    private var previewPass = true
 
     var canUndo: Bool { !undoRecords.isEmpty && !running }
+
+    var canWrite: Bool {
+        !running && !files.isEmpty && !dryRun && (!tool.needsFfmpeg || AppState.shared.ffmpegPath != nil)
+    }
+
+    var writeButtonTitle: String {
+        let count = files.filter { $0.error == nil }.count
+        return "Write \(count) video\(count == 1 ? "" : "s")"
+    }
 
     var showsExtraFolderToggles: Bool {
         if tool == .gps { return true }
@@ -39,13 +50,13 @@ final class ToolState: ObservableObject {
         if dryRun { return "Preview only — nothing will be changed." }
         switch tool {
         case .slomo:
-            return "Live — new slowed copies will be written."
+            return "Live — Write will create new slowed copies."
         case .oneMin:
             return oneMinMode == "copies"
-                ? "Live — new timestamped copies will be written."
-                : "Live — originals will be changed."
+                ? "Live — Write will create new timestamped copies."
+                : "Live — Write will change originals."
         default:
-            return "Live — files will be renamed, moved, or copied."
+            return "Live — Write will rename, move, or copy."
         }
     }
 
@@ -68,12 +79,13 @@ final class ToolState: ObservableObject {
         running = true
         cancelling = false
         progress = (0, 0)
+        progressName = ""
         files = []
         photos = []
         results = []
         recap = nil
         undoRecords = []
-        message = "Finding supported files…"
+        message = "Finding supported videos…"
         AppState.shared.rememberLastFolder(from: paths)
 
         activeTask = Task { [weak self] in
@@ -87,8 +99,26 @@ final class ToolState: ObservableObject {
         }
     }
 
-    func startRun(settings: AppSettings, ffmpegPath: String?) {
-        guard !running else { return }
+    func startPreview() {
+        guard !files.isEmpty, !running else { return }
+        running = true
+        cancelling = false
+        let priorSkips = results.filter { $0.status == .skipped }
+        results = priorSkips
+        recap = nil
+        message = "Previewing…"
+        previewPass = true
+        activeTask = Task { [weak self] in
+            await self?.performRun(ffmpegPath: AppState.shared.ffmpegPath ?? "")
+        }
+    }
+
+    func startWrite(settings: AppSettings, ffmpegPath: String?) {
+        guard !running, !files.isEmpty else { return }
+        if dryRun {
+            message = "Turn off Preview only, then Write."
+            return
+        }
         if tool.needsFfmpeg, (ffmpegPath ?? AppState.shared.ffmpegPath) == nil {
             message = "Needs ffmpeg to create transformed media."
             return
@@ -99,26 +129,23 @@ final class ToolState: ObservableObject {
         let priorSkips = results.filter { $0.status == .skipped }
         results = priorSkips
         recap = nil
-        message = dryRun ? "Previewing…" : "Writing…"
-
+        message = "Writing…"
+        previewPass = false
         let resolvedFfmpeg = ffmpegPath ?? AppState.shared.ffmpegPath ?? ""
         activeTask = Task { [weak self] in
             await self?.performRun(ffmpegPath: resolvedFfmpeg)
         }
     }
 
-    /// Re-process after Prefix / Preview / tool options change (debounced).
-    /// Live writes never auto-re-run — scan paths go stale after moves/copies.
+    /// Re-preview after Prefix / Preview / tool options change (debounced).
+    /// Never writes — even when Preview only is off.
     func scheduleRerunAfterOptionsChange() {
-        guard !files.isEmpty, !running, dryRun else { return }
+        guard !files.isEmpty, !running else { return }
         rerunTask?.cancel()
         rerunTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 450_000_000)
             guard let self, !Task.isCancelled else { return }
-            self.startRun(
-                settings: AppState.shared.settings,
-                ffmpegPath: AppState.shared.ffmpegPath
-            )
+            self.startPreview()
         }
     }
 
@@ -130,8 +157,14 @@ final class ToolState: ObservableObject {
         activeTask?.cancel()
     }
 
-    func movePhotosOut(to destDir: String) {
-        guard !photos.isEmpty, !running else { return }
+    func movePhotosOut(to destDir: String) -> String? {
+        guard !photos.isEmpty, !running else { return nil }
+        if ScanSafety.destinationIsInsideSource(dest: destDir, sourceRoot: SettingsStore.shared.settings.lastFolder) {
+            let reason = "Choose a folder outside the scanned video folder."
+            recap = reason
+            message = reason
+            return reason
+        }
         let moved = PhotoMover.move(photos, to: destDir, dryRun: dryRun)
         results.append(contentsOf: moved)
         let ok = moved.filter { $0.status == .success }.count
@@ -141,8 +174,16 @@ final class ToolState: ObservableObject {
             recap = "Moved \(ok) photo\(ok == 1 ? "" : "s") out of the video folders."
             let movedPaths = Set(moved.filter { $0.status == .success }.map(\.path))
             photos.removeAll { movedPaths.contains($0.path) }
+            let records = moved.compactMap { result -> UndoRecord? in
+                guard result.status == .success, let output = result.outputPath, output != result.path else { return nil }
+                return UndoRecord(kind: .moved, originalPath: result.path, resultPath: output)
+            }
+            if !records.isEmpty {
+                undoRecords = records
+            }
         }
         message = recap
+        return nil
     }
 
     func undoLastRun() {
@@ -168,6 +209,7 @@ final class ToolState: ObservableObject {
             ? "Undid \(restored) change\(restored == 1 ? "" : "s")."
             : "Undo finished: \(restored) restored, \(failed) failed."
         message = recap
+        Log.shared.info(recap ?? "Undo finished", scope: "run")
     }
 
     private func continueAfterScan() async {
@@ -186,16 +228,19 @@ final class ToolState: ObservableObject {
         }
         let priorSkips = results.filter { $0.status == .skipped }
         results = priorSkips
+        previewPass = true
+        message = "Previewing…"
         await performRun(ffmpegPath: AppState.shared.ffmpegPath ?? "")
     }
 
     private func finishIdle() {
         running = false
         cancelling = false
+        progressName = ""
         activeTask = nil
     }
 
-    /// Returns `true` when the tool should auto-process after this scan.
+    /// Returns `true` when the tool should auto-preview after this scan.
     private func performScan(paths: [String], settings: AppSettings) async -> Bool {
         let imageExts = Set(settings.imageExtensions.map { $0.lowercased() })
         let exts = Array(Set(settings.videoExtensions + settings.imageExtensions))
@@ -206,7 +251,7 @@ final class ToolState: ObservableObject {
             progress: { done, total in
                 await MainActor.run {
                     self.progress = (done, total)
-                    if total > 0, self.message == "Finding supported files…" {
+                    if total > 0, self.message == "Finding supported videos…" {
                         self.message = nil
                     }
                 }
@@ -263,6 +308,10 @@ final class ToolState: ObservableObject {
         let priorCount = results.count
         let target = files
         progress = (0, target.count)
+        progressName = ""
+        if !previewPass {
+            Log.shared.info("Write \(tool.rawValue) — \(target.count) videos", scope: "run")
+        }
 
         switch tool {
         case .provid, .vidres, .promax, .maxvid, .keepName:
@@ -283,7 +332,7 @@ final class ToolState: ObservableObject {
 
         let runResults = Array(results.dropFirst(priorCount))
         applyRunRecap(runResults)
-        if !dryRun, !pendingUndo.isEmpty {
+        if !previewPass, !pendingUndo.isEmpty {
             undoRecords = pendingUndo
         }
         pendingUndo = []
@@ -296,7 +345,7 @@ final class ToolState: ObservableObject {
         var summary: String
         if Task.isCancelled || cancelling {
             summary = "Cancelled after \(progress.done) of \(progress.total)."
-        } else if dryRun {
+        } else if previewPass {
             summary = "Preview: \(success) would change"
             if failed > 0 { summary += ", \(failed) failed" }
             if skipped > 0 { summary += ", \(skipped) skipped" }
@@ -307,11 +356,14 @@ final class ToolState: ObservableObject {
             if skipped > 0 { summary += ", \(skipped) skipped" }
             summary += "."
         }
-        if dryRun, let reportURL = DryRunReport.write(tool: tool, results: runResults) {
+        if previewPass, let reportURL = DryRunReport.write(tool: tool, results: runResults) {
             summary += " Report: \(reportURL.lastPathComponent)"
         }
         recap = summary
         message = summary
+        if !previewPass {
+            Log.shared.info(summary, scope: "run")
+        }
     }
 
     private var usesPrefixField: Bool {
@@ -331,13 +383,30 @@ final class ToolState: ObservableObject {
     }
 
     private func noteUndo(kind: UndoRecord.Kind, from: String, result: OperationResult) {
-        guard !dryRun, result.status == .success, let output = result.outputPath, output != from else { return }
+        guard !previewPass, result.status == .success, let output = result.outputPath, output != from else { return }
         pendingUndo.append(UndoRecord(kind: kind, originalPath: from, resultPath: output))
     }
 
     private func keepNameFileName(for file: VideoInfo) -> String {
         let stem = FileOps.sanitizeFileName(file.name)
         return "\(stem).\(file.ext.lowercased())"
+    }
+
+    private func commitMove(
+        from: String,
+        planned: String,
+        reserved: inout Set<String>,
+        kind: UndoRecord.Kind = .moved
+    ) async -> OperationResult {
+        progressName = (from as NSString).lastPathComponent
+        let dry = previewPass
+        let reservedSnapshot = reserved
+        let result = await Task.detached {
+            FileOps.moveFile(from: from, to: planned, dryRun: dry, reserved: reservedSnapshot)
+        }.value
+        if let output = result.outputPath { reserved.insert(output) }
+        noteUndo(kind: kind, from: from, result: result)
+        return result
     }
 
     private func sort(target: [VideoInfo]) async {
@@ -363,14 +432,8 @@ final class ToolState: ObservableObject {
                     index: index,
                     padWidth: padWidth
                 )
-            let dest = FileOps.uniquePath(
-                for: (folder as NSString).appendingPathComponent(filename),
-                reserved: reserved
-            )
-            reserved.insert(dest)
-            let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun, reserved: reserved)
-            if let output = result.outputPath { reserved.insert(output) }
-            noteUndo(kind: .moved, from: file.path, result: result)
+            let planned = (folder as NSString).appendingPathComponent(filename)
+            let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
             results.append(result)
             advanceProgress()
         }
@@ -397,14 +460,8 @@ final class ToolState: ObservableObject {
                     index: index,
                     padWidth: padWidth
                 )
-            let dest = FileOps.uniquePath(
-                for: (file.dir as NSString).appendingPathComponent(filename),
-                reserved: reserved
-            )
-            reserved.insert(dest)
-            let result = FileOps.renameFile(from: file.path, to: dest, dryRun: dryRun, reserved: reserved)
-            if let output = result.outputPath { reserved.insert(output) }
-            noteUndo(kind: .moved, from: file.path, result: result)
+            let planned = (file.dir as NSString).appendingPathComponent(filename)
+            let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
             results.append(result)
             advanceProgress()
         }
@@ -454,14 +511,8 @@ final class ToolState: ObservableObject {
             }
             let folder = destinationFolder(for: file, duplicateExtra: extras.contains(file.path), gpsCity: city)
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
-            let dest = FileOps.uniquePath(
-                for: (folder as NSString).appendingPathComponent(filename),
-                reserved: reserved
-            )
-            reserved.insert(dest)
-            let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun, reserved: reserved)
-            if let output = result.outputPath { reserved.insert(output) }
-            noteUndo(kind: .moved, from: file.path, result: result)
+            let planned = (folder as NSString).appendingPathComponent(filename)
+            let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
             results.append(result)
             advanceProgress()
         }
@@ -472,7 +523,8 @@ final class ToolState: ObservableObject {
         let ordered = target.sorted { $0.path < $1.path }
         typealias ClassifiedFile = (file: VideoInfo, classification: IPhoneSortLogic.Classification)
         var iphoneFiles: [ClassifiedFile] = []
-        var otherFiles: [ClassifiedFile] = []
+        var otherAppleFiles: [ClassifiedFile] = []
+        var notAppleFiles: [ClassifiedFile] = []
 
         for file in ordered {
             if shouldStop() { return }
@@ -491,36 +543,36 @@ final class ToolState: ObservableObject {
                 make: file.make,
                 model: file.model
             )
-            if classification.isIPhoneFolder {
+            switch classification.folder {
+            case .iPhone:
                 iphoneFiles.append((file, classification))
-            } else {
-                otherFiles.append((file, classification))
+            case .otherApple:
+                otherAppleFiles.append((file, classification))
+            case .notApple:
+                notAppleFiles.append((file, classification))
             }
         }
 
-        let totalNamed = iphoneFiles.count + otherFiles.count
+        let totalNamed = iphoneFiles.count + otherAppleFiles.count + notAppleFiles.count
         let padWidth = FileNaming.paddingWidth(forCount: totalNamed)
         var reserved = Set<String>()
         var index = 0
 
-        for item in iphoneFiles + otherFiles {
+        for item in iphoneFiles + otherAppleFiles + notAppleFiles {
             if shouldStop() { return }
             let file = item.file
             let classification = item.classification
             index += 1
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
-            let bucket = classification.isIPhoneFolder ? "iPhone" : "Not iPhone"
-            var parts = extras.contains(file.path) ? ["Duplicates", bucket] : [bucket]
+            var parts: [String] = []
+            if SettingsStore.shared.settings.sortDuplicatesIntoFolder, extras.contains(file.path) {
+                parts.append("Duplicates")
+            }
+            parts.append(classification.folder.rawValue)
             parts.append(contentsOf: extraFolderParts(for: file))
             let folder = parts.reduce(file.dir) { ($0 as NSString).appendingPathComponent($1) }
-            let dest = FileOps.uniquePath(
-                for: (folder as NSString).appendingPathComponent(filename),
-                reserved: reserved
-            )
-            reserved.insert(dest)
-            let result = FileOps.moveFile(from: file.path, to: dest, dryRun: dryRun, reserved: reserved)
-            if let output = result.outputPath { reserved.insert(output) }
-            noteUndo(kind: .moved, from: file.path, result: result)
+            let planned = (folder as NSString).appendingPathComponent(filename)
+            let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
             results.append(OperationResult(
                 path: file.path,
                 status: result.status,
@@ -545,6 +597,7 @@ final class ToolState: ObservableObject {
                 continue
             }
             index += 1
+            progressName = "\(file.name).\(file.ext)"
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let planned: String
             if mode == "copies" {
@@ -555,14 +608,8 @@ final class ToolState: ObservableObject {
             }
             let output = FileOps.uniquePath(for: planned, reserved: reserved)
             reserved.insert(output)
-            if !dryRun {
-                try? FileManager.default.createDirectory(
-                    atPath: (output as NSString).deletingLastPathComponent,
-                    withIntermediateDirectories: true
-                )
-            }
             let result: OperationResult
-            if dryRun {
+            if previewPass {
                 result = OperationResult(
                     path: file.path,
                     status: .success,
@@ -570,17 +617,27 @@ final class ToolState: ObservableObject {
                     outputPath: output
                 )
             } else {
-                result = await FfmpegOps.adjustTimestamp(
+                var written = await FfmpegOps.adjustTimestamp(
                     filePath: file.path,
                     outputPath: output,
                     creationTime: current,
-                    ffmpegPath: ffmpegPath
+                    ffmpegPath: ffmpegPath,
+                    durationSec: file.durationSec
                 )
                 if mode != "copies",
-                   result.status == .success,
+                   written.status == .success,
                    output != file.path {
-                    try? FileManager.default.removeItem(atPath: file.path)
+                    let removed = FileOps.deleteFile(file.path, dryRun: false)
+                    if removed.status != .success {
+                        written = OperationResult(
+                            path: file.path,
+                            status: .failed,
+                            reason: "Wrote \(output) but could not remove original: \(removed.reason ?? "unknown error")",
+                            outputPath: output
+                        )
+                    }
                 }
+                result = written
             }
             if let out = result.outputPath { reserved.insert(out) }
             noteUndo(kind: mode == "copies" ? .createdCopy : .moved, from: file.path, result: result)
@@ -604,6 +661,7 @@ final class ToolState: ObservableObject {
                 continue
             }
             index += 1
+            progressName = "Slowing \(file.name).\(file.ext)…"
             let dir = (file.dir as NSString).appendingPathComponent("SloMo")
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let output = FileOps.uniquePath(
@@ -612,7 +670,7 @@ final class ToolState: ObservableObject {
             )
             reserved.insert(output)
             let result: OperationResult
-            if dryRun {
+            if previewPass {
                 result = OperationResult(
                     path: file.path,
                     status: .success,
@@ -620,12 +678,12 @@ final class ToolState: ObservableObject {
                     outputPath: output
                 )
             } else {
-                try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
                 result = await FfmpegOps.sloMo(
                     filePath: file.path,
                     outputPath: output,
                     factor: factor,
-                    ffmpegPath: ffmpegPath
+                    ffmpegPath: ffmpegPath,
+                    durationSec: file.durationSec
                 )
             }
             if let out = result.outputPath { reserved.insert(out) }
@@ -659,7 +717,7 @@ final class ToolState: ObservableObject {
 
     private func destinationFolder(for file: VideoInfo, duplicateExtra: Bool, gpsCity: String? = nil) -> String {
         var parts: [String] = []
-        if duplicateExtra {
+        if SettingsStore.shared.settings.sortDuplicatesIntoFolder, duplicateExtra {
             parts.append("Duplicates")
         }
         if let gpsCity {

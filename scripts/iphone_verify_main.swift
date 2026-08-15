@@ -36,8 +36,7 @@ struct IPhoneVerifyMain {
 
         // Apply sorter (non-dry-run)
         let ordered = infos.sorted { $0.path < $1.path }
-        var iphoneFiles: [VideoInfo] = []
-        var otherFiles: [VideoInfo] = []
+        var groups: [IPhoneSortLogic.Folder: [VideoInfo]] = [:]
 
         for file in ordered {
             if let error = file.error {
@@ -50,65 +49,35 @@ struct IPhoneVerifyMain {
                 make: file.make,
                 model: file.model
             )
-            if c.isIPhoneFolder { iphoneFiles.append(file) } else { otherFiles.append(file) }
+            groups[c.folder, default: []].append(file)
         }
 
-        let allNamed = iphoneFiles + otherFiles
+        let allNamed = IPhoneSortLogic.Folder.allCases.flatMap { groups[$0] ?? [] }
         let pad = FileNaming.paddingWidth(forCount: allNamed.count)
         var reserved = Set<String>()
         var index = 0
 
-        func uniqueReserved(_ path: String) -> String {
-            var candidate = path
-            var counter = 1
-            let ext = (path as NSString).pathExtension
-            let base = (path as NSString).deletingPathExtension
-            while reserved.contains(candidate) || fm.fileExists(atPath: candidate) {
-                candidate = ext.isEmpty ? "\(base) (\(counter))" : "\(base) (\(counter)).\(ext)"
-                counter += 1
+        for folder in IPhoneSortLogic.Folder.allCases {
+            for file in groups[folder] ?? [] {
+                let c = IPhoneSortLogic.classify(
+                    hasAppleMake: file.hasAppleMake,
+                    hasiPhoneModel: file.hasiPhoneModel,
+                    make: file.make,
+                    model: file.model
+                )
+                index += 1
+                let filename = FileNaming.standardFileName(for: file, index: index, padWidth: pad)
+                let destDir = (file.dir as NSString).appendingPathComponent(folder.rawValue)
+                let planned = (destDir as NSString).appendingPathComponent(filename)
+                let result = FileOps.moveFile(from: file.path, to: planned, dryRun: false, reserved: reserved)
+                if let output = result.outputPath { reserved.insert(output) }
+                let markers = FileNaming.metadataMarkers(
+                    hasAppleMake: file.hasAppleMake,
+                    hasiPhoneModel: file.hasiPhoneModel,
+                    hasGPS: file.hasGPS
+                )
+                results.append("\(result.status.rawValue)\t\(file.name).\(file.ext)\t\(result.outputPath ?? "")\t\(markers)\t\(c.note)")
             }
-            reserved.insert(candidate)
-            return candidate
-        }
-
-        for file in iphoneFiles {
-            let c = IPhoneSortLogic.classify(
-                hasAppleMake: file.hasAppleMake,
-                hasiPhoneModel: file.hasiPhoneModel,
-                make: file.make,
-                model: file.model
-            )
-            index += 1
-            let filename = FileNaming.standardFileName(for: file, index: index, padWidth: pad)
-            let folder = (file.dir as NSString).appendingPathComponent("iPhone")
-            let dest = uniqueReserved((folder as NSString).appendingPathComponent(filename))
-            let result = FileOps.moveFile(from: file.path, to: dest, dryRun: false)
-            let markers = FileNaming.metadataMarkers(
-                hasAppleMake: file.hasAppleMake,
-                hasiPhoneModel: file.hasiPhoneModel,
-                hasGPS: file.hasGPS
-            )
-            results.append("\(result.status.rawValue)\t\(file.name).\(file.ext)\t\(result.outputPath ?? "")\t\(markers)\t\(c.note)")
-        }
-
-        for file in otherFiles {
-            let c = IPhoneSortLogic.classify(
-                hasAppleMake: file.hasAppleMake,
-                hasiPhoneModel: file.hasiPhoneModel,
-                make: file.make,
-                model: file.model
-            )
-            index += 1
-            let filename = FileNaming.standardFileName(for: file, index: index, padWidth: pad)
-            let folder = (file.dir as NSString).appendingPathComponent("Not iPhone")
-            let dest = uniqueReserved((folder as NSString).appendingPathComponent(filename))
-            let result = FileOps.moveFile(from: file.path, to: dest, dryRun: false)
-            let markers = FileNaming.metadataMarkers(
-                hasAppleMake: file.hasAppleMake,
-                hasiPhoneModel: file.hasiPhoneModel,
-                hasGPS: file.hasGPS
-            )
-            results.append("\(result.status.rawValue)\t\(file.name).\(file.ext)\t\(result.outputPath ?? "")\t\(markers)\t\(c.note)")
         }
 
         print("RESULTS")

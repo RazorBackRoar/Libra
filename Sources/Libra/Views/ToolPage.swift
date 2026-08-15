@@ -52,6 +52,8 @@ struct ToolPage: View {
                 )
                 .disabled(state.running)
                 .opacity(state.running ? 0.6 : 1)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Drop videos here")
 
                 workspaceTabs
 
@@ -153,10 +155,11 @@ struct ToolPage: View {
             sortRenameControls
         }
 
-        if state.showsExtraFolderToggles {
+        if state.showsExtraFolderToggles || tool == .iphoneSorter {
             HStack(spacing: 16) {
                 Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
                 Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
+                Toggle("Put extras in Duplicates", isOn: $settingsStore.settings.sortDuplicatesIntoFolder)
             }
             .toggleStyle(.checkbox)
             .disabled(state.running)
@@ -165,6 +168,10 @@ struct ToolPage: View {
                 state.scheduleRerunAfterOptionsChange()
             }
             .onChange(of: settingsStore.settings.sortByCamera) { _, _ in
+                settingsStore.save()
+                state.scheduleRerunAfterOptionsChange()
+            }
+            .onChange(of: settingsStore.settings.sortDuplicatesIntoFolder) { _, _ in
                 settingsStore.save()
                 state.scheduleRerunAfterOptionsChange()
             }
@@ -201,9 +208,10 @@ struct ToolPage: View {
 
         if state.running {
             ProgressView(value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
-            Text("\(state.progress.done) / \(state.progress.total)")
+            Text(progressCaption)
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
+                .accessibilityLabel(progressCaption)
         }
 
         ResultsTable(files: state.filteredFiles, results: state.results)
@@ -300,6 +308,7 @@ struct ToolPage: View {
                 Button("Move photos out…") { movePhotosOut() }
                     .buttonStyle(LibraPrimaryButtonStyle())
                     .disabled(state.running)
+                    .accessibilityLabel("Move photos out")
             }
         }
     }
@@ -321,6 +330,7 @@ struct ToolPage: View {
                 .toggleStyle(.switch)
                 .tint(.yellow)
                 .disabled(state.running)
+                .accessibilityLabel("Preview only")
                 .onChange(of: state.dryRun) { _, _ in
                     state.scheduleRerunAfterOptionsChange()
                 }
@@ -335,6 +345,7 @@ struct ToolPage: View {
                     Button("Undo last run") {
                         state.undoLastRun()
                     }
+                    .accessibilityLabel("Undo last run")
                 }
 
                 if state.running {
@@ -342,9 +353,40 @@ struct ToolPage: View {
                         state.cancelActiveWork()
                     }
                     .disabled(state.cancelling)
+                    .accessibilityLabel("Cancel")
+                } else {
+                    Button(state.writeButtonTitle) {
+                        confirmAndWrite()
+                    }
+                    .buttonStyle(LibraPrimaryButtonStyle())
+                    .disabled(!state.canWrite)
+                    .accessibilityLabel(state.writeButtonTitle)
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.openFolder)) { _ in
+            browse()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.selectFiles)) { _ in
+            selectFiles()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.undoLastRun)) { _ in
+            state.undoLastRun()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.cancelWork)) { _ in
+            state.cancelActiveWork()
+        }
+        .onExitCommand {
+            if state.running {
+                state.cancelActiveWork()
+            }
+        }
+    }
+
+    private var progressCaption: String {
+        let counts = "\(state.progress.done) of \(state.progress.total) videos"
+        if state.progressName.isEmpty { return counts }
+        return "\(counts) — \(state.progressName)"
     }
 
     private func movePhotosOut() {
@@ -355,10 +397,55 @@ struct ToolPage: View {
         panel.prompt = "Move photos here"
         panel.message = "Choose a folder outside your video library."
         guard panel.runModal() == .OK, let dest = panel.url?.path else { return }
-        state.movePhotosOut(to: dest)
+        if settingsStore.settings.requireConfirmToWrite, !state.dryRun {
+            let alert = NSAlert()
+            alert.messageText = "Move \(state.photos.count) photo\(state.photos.count == 1 ? "" : "s")?"
+            alert.informativeText = "From the scanned folder to:\n\(dest)"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Move Photos")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        if let refused = state.movePhotosOut(to: dest) {
+            let alert = NSAlert()
+            alert.messageText = "Choose another folder"
+            alert.informativeText = refused
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
+    }
+
+    private func confirmAndWrite() {
+        guard state.canWrite else { return }
+        if settingsStore.settings.requireConfirmToWrite {
+            let alert = NSAlert()
+            alert.messageText = state.writeButtonTitle + "?"
+            alert.informativeText = """
+            Source: \(settingsStore.settings.lastFolder ?? "dropped items")
+            \(state.previewLiveCaption)
+            """
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Write")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        state.startWrite(
+            settings: settingsStore.settings,
+            ffmpegPath: appState.ffmpegPath
+        )
     }
 
     private func beginScan(_ paths: [String]) {
+        if let warning = ScanSafety.warning(for: paths) {
+            let alert = NSAlert()
+            alert.messageText = "Scan this location?"
+            alert.informativeText = warning
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Scan")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
         state.startScan(
             paths: paths,
             settings: settingsStore.settings

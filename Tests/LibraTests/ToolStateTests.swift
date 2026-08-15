@@ -19,15 +19,16 @@ final class ToolStateTests: XCTestCase {
     }
 
     @MainActor
-    func testScheduleRerunSkipsWhenNotDryRun() async {
+    func testScheduleRerunPreviewsWhenLiveToggleOff() async {
         let state = ToolState(tool: .vidres)
         state.dryRun = false
         state.files = [stubVideo()]
 
         state.scheduleRerunAfterOptionsChange()
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        try? await Task.sleep(nanoseconds: 700_000_000)
 
-        XCTAssertFalse(state.running)
+        XCTAssertTrue(state.undoRecords.isEmpty)
+        XCTAssertFalse(state.canWrite && state.running)
     }
 
     private func stubVideo() -> VideoInfo {

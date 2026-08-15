@@ -11,6 +11,9 @@ final class PhotoSweepState: ObservableObject {
     @Published var recap: String?
     @Published var dryRun = true
     @Published var progress: (done: Int, total: Int) = (0, 0)
+    @Published var undoRecords: [UndoRecord] = []
+
+    var canUndo: Bool { !undoRecords.isEmpty && !running }
 
     private var task: Task<Void, Never>?
 
@@ -20,6 +23,7 @@ final class PhotoSweepState: ObservableObject {
         recap = "Finding photos…"
         photos = []
         results = []
+        undoRecords = []
         AppState.shared.rememberLastFolder(from: paths)
         task = Task { [weak self] in
             guard let self else { return }
@@ -53,6 +57,19 @@ final class PhotoSweepState: ObservableObject {
         panel.prompt = "Move photos here"
         panel.message = "Choose a folder outside your video library."
         guard panel.runModal() == .OK, let dest = panel.url?.path else { return }
+        if ScanSafety.destinationIsInsideSource(dest: dest, sourceRoot: SettingsStore.shared.settings.lastFolder) {
+            recap = "Choose a folder outside the scanned video folder."
+            return
+        }
+        if SettingsStore.shared.settings.requireConfirmToWrite, !dryRun {
+            let alert = NSAlert()
+            alert.messageText = "Move \(photos.count) photo\(photos.count == 1 ? "" : "s")?"
+            alert.informativeText = dest
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Move Photos")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
 
         running = true
         let moved = PhotoMover.move(photos, to: dest, dryRun: dryRun)
@@ -65,8 +82,29 @@ final class PhotoSweepState: ObservableObject {
             photos = photos.filter { photo in
                 !moved.contains { $0.path == photo.path && $0.status == .success }
             }
+            undoRecords = moved.compactMap { result in
+                guard result.status == .success, let output = result.outputPath, output != result.path else { return nil }
+                return UndoRecord(kind: .moved, originalPath: result.path, resultPath: output)
+            }
         }
         running = false
+    }
+
+    func undoLastRun() {
+        guard canUndo else { return }
+        running = true
+        let records = undoRecords
+        undoRecords = []
+        var restored = 0
+        var failed = 0
+        for record in records.reversed() {
+            let result = FileOps.moveFile(from: record.resultPath, to: record.originalPath, dryRun: false)
+            if result.status == .success { restored += 1 } else { failed += 1 }
+        }
+        running = false
+        recap = failed == 0
+            ? "Undid \(restored) photo move\(restored == 1 ? "" : "s")."
+            : "Undo finished: \(restored) restored, \(failed) failed."
     }
 }
 
@@ -78,7 +116,7 @@ struct PhotoSweepView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Move photos out of video folders")
                 .font(.system(size: 15, weight: .semibold))
-            Text("Move photos out of video folders.")
+            Text("Scan a mixed folder, then move stills somewhere else.")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
 
@@ -86,7 +124,7 @@ struct PhotoSweepView: View {
                 title: "Drop a folder",
                 subtitle: "We’ll list photos (JPG, HEIC, PNG, …) so you can move them out.",
                 onDrop: { paths in
-                    state.startScan(paths: paths, settings: settingsStore.settings)
+                    beginScan(paths)
                 },
                 onBrowse: { browse(files: false) },
                 onSelectFiles: { browse(files: true) }
@@ -152,11 +190,18 @@ struct PhotoSweepView: View {
 
                 Spacer()
 
+                if state.canUndo {
+                    Button("Undo last run") {
+                        state.undoLastRun()
+                    }
+                }
+
                 Button("Move photos out…") {
                     state.moveOut()
                 }
                 .buttonStyle(LibraPrimaryButtonStyle())
                 .disabled(state.photos.isEmpty || state.running)
+                .accessibilityLabel("Move photos out")
             }
 
             if let recap = state.recap {
@@ -168,6 +213,19 @@ struct PhotoSweepView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private func beginScan(_ paths: [String]) {
+        if let warning = ScanSafety.warning(for: paths) {
+            let alert = NSAlert()
+            alert.messageText = "Scan this location?"
+            alert.informativeText = warning
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Scan")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+        state.startScan(paths: paths, settings: settingsStore.settings)
+    }
+
     private func browse(files: Bool) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = files
@@ -177,10 +235,7 @@ struct PhotoSweepView: View {
             panel.allowedContentTypes = [.image, .data]
         }
         if panel.runModal() == .OK {
-            state.startScan(
-                paths: panel.urls.map(\.path),
-                settings: settingsStore.settings
-            )
+            beginScan(panel.urls.map(\.path))
         }
     }
 }

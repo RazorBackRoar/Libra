@@ -40,8 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.backgroundColor = .black
-            // Override any restored frame from earlier launches.
-            window.setContentSize(NSSize(width: 900, height: 860))
             window.minSize = NSSize(width: 780, height: 740)
         }
     }
@@ -63,12 +61,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainMenu.addItem(appMenuItem)
 
         let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(withTitle: "Open Folder…", action: #selector(openFolder), keyEquivalent: "o")
+        let selectItem = NSMenuItem(title: "Select Files…", action: #selector(selectFiles), keyEquivalent: "o")
+        selectItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(selectItem)
         let fileMenuItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
         let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Undo Last Run", action: #selector(undoLastRun), keyEquivalent: "z")
         editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
@@ -122,5 +124,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showSettings() {
         NSApp?.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+    }
+
+    @objc func openFolder() {
+        NotificationCenter.default.post(name: LibraCommands.openFolder, object: nil)
+    }
+
+    @objc func selectFiles() {
+        NotificationCenter.default.post(name: LibraCommands.selectFiles, object: nil)
+    }
+
+    @objc func undoLastRun() {
+        if NSApp?.keyWindow?.firstResponder is NSTextView { return }
+        NotificationCenter.default.post(name: LibraCommands.undoLastRun, object: nil)
     }
 }

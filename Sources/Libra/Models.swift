@@ -41,7 +41,7 @@ struct VideoInfo: Identifiable, Equatable {
     }
 
     /// Canonical resolution bucket labels (contract order).
-    static let resolutionClasses = ["4K", "FHD", "1080p", "HD", "720p", "SD"]
+    static let resolutionClasses = ["8K", "4K", "FHD", "1080p", "HD", "720p", "SD"]
 
     var resolutionFolder: String { resolutionClass }
     var orientationFolder: String { orientation.capitalized }
@@ -97,7 +97,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
 
     var description: String {
         switch self {
-        case .iphoneSorter: return "Split videos into iPhone and Not iPhone folders."
+        case .iphoneSorter: return "Split videos into iPhone, Other Apple, and Not Apple folders."
         case .provid, .vidres, .keepName, .promax, .maxvid:
             return "Rename files, or nest folders by resolution, orientation, and FPS."
         case .oneMin: return "Stamp sequential 60-second creation times. Needs ffmpeg."
@@ -187,6 +187,7 @@ struct AppSettings: Codable {
     var defaultPrefix: String
     var sortByDate: Bool
     var sortByCamera: Bool
+    var sortDuplicatesIntoFolder: Bool
 
     static let `default` = AppSettings(
         ffmpegPath: nil,
@@ -198,7 +199,8 @@ struct AppSettings: Codable {
         requireConfirmToWrite: true,
         defaultPrefix: "",
         sortByDate: false,
-        sortByCamera: false
+        sortByCamera: false,
+        sortDuplicatesIntoFolder: false
     )
 
     init(
@@ -211,7 +213,8 @@ struct AppSettings: Codable {
         requireConfirmToWrite: Bool,
         defaultPrefix: String,
         sortByDate: Bool,
-        sortByCamera: Bool
+        sortByCamera: Bool,
+        sortDuplicatesIntoFolder: Bool
     ) {
         self.ffmpegPath = ffmpegPath
         self.ffprobePath = ffprobePath
@@ -223,6 +226,7 @@ struct AppSettings: Codable {
         self.defaultPrefix = defaultPrefix
         self.sortByDate = sortByDate
         self.sortByCamera = sortByCamera
+        self.sortDuplicatesIntoFolder = sortDuplicatesIntoFolder
     }
 
     init(from decoder: Decoder) throws {
@@ -237,5 +241,6 @@ struct AppSettings: Codable {
         defaultPrefix = try container.decodeIfPresent(String.self, forKey: .defaultPrefix) ?? ""
         sortByDate = try container.decodeIfPresent(Bool.self, forKey: .sortByDate) ?? false
         sortByCamera = try container.decodeIfPresent(Bool.self, forKey: .sortByCamera) ?? false
+        sortDuplicatesIntoFolder = try container.decodeIfPresent(Bool.self, forKey: .sortDuplicatesIntoFolder) ?? false
     }
 }

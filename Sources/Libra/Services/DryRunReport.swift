@@ -6,16 +6,16 @@ enum DryRunReport {
     /// without overwriting existing files.
     @discardableResult
     static func write(tool: Tool, results: [OperationResult]) -> URL? {
-        let entries = results.compactMap { result -> (before: String, after: String, note: String?)? in
-            let before = (result.path as NSString).lastPathComponent
+        let entries = results.compactMap { result -> (before: String, after: String, folder: String?, note: String?)? in
+            let before = result.path
             if let output = result.outputPath {
-                let after = (output as NSString).lastPathComponent
-                return (before, after, result.status == .success ? nil : result.reason)
+                let folder = (output as NSString).deletingLastPathComponent
+                return (before, output, folder, result.status == .success ? nil : result.reason)
             }
             if let reason = result.reason {
-                return (before, "(no change)", reason)
+                return (before, "(no change)", nil, reason)
             }
-            return (before, "(no change)", result.status.rawValue)
+            return (before, "(no change)", nil, result.status.rawValue)
         }
         guard !entries.isEmpty else { return nil }
 
@@ -37,6 +37,9 @@ enum DryRunReport {
             lines.append("\(index + 1).")
             lines.append("Before: \(entry.before)")
             lines.append("After:  \(entry.after)")
+            if let folder = entry.folder, !folder.isEmpty {
+                lines.append("Folder: \(folder)")
+            }
             if let note = entry.note, !note.isEmpty {
                 lines.append("Note:   \(note)")
             }

@@ -13,6 +13,7 @@ final class MediaClassificationTests: XCTestCase {
 
     func testResolution_otherBuckets() {
         XCTAssertEqual(MediaClassification.resolutionClass(width: 3840, height: 2160), "4K")
+        XCTAssertEqual(MediaClassification.resolutionClass(width: 7680, height: 4320), "8K")
         XCTAssertEqual(MediaClassification.resolutionClass(width: 1280, height: 720), "720p")
         XCTAssertEqual(MediaClassification.resolutionClass(width: 1366, height: 768), "HD")
         XCTAssertEqual(MediaClassification.resolutionClass(width: 640, height: 480), "SD")

@@ -71,10 +71,15 @@ struct GPSMapPanel: View {
         .cornerRadius(12)
         .onAppear {
             expanded = startsExpanded
-            model.update(files: files)
+            model.update(files: files, geocode: expanded)
         }
         .onChange(of: files.map(\.path)) { _, _ in
-            model.update(files: files)
+            model.update(files: files, geocode: expanded)
+        }
+        .onChange(of: expanded) { _, isExpanded in
+            if isExpanded {
+                model.update(files: files, geocode: true)
+            }
         }
     }
 
@@ -153,6 +158,6 @@ private struct GPSMapPin: View {
                 .frame(width: 2, height: 5)
                 .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
         }
-        .accessibilityHidden(true)
+        .accessibilityLabel(selected ? "Selected map pin" : "Map pin")
     }
 }

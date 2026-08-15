@@ -1,6 +1,5 @@
 import Foundation
 
-@MainActor
 enum FileOps {
     static func moveFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
         let target = uniquePath(for: to, reserved: reserved)
@@ -106,6 +105,15 @@ enum FileOps {
 
     private static func pad(_ number: Int, width: Int) -> String {
         String(format: "%0\(width)d", number)
+    }
+
+    /// True when `path` is `ancestor` or a file/folder inside it.
+    static func isPath(_ path: String, inside ancestor: String) -> Bool {
+        let child = URL(fileURLWithPath: path).standardizedFileURL.path
+        let root = URL(fileURLWithPath: ancestor).standardizedFileURL.path
+        if child == root { return true }
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        return child.hasPrefix(prefix)
     }
 
     private static func join(dir: String, stem: String, ext: String) -> String {

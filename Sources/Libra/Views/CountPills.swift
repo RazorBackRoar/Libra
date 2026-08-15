@@ -8,6 +8,8 @@ enum MediaBrowserFilter: Hashable, Identifiable {
     case iPhoneModel
     case appleDevice
     case both
+    case otherApple
+    case notApple
     case duplicates
 
     var id: String {
@@ -19,6 +21,8 @@ enum MediaBrowserFilter: Hashable, Identifiable {
         case .iPhoneModel: return "iphone-model"
         case .appleDevice: return "apple-device"
         case .both: return "both"
+        case .otherApple: return "other-apple"
+        case .notApple: return "not-apple"
         case .duplicates: return "duplicates"
         }
     }
@@ -32,6 +36,8 @@ enum MediaBrowserFilter: Hashable, Identifiable {
         case .iPhoneModel: return "iPhone model"
         case .appleDevice: return "Apple device"
         case .both: return "Apple make + iPhone model"
+        case .otherApple: return "Other Apple"
+        case .notApple: return "Not Apple"
         case .duplicates: return "Likely duplicates"
         }
     }
@@ -52,6 +58,10 @@ enum MediaBrowserFilter: Hashable, Identifiable {
             return file.isApple
         case .both:
             return file.hasAppleMake && file.hasiPhoneModel
+        case .otherApple:
+            return file.hasAppleMake && !file.hasiPhoneModel
+        case .notApple:
+            return !file.hasAppleMake && !file.hasiPhoneModel
         case .duplicates:
             return duplicateExtras.contains(file.path)
         }
@@ -66,11 +76,11 @@ struct CountPills: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                pill(filter: .all, label: "Files", value: files.count)
+                pill(filter: .all, label: "Videos", value: files.count)
                 if tool == .iphoneSorter {
-                    pill(filter: .appleMake, label: "Apple make", value: files.filter { $0.hasAppleMake }.count)
-                    pill(filter: .iPhoneModel, label: "iPhone model", value: files.filter { $0.hasiPhoneModel }.count)
-                    pill(filter: .both, label: "Apple make + iPhone model", value: files.filter { $0.hasAppleMake && $0.hasiPhoneModel }.count)
+                    pill(filter: .iPhoneModel, label: "iPhone", value: files.filter { $0.hasiPhoneModel }.count)
+                    pill(filter: .otherApple, label: "Other Apple", value: files.filter { $0.hasAppleMake && !$0.hasiPhoneModel }.count)
+                    pill(filter: .notApple, label: "Not Apple", value: files.filter { !$0.hasAppleMake && !$0.hasiPhoneModel }.count)
                 } else {
                     ForEach(VideoInfo.resolutionClasses, id: \.self) { label in
                         pill(
@@ -125,6 +135,7 @@ struct CountPill: View {
         .buttonStyle(.plain)
         .disabled(value == 0 || action == nil)
         .opacity(value == 0 ? 0.55 : 1)
-        .help(value == 0 ? "No \(label) files" : "Browse \(label) files")
+        .help(value == 0 ? "No \(label.lowercased()) videos" : "Browse \(label.lowercased()) videos")
+        .accessibilityLabel("\(value) \(label)")
     }
 }

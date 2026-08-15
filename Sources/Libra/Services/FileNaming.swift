@@ -7,10 +7,9 @@ import Foundation
 ///
 /// A non-empty prefix replaces the original name (with a space after it):
 /// `katie 720p W30 002.mp4` — not `katie 1E8B0D0F-… 720p W30 002.mp4`.
-@MainActor
 enum FileNaming {
-    static let resolutionClasses = ["4K", "FHD", "1080p", "HD", "720p", "SD"]
-    static let fpsBuckets = [30, 60, 120]
+    static let resolutionClasses = ["8K", "4K", "FHD", "1080p", "HD", "720p", "SD"]
+    static let fpsBuckets = [24, 30, 60, 120]
 
     /// Zero-pad width: at least 3 digits (`001`), growing for larger batches.
     static func paddingWidth(forCount count: Int) -> Int {

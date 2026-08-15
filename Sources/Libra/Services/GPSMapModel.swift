@@ -63,7 +63,7 @@ final class GPSMapModel: ObservableObject {
         clusters.reduce(0) { $0 + $1.files.count }
     }
 
-    func update(files: [VideoInfo]) {
+    func update(files: [VideoInfo], geocode: Bool = false) {
         let built = GPSMapClustering.cluster(files: files)
         clusters = built.map { cluster in
             var copy = cluster
@@ -76,7 +76,9 @@ final class GPSMapModel: ObservableObject {
         if let selectedClusterID, !clusters.contains(where: { $0.id == selectedClusterID }) {
             self.selectedClusterID = nil
         }
-        startGeocodingIfNeeded()
+        if geocode {
+            startGeocodingIfNeeded()
+        }
     }
 }
 

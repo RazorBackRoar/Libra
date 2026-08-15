@@ -56,6 +56,11 @@ enum ScannerService {
                         completedCount: 0
                     )
                 } catch {
+                    unsupported.append(OperationResult(
+                        path: path,
+                        status: .skipped,
+                        reason: "Could not read folder: \(error.localizedDescription)"
+                    ))
                     continue
                 }
             } else {
@@ -76,63 +81,67 @@ enum ScannerService {
         let total = deduped.count
         await progress?(0, total)
 
-        var results: [VideoInfo] = []
-        for (index, file) in deduped.enumerated() {
-            if Task.isCancelled {
-                return cancelledOutcome(
-                    supported: results,
-                    unsupported: unsupported,
-                    discoveredTotal: total,
-                    completedCount: results.count
-                )
-            }
+        var slotResults: [Int: VideoInfo] = [:]
+        let workerCount = min(4, max(total, 0))
 
-            do {
-                let info = try await probeHandler(file)
-                results.append(info)
-            } catch is CancellationError {
-                return cancelledOutcome(
-                    supported: results,
-                    unsupported: unsupported,
-                    discoveredTotal: total,
-                    completedCount: results.count
-                )
-            } catch ProcessRunnerError.cancelled {
-                return cancelledOutcome(
-                    supported: results,
-                    unsupported: unsupported,
-                    discoveredTotal: total,
-                    completedCount: results.count
-                )
-            } catch {
-                results.append(
-                    VideoInfo(
-                        path: file,
-                        name: URL(fileURLWithPath: file).deletingPathExtension().lastPathComponent,
-                        dir: URL(fileURLWithPath: file).deletingLastPathComponent().path,
-                        ext: (file as NSString).pathExtension.lowercased(),
-                        sizeBytes: 0,
-                        width: 0,
-                        height: 0,
-                        resolutionClass: "Unknown",
-                        orientation: "Unknown",
-                        fps: 0,
-                        durationSec: 0,
-                        codec: "",
-                        container: "",
-                        make: "",
-                        model: "",
-                        hasAppleMake: false,
-                        hasiPhoneModel: false,
-                        hasGPS: false,
-                        creationTime: nil,
-                        error: "Could not read video metadata",
-                        warning: nil
-                    )
-                )
-            }
+        if total > 0 {
+            await withTaskGroup(of: (Int, Result<VideoInfo, Error>).self) { group in
+                var submitted = 0
+                func enqueue(_ index: Int) {
+                    let file = deduped[index]
+                    group.addTask {
+                        do {
+                            let info = try await probeHandler(file)
+                            return (index, .success(info))
+                        } catch {
+                            return (index, .failure(error))
+                        }
+                    }
+                }
 
-            await progress?(index + 1, total)
+                while submitted < workerCount {
+                    enqueue(submitted)
+                    submitted += 1
+                }
+
+                var completed = 0
+                while let (index, result) = await group.next() {
+                    if Task.isCancelled {
+                        group.cancelAll()
+                        break
+                    }
+                    switch result {
+                    case .success(let info):
+                        slotResults[index] = info
+                    case .failure(let error):
+                        if error is CancellationError {
+                            group.cancelAll()
+                            break
+                        }
+                        if let runner = error as? ProcessRunnerError, case .cancelled = runner {
+                            group.cancelAll()
+                            break
+                        }
+                        slotResults[index] = failedProbeInfo(filePath: deduped[index])
+                    }
+                    completed += 1
+                    await progress?(completed, total)
+                    if submitted < total {
+                        enqueue(submitted)
+                        submitted += 1
+                    }
+                }
+            }
+        }
+
+        let results = slotResults.keys.sorted().compactMap { slotResults[$0] }
+        if Task.isCancelled || results.count < total {
+            return cancelledOutcome(
+                supported: results,
+                unsupported: unsupported,
+                discoveredTotal: total,
+                completedCount: results.count
+            )
         }
 
         return ScanOutcome(
@@ -141,6 +150,32 @@ enum ScannerService {
             discoveredTotal: total,
             completedCount: results.count,
             terminal: .completed
+        )
+    }
+
+    private static func failedProbeInfo(filePath: String) -> VideoInfo {
+        VideoInfo(
+            path: filePath,
+            name: URL(fileURLWithPath: filePath).deletingPathExtension().lastPathComponent,
+            dir: URL(fileURLWithPath: filePath).deletingLastPathComponent().path,
+            ext: (filePath as NSString).pathExtension.lowercased(),
+            sizeBytes: 0,
+            width: 0,
+            height: 0,
+            resolutionClass: "Unknown",
+            orientation: "Unknown",
+            fps: 0,
+            durationSec: 0,
+            codec: "",
+            container: "",
+            make: "",
+            model: "",
+            hasAppleMake: false,
+            hasiPhoneModel: false,
+            hasGPS: false,
+            creationTime: nil,
+            error: "Could not read video metadata",
+            warning: nil
         )
     }
 

@@ -56,4 +56,24 @@ final class FileNamingTests: XCTestCase {
         )
         XCTAssertEqual(name, "video 1080p V60 001.mp4")
     }
+
+    func testEightKAnd24FpsBuckets() {
+        XCTAssertEqual(FileNaming.resolutionLabel("8K"), "8K")
+        XCTAssertEqual(FileNaming.fpsBucket(24), 24)
+        XCTAssertEqual(FileNaming.fpsBucket(30), 30)
+        let name = FileNaming.standardFileName(
+            originalName: "Cinema",
+            prefix: "",
+            resolutionClass: "8K",
+            orientation: "landscape",
+            fps: 24,
+            hasAppleMake: false,
+            hasiPhoneModel: false,
+            hasGPS: false,
+            index: 1,
+            padWidth: 3,
+            ext: "mov"
+        )
+        XCTAssertEqual(name, "Cinema 8K W24 001.mov")
+    }
 }

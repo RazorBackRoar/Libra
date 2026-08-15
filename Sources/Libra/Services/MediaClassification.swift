@@ -3,11 +3,12 @@ import Foundation
 
 /// Resolution buckets and display orientation. Independent of how metadata was probed.
 enum MediaClassification {
-    /// Six-tier buckets. First match wins on `long = max(w, h)`:
-    /// 4K (≥3840) → 1080p (±2 of 1920) → 720p (±2 of 1280) → FHD (>1920) → HD (>720) → SD.
+    /// First match wins on `long = max(w, h)`:
+    /// 8K (≥7680) → 4K (≥3840) → 1080p (±2 of 1920) → 720p (±2 of 1280) → FHD (>1920) → HD (>720) → SD.
     static func resolutionClass(width: Int, height: Int) -> String {
         guard width > 0, height > 0 else { return "Unknown" }
         let long = max(width, height)
+        if long >= 7680 { return "8K" }
         if long >= 3840 { return "4K" }
         if abs(long - 1920) <= 2 { return "1080p" }
         if abs(long - 1280) <= 2 { return "720p" }
