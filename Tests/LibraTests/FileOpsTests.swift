@@ -161,4 +161,29 @@ final class FileOpsTests: XCTestCase {
         XCTAssertTrue(FileOps.isPath("/Trip", inside: "/Trip"))
         XCTAssertFalse(FileOps.isPath("/Photos", inside: "/Trip"))
     }
+
+    func testMoveFile_skipsDestinationParentSymlinkOutsideRoot() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("libra-dest-link-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let root = dir.appendingPathComponent("media", isDirectory: true)
+        let outside = dir.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+
+        let source = root.appendingPathComponent("clip.mov").path
+        FileManager.default.createFile(atPath: source, contents: Data("src".utf8))
+
+        let link = root.appendingPathComponent("1080p").path
+        try FileManager.default.createSymbolicLink(atPath: link, withDestinationPath: outside.path)
+        let dest = (link as NSString).appendingPathComponent("clip.mov")
+
+        XCTAssertFalse(FileOps.destinationIsSafe(dest, within: root.path))
+        let result = FileOps.moveFile(from: source, to: dest, dryRun: false, withinRoot: root.path)
+        XCTAssertEqual(result.status, .skipped)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source))
+        XCTAssertTrue(FileManager.default.contentsOfDirectory(atPath: outside.path)?.isEmpty ?? true)
+    }
 }

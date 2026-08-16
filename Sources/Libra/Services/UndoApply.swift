@@ -7,7 +7,13 @@ enum UndoApply {
         for record in records.reversed() {
             switch record.kind {
             case .moved:
-                let result = FileOps.moveFile(from: record.resultPath, to: record.originalPath, dryRun: false)
+                let originalDir = (record.originalPath as NSString).deletingLastPathComponent
+                let result = FileOps.moveFile(
+                    from: record.resultPath,
+                    to: record.originalPath,
+                    dryRun: false,
+                    withinRoot: originalDir
+                )
                 if result.status == .success { restored += 1 } else { failed += 1 }
             case .createdCopy:
                 let result = FileOps.deleteFile(record.resultPath, dryRun: false)

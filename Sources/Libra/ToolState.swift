@@ -389,8 +389,9 @@ final class ToolState: ObservableObject {
         progressName = (from as NSString).lastPathComponent
         let dry = previewPass
         let reservedSnapshot = reserved
+        let root = SettingsStore.shared.settings.lastFolder ?? (from as NSString).deletingLastPathComponent
         let result = await Task.detached {
-            FileOps.moveFile(from: from, to: planned, dryRun: dry, reserved: reservedSnapshot)
+            FileOps.moveFile(from: from, to: planned, dryRun: dry, reserved: reservedSnapshot, withinRoot: root)
         }.value
         if let output = result.outputPath { reserved.insert(output) }
         noteUndo(kind: kind, from: from, result: result)
@@ -610,7 +611,8 @@ final class ToolState: ObservableObject {
                     outputPath: output,
                     creationTime: current,
                     ffmpegPath: ffmpegPath,
-                    durationSec: file.durationSec
+                    durationSec: file.durationSec,
+                    withinRoot: SettingsStore.shared.settings.lastFolder ?? file.dir
                 )
                 if mode != "copies",
                    written.status == .success,
@@ -671,7 +673,8 @@ final class ToolState: ObservableObject {
                     outputPath: output,
                     factor: factor,
                     ffmpegPath: ffmpegPath,
-                    durationSec: file.durationSec
+                    durationSec: file.durationSec,
+                    withinRoot: SettingsStore.shared.settings.lastFolder ?? file.dir
                 )
             }
             if let out = result.outputPath { reserved.insert(out) }

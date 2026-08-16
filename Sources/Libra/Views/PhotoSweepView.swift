@@ -98,7 +98,13 @@ final class PhotoSweepState: ObservableObject {
         var restored = 0
         var failed = 0
         for record in records.reversed() {
-            let result = FileOps.moveFile(from: record.resultPath, to: record.originalPath, dryRun: false)
+            let originalDir = (record.originalPath as NSString).deletingLastPathComponent
+            let result = FileOps.moveFile(
+                from: record.resultPath,
+                to: record.originalPath,
+                dryRun: false,
+                withinRoot: originalDir
+            )
             if result.status == .success { restored += 1 } else { failed += 1 }
         }
         running = false

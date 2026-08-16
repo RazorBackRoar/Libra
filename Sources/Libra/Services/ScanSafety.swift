@@ -42,6 +42,6 @@ enum ScanSafety {
 
     static func destinationIsInsideSource(dest: String, sourceRoot: String?) -> Bool {
         guard let sourceRoot, !sourceRoot.isEmpty else { return false }
-        return FileOps.isPath(dest, inside: sourceRoot)
+        return FileOps.isPhysicallyInside(dest, ancestor: sourceRoot)
     }
 }

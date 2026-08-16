@@ -11,7 +11,8 @@ enum FfmpegOps {
         outputPath: String,
         factor: Double,
         ffmpegPath: String,
-        durationSec: Double = 0
+        durationSec: Double = 0,
+        withinRoot: String? = nil
     ) async -> OperationResult {
         let multiplier = 1.0 / factor
         let setpts = "PTS*\(multiplier)"
@@ -20,6 +21,7 @@ enum FfmpegOps {
             outputPath: outputPath,
             ffmpegPath: ffmpegPath,
             timeout: timeout(durationSec: durationSec, factor: factor),
+            withinRoot: withinRoot,
             arguments: { tmp in
                 [
                     "-i", filePath,
@@ -37,7 +39,8 @@ enum FfmpegOps {
         outputPath: String,
         creationTime: Date,
         ffmpegPath: String,
-        durationSec: Double = 0
+        durationSec: Double = 0,
+        withinRoot: String? = nil
     ) async -> OperationResult {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -49,6 +52,7 @@ enum FfmpegOps {
             outputPath: outputPath,
             ffmpegPath: ffmpegPath,
             timeout: timeout(durationSec: durationSec, factor: 1),
+            withinRoot: withinRoot,
             arguments: { tmp in
                 [
                     "-i", filePath,
@@ -69,11 +73,26 @@ enum FfmpegOps {
         outputPath: String,
         ffmpegPath: String,
         timeout: TimeInterval,
+        withinRoot: String? = nil,
         arguments: (String) -> [String]
     ) async -> OperationResult {
+        if let withinRoot, !FileOps.destinationIsSafe(outputPath, within: withinRoot) {
+            return OperationResult(
+                path: filePath,
+                status: .failed,
+                reason: "Destination is outside the selected folder (symlink)"
+            )
+        }
         let dir = (outputPath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let tmp = FileOps.uniquePath(for: outputPath + ".libra-tmp")
+        if let withinRoot, !FileOps.destinationIsSafe(tmp, within: withinRoot) {
+            return OperationResult(
+                path: filePath,
+                status: .failed,
+                reason: "Destination is outside the selected folder (symlink)"
+            )
+        }
         do {
             let output = try await ProcessRunner.run(
                 executablePath: ffmpegPath,

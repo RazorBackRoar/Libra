@@ -10,11 +10,50 @@ enum FileOps {
         return values?.isAliasFile == true
     }
 
-    static func moveFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
+    /// Symlink-resolved, standardized path.
+    static func resolvedPath(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    /// True when `path` is `ancestor` or a file/folder inside it (logical, no symlink resolve).
+    static func isPath(_ path: String, inside ancestor: String) -> Bool {
+        let child = URL(fileURLWithPath: path).standardizedFileURL.path
+        let root = URL(fileURLWithPath: ancestor).standardizedFileURL.path
+        if child == root { return true }
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        return child.hasPrefix(prefix)
+    }
+
+    /// True when the physical location of `path` stays inside the physical `ancestor`.
+    static func isPhysicallyInside(_ path: String, ancestor: String) -> Bool {
+        isPath(resolvedPath(path), inside: resolvedPath(ancestor))
+    }
+
+    /// Reject dest files that are links, and dest parents that resolve outside `root`.
+    static func destinationIsSafe(_ dest: String, within root: String) -> Bool {
+        guard !dest.isEmpty, !root.isEmpty else { return false }
+        if isSymlinkOrAlias(dest) { return false }
+        return isPhysicallyInside(dest, ancestor: root)
+    }
+
+    static func moveFile(
+        from: String,
+        to: String,
+        dryRun: Bool,
+        reserved: Set<String> = [],
+        withinRoot: String? = nil
+    ) -> OperationResult {
         if isSymlinkOrAlias(from) {
             return OperationResult(path: from, status: .skipped, reason: "Skipped symlink or alias")
         }
         let target = uniquePath(for: to, reserved: reserved)
+        if let withinRoot, !destinationIsSafe(target, within: withinRoot) {
+            return OperationResult(
+                path: from,
+                status: .skipped,
+                reason: "Skipped destination outside selected folder (symlink)"
+            )
+        }
         if dryRun {
             return OperationResult(path: from, status: .success, reason: "Dry-run move to \(target)", outputPath: target)
         }
@@ -28,11 +67,24 @@ enum FileOps {
         }
     }
 
-    static func copyFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
+    static func copyFile(
+        from: String,
+        to: String,
+        dryRun: Bool,
+        reserved: Set<String> = [],
+        withinRoot: String? = nil
+    ) -> OperationResult {
         if isSymlinkOrAlias(from) {
             return OperationResult(path: from, status: .skipped, reason: "Skipped symlink or alias")
         }
         let target = uniquePath(for: to, reserved: reserved)
+        if let withinRoot, !destinationIsSafe(target, within: withinRoot) {
+            return OperationResult(
+                path: from,
+                status: .skipped,
+                reason: "Skipped destination outside selected folder (symlink)"
+            )
+        }
         if dryRun {
             return OperationResult(path: from, status: .success, reason: "Dry-run copy to \(target)", outputPath: target)
         }
@@ -120,15 +172,6 @@ enum FileOps {
 
     private static func pad(_ number: Int, width: Int) -> String {
         String(format: "%0\(width)d", number)
-    }
-
-    /// True when `path` is `ancestor` or a file/folder inside it.
-    static func isPath(_ path: String, inside ancestor: String) -> Bool {
-        let child = URL(fileURLWithPath: path).standardizedFileURL.path
-        let root = URL(fileURLWithPath: ancestor).standardizedFileURL.path
-        if child == root { return true }
-        let prefix = root.hasSuffix("/") ? root : root + "/"
-        return child.hasPrefix(prefix)
     }
 
     private static func join(dir: String, stem: String, ext: String) -> String {
