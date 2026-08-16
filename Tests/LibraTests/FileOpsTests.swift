@@ -184,6 +184,7 @@ final class FileOpsTests: XCTestCase {
         let result = FileOps.moveFile(from: source, to: dest, dryRun: false, withinRoot: root.path)
         XCTAssertEqual(result.status, .skipped)
         XCTAssertTrue(FileManager.default.fileExists(atPath: source))
-        XCTAssertTrue(FileManager.default.contentsOfDirectory(atPath: outside.path)?.isEmpty ?? true)
+        let outsideItems = try FileManager.default.contentsOfDirectory(atPath: outside.path)
+        XCTAssertTrue(outsideItems.isEmpty)
     }
 }

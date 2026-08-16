@@ -69,7 +69,13 @@ struct IPhoneVerifyMain {
                 let filename = FileNaming.standardFileName(for: file, index: index, padWidth: pad)
                 let destDir = (file.dir as NSString).appendingPathComponent(folder.rawValue)
                 let planned = (destDir as NSString).appendingPathComponent(filename)
-                let result = FileOps.moveFile(from: file.path, to: planned, dryRun: false, reserved: reserved)
+                let result = FileOps.moveFile(
+                    from: file.path,
+                    to: planned,
+                    dryRun: false,
+                    reserved: reserved,
+                    withinRoot: file.dir
+                )
                 if let output = result.outputPath { reserved.insert(output) }
                 let markers = FileNaming.metadataMarkers(
                     hasAppleMake: file.hasAppleMake,

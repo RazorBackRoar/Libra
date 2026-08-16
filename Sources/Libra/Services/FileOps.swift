@@ -10,9 +10,15 @@ enum FileOps {
         return values?.isAliasFile == true
     }
 
-    /// Symlink-resolved, standardized path.
+    /// Symlink-resolved, standardized path. Missing last components still resolve existing parents.
     static func resolvedPath(_ path: String) -> String {
-        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+        let url = URL(fileURLWithPath: path)
+        if FileManager.default.fileExists(atPath: path) || isSymlinkOrAlias(path) {
+            return url.resolvingSymlinksInPath().standardizedFileURL.path
+        }
+        let parent = url.deletingLastPathComponent()
+        let resolvedParent = URL(fileURLWithPath: parent.path).resolvingSymlinksInPath()
+        return resolvedParent.appendingPathComponent(url.lastPathComponent).standardizedFileURL.path
     }
 
     /// True when `path` is `ancestor` or a file/folder inside it (logical, no symlink resolve).
@@ -33,6 +39,10 @@ enum FileOps {
     static func destinationIsSafe(_ dest: String, within root: String) -> Bool {
         guard !dest.isEmpty, !root.isEmpty else { return false }
         if isSymlinkOrAlias(dest) { return false }
+        let parent = (dest as NSString).deletingLastPathComponent
+        if isSymlinkOrAlias(parent), !isPhysicallyInside(parent, ancestor: root) {
+            return false
+        }
         return isPhysicallyInside(dest, ancestor: root)
     }
 
