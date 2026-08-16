@@ -29,8 +29,15 @@ echo "Building L!bra release..."
 cd "$PROJECT_DIR"
 
 if [[ -f "$PROJECT_DIR/Libra.png" ]]; then
-    ICON_PYTHON="${LIBRA_ICON_PYTHON:-$HOME/.local/bin/python3.14}"
-    "$ICON_PYTHON" "$SCRIPT_DIR/generate-icon.py"
+    ICON_PYTHON="${LIBRA_ICON_PYTHON:-}"
+    if [[ -z "$ICON_PYTHON" ]] && command -v uv >/dev/null 2>&1; then
+        echo "Generating L!bra.icns with uv + Pillow..."
+        uv run --with pillow python "$SCRIPT_DIR/generate-icon.py"
+    elif [[ -n "$ICON_PYTHON" ]]; then
+        "$ICON_PYTHON" "$SCRIPT_DIR/generate-icon.py"
+    else
+        echo "Pillow not found; using existing AppIcon.icns"
+    fi
 fi
 
 swift build -c release
