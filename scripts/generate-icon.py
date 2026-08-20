@@ -4,7 +4,7 @@
 Libra.png is a 1024x1024 RGBA export whose squircle body sits off-grid at
 ~779x777. This rescales the artwork (including its baked shadow) so the solid
 body lands at 824x824 centred at (100,100) — matching 4Charm / Looper /
-MetaBurn / Nexus / Rusty — then applies a small downward optical nudge so the
+MetaBurn / Nexus / Swifter — then applies a small downward optical nudge so the
 gold lighting does not sit high next to the Applications folder in the DMG.
 The existing colours and shadow are preserved; nothing is re-graded.
 """
