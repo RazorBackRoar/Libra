@@ -22,3 +22,10 @@ swift-6.0.3-RELEASE-ubuntu24.04/
 # Cursor local runtime (hook stamps/index; empty project plugin UI)
 .cursor/hooks/state/
 .cursor/settings.json
+
+# Generated / leftover local junk (do not ship)
+graphify-out/
+node_modules/
+.scratch/
+*.bak
+.mcp.json
