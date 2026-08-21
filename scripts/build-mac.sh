@@ -105,6 +105,23 @@ mkdir -p "$RELEASE_DIR"
   --app-name "$DISPLAY_NAME" \
   --volname "$DISPLAY_NAME"
 
+# package-dmg.sh replaced ~/Desktop/<DisplayName>.dmg. Mount it on the Desktop
+# and back up the old installed app before the user drags the new .app in.
+if [[ -z "${GITHUB_ACTIONS:-}" && -z "${CI:-}" && -d "${HOME}/Desktop" ]]; then
+  DESKTOP_DMG="${HOME}/Desktop/${DISPLAY_NAME}.dmg"
+  echo "Mounting Desktop DMG..."
+  if ! hdiutil attach "$DESKTOP_DMG"; then
+    echo "Warning: $DESKTOP_DMG may already be mounted; continuing." >&2
+  fi
+
+  if [[ -d "/Applications/${DISPLAY_NAME}.app" ]]; then
+    BACKUP_ZIP="$HOME/Desktop/${DISPLAY_NAME} backup.zip"
+    rm -f "$BACKUP_ZIP"
+    echo "Backing up /Applications/${DISPLAY_NAME}.app to $BACKUP_ZIP"
+    zip -r -y -q "$BACKUP_ZIP" "/Applications/${DISPLAY_NAME}.app"
+  fi
+fi
+
 # Package as a single DMG; do not leave the .app bundle in the app folder.
 rm -rf "$APP_PATH"
 
