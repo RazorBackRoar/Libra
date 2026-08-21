@@ -96,6 +96,7 @@ Jules reads this repository-root `AGENTS.md` when it clones the repository. Pare
 - After a drop, only preview; writing requires an explicit Write action. Turning Preview off must not start a write.
 - Do not show container format (mov, mp4, …) in identification rows; the filename already includes it.
 - Prefer taller layouts that avoid window scrollbars; numbered file lists (1, 2, 3…) may scroll in a small pane.
+- Photos is a sixth home tile, not a Video | Photos tab.
 
 ## Learned Workspace Facts
 - Organization, rename, and sort tools must not require Homebrew ffmpeg; ffmpeg is optional for transform tools only.

@@ -61,6 +61,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
     case slomo = "Slo-Mo"
     case oneMin = "1MinVid"
     case gps = "GPS Sorter"
+    case photoSweep = "Photos"
 
     var id: String { rawValue }
 
@@ -72,16 +73,17 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         case .gps: return "GPS sort"
         case .slomo: return "Slow motion"
         case .oneMin: return "1-minute stamps"
+        case .photoSweep: return "Photos"
         }
     }
 
-    /// Home Video tab destinations. The five sort modes share one card.
-    static let videoHomeTools: [Tool] = [.provid, .iphoneSorter, .gps, .slomo, .oneMin]
+    /// Home 3×2 grid. Sort modes share one card; Photos fills the sixth tile.
+    static let homeTools: [Tool] = [.provid, .iphoneSorter, .gps, .slomo, .oneMin, .photoSweep]
 
     var isSortRenameFamily: Bool {
         switch self {
         case .provid, .vidres, .keepName, .promax, .maxvid: return true
-        default: return false
+        case .iphoneSorter, .gps, .slomo, .oneMin, .photoSweep: return false
         }
     }
 
@@ -92,6 +94,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         case .oneMin: return "clock.arrow.circlepath"
         case .slomo: return "slowmo"
         case .gps: return "location.circle"
+        case .photoSweep: return "photo.on.rectangle"
         }
     }
 
@@ -103,19 +106,20 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         case .oneMin: return "Stamp sequential 60-second creation times. Needs ffmpeg."
         case .slomo: return "Write slowed copies into a SloMo folder. Needs ffmpeg."
         case .gps: return "Sort into city folders from location, or No-GPS when location is missing."
+        case .photoSweep: return "Move stills out of mixed video folders."
         }
     }
 
     var category: String {
         switch self {
-        case .iphoneSorter, .gps, .provid, .vidres, .promax, .maxvid, .keepName:
+        case .iphoneSorter, .gps, .provid, .vidres, .promax, .maxvid, .keepName, .photoSweep:
             return "Organize"
         case .oneMin, .slomo:
             return "Transform"
         }
     }
 
-    var acceptsImages: Bool { false }
+    var acceptsImages: Bool { self == .photoSweep }
 
     var needsFfmpeg: Bool {
         switch self {

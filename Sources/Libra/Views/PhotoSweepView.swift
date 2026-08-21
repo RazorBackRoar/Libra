@@ -115,16 +115,25 @@ final class PhotoSweepState: ObservableObject {
 }
 
 struct PhotoSweepView: View {
+    let onBack: () -> Void
     @StateObject private var state = PhotoSweepState()
     @ObservedObject private var settingsStore = SettingsStore.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Move photos out of video folders")
-                .font(.system(size: 15, weight: .semibold))
-            Text("Scan a mixed folder, then move stills somewhere else.")
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
+            HStack(alignment: .center, spacing: 12) {
+                Button("Back") { onBack() }
+                    .buttonStyle(LibraSecondaryButtonStyle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Photos")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Move stills out of mixed video folders.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+            }
 
             DropZone(
                 title: "Drop a folder",
@@ -216,7 +225,9 @@ struct PhotoSweepView: View {
                     .textSelection(.enabled)
             }
         }
+        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.black.ignoresSafeArea())
     }
 
     private func beginScan(_ paths: [String]) {

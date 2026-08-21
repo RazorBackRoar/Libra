@@ -24,7 +24,7 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 - **Drag-and-drop tools** — drop a folder to scan; Dry Run previews automatically
 - **Undo last run** — put moved files back (or delete created copies)
 - **Dry Run first** — bright yellow toggle; Desktop reports named `L!bra ProVid Dry Run 1.txt` (tool name swaps per mode)
-- **Video | Photo** — nine video tools stay video-only; the Photo tab moves stills out of mixed folders
+- **Home grid** — five video tools plus a **Photos** tile that moves stills out of mixed folders
 - **Sort & rename** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
 - **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; collapsed on sort tools, full on GPS Sorter; click a filename to open the video
 - **GPS Sorter** — city folders from coordinates, `No-GPS` when missing
@@ -46,7 +46,7 @@ Requires macOS 14+ on Apple Silicon. ffmpeg / ffprobe via Homebrew when transfor
 
 ## Usage
 
-1. Open **L!bra** and pick a tool from the Video tab (or use Photo to move stills out)
+1. Open **L!bra** and pick a tool from the home grid (use **Photos** to move stills out)
 2. Drop a folder or video files, or use Open Folder / Select Files
 3. Leave **Preview only** on to plan the run; turn it off and press **Write** to change files (confirm first)
 4. Use **Undo last run** if a live pass wasn’t what you wanted

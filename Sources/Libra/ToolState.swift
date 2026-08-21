@@ -321,6 +321,8 @@ final class ToolState: ObservableObject {
             await oneMinAdjust(target: target, start: oneMinStart, mode: oneMinMode, ffmpegPath: ffmpegPath)
         case .slomo:
             await sloMo(target: target, factor: slomoFactor, ffmpegPath: ffmpegPath)
+        case .photoSweep:
+            break
         }
 
         let runResults = Array(results.dropFirst(priorCount))

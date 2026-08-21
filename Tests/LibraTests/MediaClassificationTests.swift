@@ -84,5 +84,8 @@ final class MediaClassificationTests: XCTestCase {
         XCTAssertEqual(OrganizeLayout.folderDepth(for: .keepName), .resolution)
         XCTAssertEqual(OrganizeLayout.folderDepth(for: .promax), .resolutionOrientation)
         XCTAssertEqual(OrganizeLayout.folderDepth(for: .maxvid), .resolutionOrientationFps)
+        XCTAssertEqual(Tool.homeTools.count, 6)
+        XCTAssertEqual(Tool.homeTools.last, .photoSweep)
+        XCTAssertEqual(Tool.photoSweep.title, "Photos")
     }
 }

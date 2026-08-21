@@ -110,8 +110,8 @@ mkdir -p "$RELEASE_DIR"
   --app-name "$DISPLAY_NAME" \
   --volname "$DISPLAY_NAME"
 
-# package-dmg.sh owns Desktop copy / mount / /Applications install / smoke launch.
-# Keep only the DMG in-tree — /Applications is the runnable copy.
+# package-dmg.sh owns Desktop copy / mount. Never install into /Applications.
+# Delete the staging .app. Local handoff already moved the DMG to the Desktop.
 rm -rf "$APP_PATH" "$RELEASE_DIR/.previous-build"
 
 echo "Build complete: $DMG_PATH"

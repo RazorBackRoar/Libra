@@ -1,15 +1,9 @@
 import SwiftUI
 
-enum HomeSection: String, CaseIterable {
-    case video = "Video"
-    case photos = "Photos"
-}
-
 struct HomeView: View {
     @Binding var selectedTool: Tool?
-    @Binding var section: HomeSection
 
-    private let tools = Tool.videoHomeTools
+    private let tools = Tool.homeTools
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -25,14 +19,9 @@ struct HomeView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer(minLength: 12)
-                HomeTabBar(section: $section)
             }
 
-            if section == .video {
-                videoGrid
-            } else {
-                PhotoSweepView()
-            }
+            videoGrid
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -56,31 +45,6 @@ struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-struct HomeTabBar: View {
-    @Binding var section: HomeSection
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(HomeSection.allCases, id: \.self) { item in
-                Button {
-                    section = item
-                } label: {
-                    VStack(spacing: 5) {
-                        Text(item.rawValue)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(section == item ? .yellow : .secondary)
-                        Rectangle()
-                            .fill(section == item ? Color.yellow : Color.clear)
-                            .frame(height: 2)
-                    }
-                    .frame(width: 72)
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 }
 
@@ -121,5 +85,7 @@ struct ToolCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(tool.title)
+        .accessibilityHint(tool.description)
     }
 }
