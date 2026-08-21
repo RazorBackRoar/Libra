@@ -86,6 +86,11 @@ final class MediaClassificationTests: XCTestCase {
         XCTAssertEqual(OrganizeLayout.folderDepth(for: .maxvid), .resolutionOrientationFps)
         XCTAssertEqual(Tool.homeTools.count, 6)
         XCTAssertEqual(Tool.homeTools.last, .photoSweep)
-        XCTAssertEqual(Tool.photoSweep.title, "Photos")
+        XCTAssertEqual(Tool.photoSweep.title, "Photos Only")
+        XCTAssertEqual(Tool.provid.title, "L!bra Sorter")
+        XCTAssertEqual(Tool.iphoneSorter.title, "iPhone Model Sort")
+        XCTAssertEqual(Tool.gps.title, "GPS")
+        XCTAssertEqual(Tool.slomo.title, "Slo-Mo")
+        XCTAssertEqual(Tool.oneMin.title, "1-Min-Adjuster")
     }
 }

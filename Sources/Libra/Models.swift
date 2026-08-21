@@ -68,12 +68,12 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .provid, .vidres, .keepName, .promax, .maxvid:
-            return "Sort & rename"
-        case .iphoneSorter: return "iPhone sort"
-        case .gps: return "GPS sort"
-        case .slomo: return "Slow motion"
-        case .oneMin: return "1-minute stamps"
-        case .photoSweep: return "Photos"
+            return "L!bra Sorter"
+        case .iphoneSorter: return "iPhone Model Sort"
+        case .gps: return "GPS"
+        case .slomo: return "Slo-Mo"
+        case .oneMin: return "1-Min-Adjuster"
+        case .photoSweep: return "Photos Only"
         }
     }
 

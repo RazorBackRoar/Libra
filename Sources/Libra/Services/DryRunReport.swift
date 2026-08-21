@@ -2,7 +2,7 @@ import Foundation
 
 enum DryRunReport {
     /// Writes a clean before/after listing to the Desktop as
-    /// `L!bra ProVid Dry Run 1.txt` (tool title in the name), then `2`, `3`, …
+    /// `L!bra Sorter Dry Run 1.txt` (tool title in the name), then `2`, `3`, …
     /// without overwriting existing files.
     @discardableResult
     static func write(tool: Tool, results: [OperationResult]) -> URL? {
@@ -24,7 +24,7 @@ enum DryRunReport {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 
         var lines: [String] = [
-            "\(Brand.displayName) \(tool.title) Dry Run",
+            "\(tool.title.hasPrefix(Brand.displayName) ? tool.title : "\(Brand.displayName) \(tool.title)") Dry Run",
             "Tool: \(tool.title)",
             "Generated: \(formatter.string(from: Date()))",
             "Items: \(entries.count)",
@@ -58,7 +58,10 @@ enum DryRunReport {
     private static func nextReportURL(tool: Tool) -> URL {
         let desktop = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Desktop", isDirectory: true)
-        let base = "\(Brand.displayName) \(tool.title) Dry Run"
+        let labeled = tool.title.hasPrefix(Brand.displayName)
+            ? tool.title
+            : "\(Brand.displayName) \(tool.title)"
+        let base = "\(labeled) Dry Run"
         var number = 1
         while true {
             let name = "\(base) \(number).txt"

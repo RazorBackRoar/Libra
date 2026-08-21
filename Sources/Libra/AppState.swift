@@ -52,7 +52,7 @@ final class AppState: ObservableObject {
 
         brew install ffmpeg
 
-        ffmpeg is only needed for Slow motion and 1-minute stamps. Organize tools do not require it.
+        ffmpeg is only needed for Slo-Mo and 1-Min-Adjuster. Organize tools do not require it.
         """
         alert.addButton(withTitle: "Install ffmpeg…")
         alert.addButton(withTitle: "Cancel")

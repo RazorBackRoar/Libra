@@ -125,7 +125,7 @@ struct PhotoSweepView: View {
                 Button("Back") { onBack() }
                     .buttonStyle(LibraSecondaryButtonStyle())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Photos")
+                    Text(Tool.photoSweep.title)
                         .font(.system(size: 20, weight: .bold))
                     Text("Move stills out of mixed video folders.")
                         .font(.system(size: 12))

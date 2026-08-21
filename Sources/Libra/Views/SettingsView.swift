@@ -10,7 +10,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Media tools (ffmpeg)") {
-                Text("Needed only for Slow motion and 1-minute stamps. Organize tools scan with built-in macOS media APIs.")
+                Text("Needed only for Slo-Mo and 1-Min-Adjuster. Organize tools scan with built-in macOS media APIs.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                 TextField("ffmpeg path", text: $ffmpegPath)
