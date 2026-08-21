@@ -110,8 +110,8 @@ mkdir -p "$RELEASE_DIR"
   --app-name "$DISPLAY_NAME" \
   --volname "$DISPLAY_NAME"
 
-# package-dmg.sh owns Desktop copy / mount. Never install into /Applications.
-# Keep the in-repo DMG. Delete only the staging .app.
+# package-dmg.sh writes the in-repo DMG only. Never install into /Applications.
+# Delete only the staging .app.
 rm -rf "$APP_PATH" "$RELEASE_DIR/.previous-build"
 
-echo "Build complete: $DMG_PATH and ${HOME}/Desktop/${DISPLAY_NAME}.dmg"
+echo "Build complete: $DMG_PATH"

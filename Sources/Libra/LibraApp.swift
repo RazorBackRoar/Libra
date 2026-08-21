@@ -9,7 +9,7 @@ struct LibraApp: App {
         Window("L!bra", id: "main") {
             LibraView()
         }
-        .defaultSize(width: 900, height: 860)
+        .defaultSize(width: 900, height: 880)
         .windowResizability(.contentMinSize)
 
         Settings {

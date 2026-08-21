@@ -5,7 +5,7 @@ import MapKit
 /// Caller should only present this when `files` contain coordinates.
 struct GPSMapPanel: View {
     let files: [VideoInfo]
-    var startsExpanded: Bool = false
+    var startsExpanded: Bool = true
     @StateObject private var model = GPSMapModel()
     @State private var expanded = false
 
@@ -74,6 +74,9 @@ struct GPSMapPanel: View {
             model.update(files: files, geocode: expanded)
         }
         .onChange(of: files.map(\.path)) { _, _ in
+            if startsExpanded, files.contains(where: \.hasCoordinates) {
+                expanded = true
+            }
             model.update(files: files, geocode: expanded)
         }
         .onChange(of: expanded) { _, isExpanded in

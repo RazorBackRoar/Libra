@@ -67,7 +67,7 @@ Package a macOS `.app` + DMG (ad-hoc signed):
 ```bash
 ./scripts/build-mac.sh
 # → build/Release/Libra.dmg
-# → ~/Desktop/L!bra.dmg (local handoff)
+# → build/Release/Libra.dmg
 ```
 
 | Surface | Value |

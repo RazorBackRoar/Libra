@@ -58,7 +58,7 @@ Package a macOS `.app` and DMG with ad-hoc signing:
 ./scripts/build-mac.sh
 ```
 
-Local output: `~/Desktop/L!bra.dmg` and `build/Release/Libra.dmg`
+Local output: `build/Release/Libra.dmg` (display brand **L!bra** in the DMG window)
 (executable inside stays `Libra`). CI keeps `Libra.dmg`.
 
 ## Repository rules
@@ -96,7 +96,7 @@ Jules reads this repository-root `AGENTS.md` when it clones the repository. Pare
 - After a drop, only preview; writing requires an explicit Write action. Turning Preview off must not start a write.
 - Do not show container format (mov, mp4, …) in identification rows; the filename already includes it.
 - Prefer taller layouts that avoid window scrollbars; numbered file lists (1, 2, 3…) may scroll in a small pane.
-- After any change to an app under `Workspace/Apps/`, always rebuild that app’s DMG. Leave copies at `~/Desktop/<DisplayName>.dmg` and the in-repo canonical (`dist/<App>.dmg` or `build/Release/<App>.dmg` — for L!bra that is `~/Desktop/L!bra.dmg` and `build/Release/Libra.dmg`). Do not wait to be asked.
+- After any change to an app under `Workspace/Apps/`, always rebuild that app’s DMG (`dist/<App>.dmg` or `build/Release/<App>.dmg` — for L!bra that is `build/Release/Libra.dmg`). Do not wait to be asked.
 - Home tile titles: L!bra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, Photos Only.
 
 ## Learned Workspace Facts

@@ -6,16 +6,16 @@ struct HomeView: View {
     private let tools = Tool.homeTools
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "film.stack")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundColor(.yellow)
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("L!bra")
                         .font(.system(size: 18, weight: .bold))
                     Text("Video organization toolkit")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
                 Spacer(minLength: 12)
@@ -23,13 +23,13 @@ struct HomeView: View {
 
             videoGrid
         }
-        .padding(16)
+        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.ignoresSafeArea())
     }
 
     private var videoGrid: some View {
-        Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
             ForEach(0..<2, id: \.self) { row in
                 GridRow {
                     ForEach(0..<3, id: \.self) { col in
@@ -54,10 +54,10 @@ struct ToolCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
                     Image(systemName: tool.systemImage)
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundColor(.yellow)
                     Spacer()
                     Text(tool.category)
@@ -65,17 +65,19 @@ struct ToolCard: View {
                         .foregroundColor(.secondary)
                 }
                 Text(tool.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.9)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(tool.description)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(.secondary)
-                    .lineLimit(3)
+                    .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color.white.opacity(0.06))
             .cornerRadius(14)

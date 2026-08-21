@@ -24,7 +24,7 @@ struct ToolPage: View {
 
     var body: some View {
         ZStack {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 header
 
                 if tool.needsFfmpeg && appState.missingFfmpeg {
@@ -65,7 +65,7 @@ struct ToolPage: View {
 
                 footer
             }
-            .padding(16)
+            .padding(18)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color.black.ignoresSafeArea())
 
@@ -148,7 +148,7 @@ struct ToolPage: View {
         }
 
         if state.filteredFiles.contains(where: \.hasCoordinates) {
-            GPSMapPanel(files: state.filteredFiles, startsExpanded: tool == .gps)
+            GPSMapPanel(files: state.filteredFiles, startsExpanded: true)
         }
 
         if tool.isSortRenameFamily {
