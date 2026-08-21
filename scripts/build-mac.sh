@@ -114,4 +114,4 @@ mkdir -p "$RELEASE_DIR"
 # Delete the staging .app. Local handoff already moved the DMG to the Desktop.
 rm -rf "$APP_PATH" "$RELEASE_DIR/.previous-build"
 
-echo "Build complete: $DMG_PATH"
+echo "Build complete: ${HOME}/Desktop/${DISPLAY_NAME}.dmg"

@@ -58,8 +58,8 @@ Package a macOS `.app` and DMG with ad-hoc signing:
 ./scripts/build-mac.sh
 ```
 
-Output: `build/Release/Libra.dmg` only (Finder brand on the Desktop copy is
-`L!bra.dmg`; executable inside stays `Libra`).
+Local output: `~/Desktop/L!bra.dmg` only (in-repo `build/Release/Libra.dmg` is
+deleted after that copy; executable inside stays `Libra`). CI keeps `Libra.dmg`.
 
 ## Repository rules
 
