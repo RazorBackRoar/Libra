@@ -17,8 +17,13 @@ VERSION="$(sed -n 's/.*"version".*"\([^"]*\)".*/\1/p' "$PROJECT_DIR/Sources/Libr
 
 RELEASE_DIR="$PROJECT_DIR/build/Release"
 
-# Prevent stale artifacts from previous builds with different display names.
-rm -rf "$RELEASE_DIR"/*.app "$RELEASE_DIR"/*.dmg
+# Named paths only — razorbuild invokes this script with zsh, which errors
+# on unmatched *.app globs. Cover both L!bra and machine-safe Libra names.
+rm -rf \
+  "$RELEASE_DIR/${DISPLAY_NAME}.app" \
+  "$RELEASE_DIR/${EXEC_NAME}.app" \
+  "$RELEASE_DIR/${DISPLAY_NAME}.dmg" \
+  "$RELEASE_DIR/${EXEC_NAME}.dmg"
 APP_PATH="$RELEASE_DIR/${DISPLAY_NAME}.app"
 # Output file uses the machine-safe name (GitHub rejects "!" in asset filenames).
 DMG_PATH="$RELEASE_DIR/${EXEC_NAME}.dmg"
@@ -105,24 +110,8 @@ mkdir -p "$RELEASE_DIR"
   --app-name "$DISPLAY_NAME" \
   --volname "$DISPLAY_NAME"
 
-# package-dmg.sh replaced ~/Desktop/<DisplayName>.dmg. Mount it on the Desktop
-# and back up the old installed app before the user drags the new .app in.
-if [[ -z "${GITHUB_ACTIONS:-}" && -z "${CI:-}" && -d "${HOME}/Desktop" ]]; then
-  DESKTOP_DMG="${HOME}/Desktop/${DISPLAY_NAME}.dmg"
-  echo "Mounting Desktop DMG..."
-  if ! hdiutil attach "$DESKTOP_DMG"; then
-    echo "Warning: $DESKTOP_DMG may already be mounted; continuing." >&2
-  fi
-
-  if [[ -d "/Applications/${DISPLAY_NAME}.app" ]]; then
-    BACKUP_ZIP="$HOME/Desktop/${DISPLAY_NAME} backup.zip"
-    rm -f "$BACKUP_ZIP"
-    echo "Backing up /Applications/${DISPLAY_NAME}.app to $BACKUP_ZIP"
-    zip -r -y -q "$BACKUP_ZIP" "/Applications/${DISPLAY_NAME}.app"
-  fi
-fi
-
-# Package as a single DMG; do not leave the .app bundle in the app folder.
-rm -rf "$APP_PATH"
+# package-dmg.sh owns Desktop copy / mount / /Applications install / smoke launch.
+# Keep only the DMG in-tree — /Applications is the runnable copy.
+rm -rf "$APP_PATH" "$RELEASE_DIR/.previous-build"
 
 echo "Build complete: $DMG_PATH"
