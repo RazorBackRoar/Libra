@@ -79,6 +79,9 @@ Jules reads this repository-root `AGENTS.md` when it clones the repository. Pare
 - Jules PRs are merged by the owner. There is no auto-merge workflow.
 - PR descriptions must list changed files, risk, verification commands and results, benchmark evidence when relevant, and unverified paths.
 - Never auto-merge runtime, dependency, lockfile, workflow, packaging, release, privacy, file-operation, or user-data changes.
+- **Startup stdout banner:** `AppInfoProvider.printStartupInfo()` runs before `Log.shared.setup()` and is intentional stdout startup output. Do NOT replace `print()` in `AppInfoProvider` or CLI scripts with logger calls.
+- **Directory fallbacks:** `Paths.applicationSupportDirectory()` and `Paths.cacheDirectory()` safely coalesce to `FileManager.default.temporaryDirectory`.
+- **Pure logic tests only:** Background test generation should target pure Swift utilities (`FfmpegOps.timeout`, `FileNaming`, `GPSCoordinateParser`) under `Tests/LibraTests/` without modifying core file operations, SwiftUI views, or GPS clustering algorithms.
 
 ## Automated Agent & Jules Integration Guidelines
 - **Jules PR Review**: all Jules PRs require the owner to merge; there is no auto-merge workflow.

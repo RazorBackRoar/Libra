@@ -61,4 +61,12 @@ final class ProcessRunnerTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+
+    func testFfmpegOpsTimeoutCalculations() {
+        XCTAssertEqual(FfmpegOps.timeout(durationSec: 0, factor: 1), 30)
+        XCTAssertEqual(FfmpegOps.timeout(durationSec: 10, factor: 1), 70)
+        XCTAssertEqual(FfmpegOps.timeout(durationSec: 10, factor: 2), 50)
+        XCTAssertEqual(FfmpegOps.timeout(durationSec: 2000, factor: 1), 3600, "Should cap at 3600")
+        XCTAssertEqual(FfmpegOps.timeout(durationSec: 10, factor: 0), 3600, "Zero factor clamped to 0.01")
+    }
 }

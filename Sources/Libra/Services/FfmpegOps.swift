@@ -93,6 +93,12 @@ enum FfmpegOps {
                 reason: "Destination is outside the selected folder (symlink)"
             )
         }
+        var movedToOutput = false
+        defer {
+            if !movedToOutput {
+                try? FileManager.default.removeItem(atPath: tmp)
+            }
+        }
         do {
             let output = try await ProcessRunner.run(
                 executablePath: ffmpegPath,
@@ -105,9 +111,9 @@ enum FfmpegOps {
                         try FileManager.default.removeItem(atPath: outputPath)
                     }
                     try FileManager.default.moveItem(atPath: tmp, toPath: outputPath)
+                    movedToOutput = true
                     return OperationResult(path: filePath, status: .success, outputPath: outputPath)
                 } catch {
-                    try? FileManager.default.removeItem(atPath: tmp)
                     return OperationResult(
                         path: filePath,
                         status: .failed,
@@ -115,7 +121,6 @@ enum FfmpegOps {
                     )
                 }
             } else {
-                try? FileManager.default.removeItem(atPath: tmp)
                 return OperationResult(
                     path: filePath,
                     status: .failed,
@@ -123,16 +128,12 @@ enum FfmpegOps {
                 )
             }
         } catch ProcessRunnerError.cancelled {
-            try? FileManager.default.removeItem(atPath: tmp)
             return OperationResult(path: filePath, status: .cancelled, reason: "Cancelled")
         } catch ProcessRunnerError.timeout {
-            try? FileManager.default.removeItem(atPath: tmp)
             return OperationResult(path: filePath, status: .failed, reason: "Processing timed out")
         } catch is CancellationError {
-            try? FileManager.default.removeItem(atPath: tmp)
             return OperationResult(path: filePath, status: .cancelled, reason: "Cancelled")
         } catch {
-            try? FileManager.default.removeItem(atPath: tmp)
             return OperationResult(path: filePath, status: .failed, reason: "Processing failed")
         }
     }
