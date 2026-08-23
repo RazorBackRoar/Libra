@@ -1,11 +1,11 @@
 ---
 name: Bug report
-about: Report a problem in L!bra
+about: Report a problem in Libra
 labels: bug
 ---
 
 ## App
-L!bra (version: <!-- see About panel or Sources/Libra/Resources/version.json -->)
+Libra (version: <!-- see About panel or Sources/Libra/Resources/version.json -->)
 
 ## Environment
 - macOS version:

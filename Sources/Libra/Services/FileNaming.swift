@@ -1,6 +1,6 @@
 import Foundation
 
-/// Canonical output filename builder used by every L!bra processing mode.
+/// Canonical output filename builder used by every Libra processing mode.
 ///
 /// Format: `OriginalName Resolution V|S|WFPS [🍎][📱][🌍] NNN.ext`
 /// Example: `Vacation 4K W30 🍎📱🌍 001.mov`

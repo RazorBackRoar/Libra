@@ -2,7 +2,7 @@ import Foundation
 
 enum DryRunReport {
     /// Writes a clean before/after listing to the Desktop as
-    /// `L!bra Sorter Dry Run 1.txt` (tool title in the name), then `2`, `3`, …
+    /// `Libra Sorter Dry Run 1.txt` (tool title in the name), then `2`, `3`, …
     /// without overwriting existing files.
     @discardableResult
     static func write(tool: Tool, results: [OperationResult]) -> URL? {

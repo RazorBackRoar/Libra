@@ -87,7 +87,7 @@ final class MediaClassificationTests: XCTestCase {
         XCTAssertEqual(Tool.homeTools.count, 6)
         XCTAssertEqual(Tool.homeTools.last, .photoSweep)
         XCTAssertEqual(Tool.photoSweep.title, "Photos Only")
-        XCTAssertEqual(Tool.provid.title, "L!bra Sorter")
+        XCTAssertEqual(Tool.provid.title, "Libra Sorter")
         XCTAssertEqual(Tool.iphoneSorter.title, "iPhone Model Sort")
         XCTAssertEqual(Tool.gps.title, "GPS")
         XCTAssertEqual(Tool.slomo.title, "Slo-Mo")

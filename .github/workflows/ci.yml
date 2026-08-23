@@ -17,7 +17,7 @@ jobs:
   quality:
     runs-on: macos-26
     steps:
-      - name: Checkout L!bra
+      - name: Checkout Libra
         uses: actions/checkout@v7
 
       - name: Build

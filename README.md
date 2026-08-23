@@ -1,4 +1,4 @@
-# L!bra
+# Libra
 
 [![Download](https://img.shields.io/github/v/release/RazorBackRoar/Libra?style=for-the-badge&label=Download%20DMG&color=d32f2f)](https://github.com/RazorBackRoar/Libra/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
@@ -9,7 +9,7 @@
 
 **Local-first macOS video organization toolkit.**
 
-Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machine — sort, rename, slow-mo, 1-minute stamps, plus GPS / iPhone helpers with a built-in **City / GPS Map** (5-mile pins). The user-facing brand is **L!bra**; the GitHub repo and machine IDs stay ASCII (`Libra`).
+Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machine — sort, rename, slow-mo, 1-minute stamps, plus GPS / iPhone helpers with a built-in **City / GPS Map** (5-mile pins).
 
 <p align="center">
   <a href="https://github.com/RazorBackRoar/Libra/releases/latest/download/Libra.dmg"><strong>↓ Download Libra.dmg</strong></a>
@@ -17,15 +17,15 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
   <a href="https://github.com/RazorBackRoar/Libra/releases">All releases</a>
 </p>
 
-![L!bra](docs/screenshots/app.png)
+![Libra](docs/screenshots/app.png)
 
 ## Features
 
 - **Drag-and-drop tools** — drop a folder to scan; Dry Run previews automatically
 - **Undo last run** — put moved files back (or delete created copies)
-- **Dry Run first** — bright yellow toggle; Desktop reports named `L!bra Sorter Dry Run 1.txt` (tool name swaps per mode)
-- **Home grid** — L!bra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, and Photos Only
-- **L!bra Sorter** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
+- **Dry Run first** — bright yellow toggle; Desktop reports named `Libra Sorter Dry Run 1.txt` (tool name swaps per mode)
+- **Home grid** — Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, and Photos Only
+- **Libra Sorter** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
 - **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; collapsed on sort tools, full on GPS Sorter; click a filename to open the video
 - **GPS** — city folders from coordinates, `No-GPS` when missing
 - **Optional date / camera folders** — extra sort keys on the sort tools
@@ -39,14 +39,14 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 ## Install
 
 1. Download [`Libra.dmg`](https://github.com/RazorBackRoar/Libra/releases/latest/download/Libra.dmg)
-2. Open the DMG and drag **L!bra.app** to `/Applications`
+2. Open the DMG and drag **Libra.app** to `/Applications`
 3. First launch — right-click → **Open** (ad-hoc signed build)
 
 Requires macOS 14+ on Apple Silicon. ffmpeg / ffprobe via Homebrew when transforms need them.
 
 ## Usage
 
-1. Open **L!bra** and pick a tool from the home grid (use **Photos Only** to move stills out)
+1. Open **Libra** and pick a tool from the home grid (use **Photos Only** to move stills out)
 2. Drop a folder or video files, or use Open Folder / Select Files
 3. Leave **Preview only** on to plan the run; turn it off and press **Write** to change files (confirm first)
 4. Use **Undo last run** if a live pass wasn’t what you wanted
@@ -67,12 +67,11 @@ Package a macOS `.app` + DMG (ad-hoc signed):
 ```bash
 ./scripts/build-mac.sh
 # → build/Release/Libra.dmg
-# → build/Release/Libra.dmg
 ```
 
 | Surface | Value |
 |---------|-------|
-| Display name (UI, Dock, `.app`, DMG) | **L!bra** |
+| Display name (UI, Dock, `.app`, DMG) | **Libra** |
 | GitHub | [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra) |
 | appId | `com.razorbackroar.libra` |
 | Version | `Sources/Libra/Resources/version.json` |

@@ -1,6 +1,6 @@
-# Contributing to L!bra
+# Contributing to Libra
 
-Thanks for your interest in contributing to **L!bra**
+Thanks for your interest in contributing to **Libra**
 ([RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra)).
 
 This guide matches the RazorBackRoar organization standard. Project-specific

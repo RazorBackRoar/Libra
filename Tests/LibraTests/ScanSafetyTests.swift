@@ -3,8 +3,10 @@ import XCTest
 
 final class ScanSafetyTests: XCTestCase {
     func testWarning_skipsOfficialTestFolder() {
-        let path = "/Users/home/Desktop/MetaBurn & L!bra Test/videos"
+        let path = "/Users/home/Desktop/MetaBurn & Libra Test/videos"
         XCTAssertNil(ScanSafety.warning(for: [path]))
+        let legacyPath = "/Users/home/Desktop/MetaBurn & L!bra Test/videos"
+        XCTAssertNil(ScanSafety.warning(for: [legacyPath]))
     }
 
     func testWarning_homeAndVolumeRoot() {
@@ -18,7 +20,7 @@ final class ScanSafetyTests: XCTestCase {
         XCTAssertNotNil(ScanSafety.fileCountWarning(count: 500))
         XCTAssertNil(ScanSafety.fileCountWarning(
             count: 800,
-            paths: ["/Users/home/Desktop/MetaBurn & L!bra Test/videos"]
+            paths: ["/Users/home/Desktop/MetaBurn & Libra Test/videos"]
         ))
     }
 

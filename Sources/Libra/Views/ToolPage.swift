@@ -266,7 +266,7 @@ struct ToolPage: View {
     @ViewBuilder
     private var photosWorkspace: some View {
         if state.photos.isEmpty {
-            Text("No photos in this drop. L!bra is video-only — if stills are mixed in, they show up here so you can move them out.")
+            Text("No photos in this drop. Libra is video-only — if stills are mixed in, they show up here so you can move them out.")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

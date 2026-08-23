@@ -14,7 +14,7 @@
 - [x] Full `swift test` — 17/17 passed
 - [x] `swift build` — passed
 - [x] `./scripts/build-mac.sh` → `build/Release/Libra.dmg` (layout verified)
-- [x] Copied to `~/Desktop/L!bra.dmg` (not mounted/opened/installed)
+- [x] Copied to `~/Desktop/Libra.dmg` (not mounted/opened/installed)
 - [ ] Manual UAT (user): install from Desktop DMG; drag original 75-video folder; verify completed total or bounded per-file failures; Cancel during scan; Cancel during Dry Run
 
 ## Verification notes

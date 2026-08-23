@@ -1,22 +1,21 @@
-# L!bra AGENTS
+# Libra AGENTS
 
 Guidance for agents in this repository. Use with `../AGENTS.md`.
 
 ## Branding
 
-**Rule of thumb:** if a human reads it → **L!bra**. If a machine/path/API must
-be ASCII → **Libra**.
+Product brand and display name is **Libra** across all surfaces.
 
 | Surface | Value | Why |
 | --- | --- | --- |
-| UI, Dock, About, menus, window title | **L!bra** | Product brand |
-| Application Support / Caches folder | **L!bra** | User-visible path |
-| Built `.app` / `.dmg` / volume name | **L!bra** | Finder-facing |
-| Docs, issue templates, SECURITY subject | **L!bra** | Human-facing |
-| GitHub repo | `RazorBackRoar/Libra` | GitHub disallows `!` |
+| UI, Dock, About, menus, window title | **Libra** | Product brand |
+| Application Support / Caches folder | **Libra** | User-visible path |
+| Built `.app` / `.dmg` / volume name | **Libra** | Finder-facing |
+| Docs, issue templates, SECURITY subject | **Libra** | Human-facing |
+| GitHub repo | `RazorBackRoar/Libra` | GitHub repository |
 | Local workspace folder | `Apps/Libra` | Matches GitHub |
 | `appId` | `com.razorbackroar.libra` | reverse-DNS |
-| Mach-O / `CFBundleExecutable` | `Libra` | Avoid `!` in binary name |
+| Mach-O / `CFBundleExecutable` | `Libra` | Binary name |
 | Swift package / module / `Sources/Libra` | `Libra` | Swift identifiers |
 | Swift type names (`LibraApp`, …) | `Libra…` | Code identifiers |
 
@@ -36,7 +35,7 @@ Local-first macOS video organization toolkit. Swift + SwiftUI.
 | Module | Role |
 | --- | --- |
 | `Utilities/Brand.swift` | Display vs machine-safe IDs |
-| `Utilities/Paths.swift` | Application Support / cache / logs under **L!bra** |
+| `Utilities/Paths.swift` | Application Support / cache / logs under **Libra** |
 | `Utilities/Logging.swift` | Console + file logs under Application Support |
 | `Utilities/AppInfo.swift` | Metadata + startup banner |
 | `Utilities/Updates.swift` | GitHub Releases check (`RazorBackRoar/Libra`) |
@@ -58,13 +57,12 @@ Package a macOS `.app` and DMG with ad-hoc signing:
 ./scripts/build-mac.sh
 ```
 
-Local output: `build/Release/Libra.dmg` (display brand **L!bra** in the DMG window)
+Local output: `build/Release/Libra.dmg`
 (executable inside stays `Libra`). CI keeps `Libra.dmg`.
 
 ## Repository rules
 
 - Do not create `Shared/razorcore-swift/` for v1.1.
-- Do not rename the GitHub repo to include `!`.
 - Do not commit, push, or create branches unless explicitly requested.
 
 
@@ -95,15 +93,15 @@ Jules reads this repository-root `AGENTS.md` when it clones the repository. Pare
 
 ## Learned User Preferences
 - Count labels should say photos and videos, never generic "files".
-- User-facing preview is labeled Preview only; Desktop reports stay incrementing `L!bra <Tool> Dry Run N.txt` files and must not overwrite earlier reports.
+- User-facing preview is labeled Preview only; Desktop reports stay incrementing `Libra <Tool> Dry Run N.txt` files and must not overwrite earlier reports.
 - After a drop, only preview; writing requires an explicit Write action. Turning Preview off must not start a write.
 - Do not show container format (mov, mp4, …) in identification rows; the filename already includes it.
 - Prefer taller layouts that avoid window scrollbars; numbered file lists (1, 2, 3…) may scroll in a small pane.
-- After any change to an app under `Workspace/Apps/`, always rebuild that app’s DMG (`dist/<App>.dmg` or `build/Release/<App>.dmg` — for L!bra that is `build/Release/Libra.dmg`). Do not wait to be asked.
-- Home tile titles: L!bra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, Photos Only.
+- After any change to an app under `Workspace/Apps/`, always rebuild that app’s DMG (`dist/<App>.dmg` or `build/Release/<App>.dmg` — for Libra that is `build/Release/Libra.dmg`). Do not wait to be asked.
+- Home tile titles: Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, Photos Only.
 
 ## Learned Workspace Facts
 - Organization, rename, and sort tools must not require Homebrew ffmpeg; ffmpeg is optional for transform tools only.
-- L!bra is used on local disks only; iCloud and file-provider locations are out of scope.
+- Libra is used on local disks only; iCloud and file-provider locations are out of scope.
 - iPhone sort uses three folders: iPhone, Other Apple, and Not Apple.
 - Photos is a sixth home tile named Photos Only, not a Video | Photos tab.

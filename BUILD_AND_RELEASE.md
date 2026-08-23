@@ -1,14 +1,13 @@
-# Build & Release — L!bra
+# Build & Release — Libra
 
 Organization-standard build and release guide for
 [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra).
 
 ## Overview
 
-L!bra is a native macOS app built with **Swift** / **SwiftUI**
+Libra is a native macOS app built with **Swift** / **SwiftUI**
 (swift-tools 5.10+, macOS 14+), packaged with an ad-hoc signed `.app` / `.dmg`.
 
-User-facing brand is **L!bra**; GitHub/repo/binary IDs stay ASCII (`Libra`).
 Built artifact is a single `Libra.dmg`; the `.app` bundle is consumed during packaging and not left in `build/Release`.
 
 ## Platform Requirements
@@ -55,8 +54,8 @@ build/Release/Libra.dmg
 1. Ensure `main` is green (CI `swift build`).
 2. Confirm version in `Sources/Libra/Resources/version.json`.
 3. Run `./scripts/build-mac.sh`.
-4. Install/smoke-test by mounting `build/Release/Libra.dmg` and dragging `L!bra.app` to `/Applications`.
-5. Publish a GitHub Release with title `L!bra vX.Y.Z` and attach `build/Release/Libra.dmg`.
+4. Install/smoke-test by mounting `build/Release/Libra.dmg` and dragging `Libra.app` to `/Applications`.
+5. Publish a GitHub Release with title `Libra vX.Y.Z` and attach `build/Release/Libra.dmg`.
 6. Tag `vX.Y.Z` to match `Sources/Libra/Resources/version.json`.
 
 ## Versioning Expectations
@@ -70,7 +69,7 @@ build/Release/Libra.dmg
 |---------|-------------|
 | `swift test` fails without XCTest | Install full Xcode.app, not only CLT |
 | Gatekeeper blocks launch | Right-click → **Open** (ad-hoc signed builds) |
-| Stale `/Applications` copy | Mount `build/Release/Libra.dmg` and drag `L!bra.app` to `/Applications` |
+| Stale `/Applications` copy | Mount `build/Release/Libra.dmg` and drag `Libra.app` to `/Applications` |
 | Window size restored huge | Quit app; relaunch after upgrading (defaults may cache old frames) |
 
 ## Related Docs

@@ -48,7 +48,7 @@ final class AppState: ObservableObject {
         let alert = NSAlert()
         alert.messageText = "Install ffmpeg?"
         alert.informativeText = """
-        L!bra will run Homebrew:
+        Libra will run Homebrew:
 
         brew install ffmpeg
 

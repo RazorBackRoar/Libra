@@ -1,13 +1,11 @@
 import Foundation
 
-/// L!bra brand vs machine-safe ASCII identifiers.
+/// Libra brand vs machine-safe ASCII identifiers.
 ///
 /// Use `displayName` anywhere a human sees the product (UI, menus, Dock,
-/// About, Application Support, `.app` / DMG names). Keep `githubRepo`,
-/// `appId`, and `executableName` ASCII — GitHub, reverse-DNS, and Mach-O
-/// names cannot use `!`.
+/// About, Application Support, `.app` / DMG names).
 enum Brand {
-    static let displayName = "L!bra"
+    static let displayName = "Libra"
     static let githubRepo = "Libra"
     static let githubOrg = "RazorBackRoar"
     static let appId = "com.razorbackroar.libra"

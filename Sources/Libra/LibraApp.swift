@@ -6,7 +6,7 @@ struct LibraApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        Window("L!bra", id: "main") {
+        Window("Libra", id: "main") {
             LibraView()
         }
         .defaultSize(width: 900, height: 880)
@@ -45,18 +45,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func buildMenu() -> NSMenu {
-        let mainMenu = NSMenu(title: "L!bra")
+        let mainMenu = NSMenu(title: "Libra")
 
-        let appMenu = NSMenu(title: "L!bra")
-        appMenu.addItem(withTitle: "About L!bra", action: #selector(showAbout), keyEquivalent: "")
+        let appMenu = NSMenu(title: "Libra")
+        appMenu.addItem(withTitle: "About Libra", action: #selector(showAbout), keyEquivalent: "")
         appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Preferences…", action: #selector(showSettings), keyEquivalent: ",")
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(withTitle: "Hide L!bra", action: #selector(NSApp?.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit L!bra", action: #selector(NSApp?.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Hide Libra", action: #selector(NSApp?.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit Libra", action: #selector(NSApp?.terminate(_:)), keyEquivalent: "q")
 
-        let appMenuItem = NSMenuItem(title: "L!bra", action: nil, keyEquivalent: "")
+        let appMenuItem = NSMenuItem(title: "Libra", action: nil, keyEquivalent: "")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 

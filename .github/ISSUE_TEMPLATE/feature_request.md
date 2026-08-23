@@ -1,11 +1,11 @@
 ---
 name: Feature request
-about: Suggest an improvement for L!bra
+about: Suggest an improvement for Libra
 labels: enhancement
 ---
 
 ## App
-L!bra
+Libra
 
 ## Requested feature
 

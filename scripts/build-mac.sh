@@ -1,15 +1,13 @@
 #!/bin/bash
 set -e
-# Brand name contains `!` (L!bra). Disable history expansion so echo/printf stay literal.
-set +o histexpand
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR/.."
 
-# Machine-safe SwiftPM product / Mach-O name (no `!`).
+# Machine-safe SwiftPM product / Mach-O name.
 EXEC_NAME="Libra"
 # User-facing bundle + DMG names (brand).
-DISPLAY_NAME="L!bra"
+DISPLAY_NAME="Libra"
 BUNDLE_ID="com.razorbackroar.libra"
 
 # Resolve Swift Package version from version.json
@@ -18,25 +16,25 @@ VERSION="$(sed -n 's/.*"version".*"\([^"]*\)".*/\1/p' "$PROJECT_DIR/Sources/Libr
 RELEASE_DIR="$PROJECT_DIR/build/Release"
 
 # Named paths only — razorbuild invokes this script with zsh, which errors
-# on unmatched *.app globs. Cover both L!bra and machine-safe Libra names.
+# on unmatched *.app globs.
 rm -rf \
   "$RELEASE_DIR/${DISPLAY_NAME}.app" \
   "$RELEASE_DIR/${EXEC_NAME}.app" \
   "$RELEASE_DIR/${DISPLAY_NAME}.dmg" \
   "$RELEASE_DIR/${EXEC_NAME}.dmg"
 APP_PATH="$RELEASE_DIR/${DISPLAY_NAME}.app"
-# Output file uses the machine-safe name (GitHub rejects "!" in asset filenames).
+# Output file uses the machine-safe name.
 DMG_PATH="$RELEASE_DIR/${EXEC_NAME}.dmg"
 EXEC_PATH="$PROJECT_DIR/.build/release/$EXEC_NAME"
 RESOURCE_BUNDLE="$PROJECT_DIR/.build/release/${EXEC_NAME}_${EXEC_NAME}.bundle"
 
-echo "Building L!bra release..."
+echo "Building Libra release..."
 cd "$PROJECT_DIR"
 
 if [[ -f "$PROJECT_DIR/Libra.png" ]]; then
     ICON_PYTHON="${LIBRA_ICON_PYTHON:-}"
     if [[ -z "$ICON_PYTHON" ]] && command -v uv >/dev/null 2>&1; then
-        echo "Generating L!bra.icns with uv + Pillow..."
+        echo "Generating Libra.icns with uv + Pillow..."
         uv run --with pillow python "$SCRIPT_DIR/generate-icon.py"
     elif [[ -n "$ICON_PYTHON" ]]; then
         "$ICON_PYTHON" "$SCRIPT_DIR/generate-icon.py"

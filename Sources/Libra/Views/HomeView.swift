@@ -12,7 +12,7 @@ struct HomeView: View {
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundColor(.yellow)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("L!bra")
+                    Text("Libra")
                         .font(.system(size: 18, weight: .bold))
                     Text("Video organization toolkit")
                         .font(.system(size: 12))

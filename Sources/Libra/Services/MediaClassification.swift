@@ -46,7 +46,7 @@ enum FilenameStyle: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .keepOriginal: return "Keep original names"
-        case .libraFormat: return "Use L!bra format"
+        case .libraFormat: return "Use Libra format"
         }
     }
 }
