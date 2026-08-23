@@ -1,11 +1,17 @@
 # Libra
 
 [![Download](https://img.shields.io/github/v/release/RazorBackRoar/Libra?style=for-the-badge&label=Download%20DMG&color=d32f2f)](https://github.com/RazorBackRoar/Libra/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.2.4-blue?style=for-the-badge)](https://github.com/RazorBackRoar/Libra/releases/tag/v1.2.4)
 [![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet?style=for-the-badge)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
 [![macOS](https://img.shields.io/badge/mac%20os-Apple%20Silicon-d32f2f?style=for-the-badge&logo=apple&logoColor=white)](https://support.apple.com/en-us/HT211814)
 [![MapKit](https://img.shields.io/badge/MapKit-City%20%2F%20GPS-c9a227?style=for-the-badge&logo=apple&logoColor=white)](https://developer.apple.com/documentation/mapkit)
+
+<!-- Workspace Health Layer -->
+![Status](https://img.shields.io/badge/status-active-2ea44f?style=for-the-badge)
+![Tests](https://img.shields.io/badge/tests-present-2ea44f?style=for-the-badge)
+![Build](https://img.shields.io/badge/build-swift-F05138?style=for-the-badge)
 
 **Local-first macOS video organization toolkit.**
 
