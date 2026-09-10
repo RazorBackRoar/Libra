@@ -42,7 +42,7 @@ struct CategoryBrowserView: View {
 
             if files.isEmpty {
                 Spacer()
-                Text("No files in this category.")
+                Text("No videos in this category.")
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
@@ -67,6 +67,7 @@ struct CategoryBrowserView: View {
                                 .font(.system(size: 12))
                                 .foregroundColor(.secondary)
                                 .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
 
                             Text(file.path)
                                 .font(.system(size: 12, design: .monospaced))
@@ -147,7 +148,8 @@ struct CategoryBrowserView: View {
                                 Text(file.identificationLine)
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
-                                    .lineLimit(2)
+                                    .lineLimit(1)
+                                    .help(file.identificationLine)
                             }
                         }
                     }

@@ -5,7 +5,7 @@ import MapKit
 /// Caller should only present this when `files` contain coordinates.
 struct GPSMapPanel: View {
     let files: [VideoInfo]
-    var startsExpanded: Bool = true
+    var startsExpanded: Bool = false
     @StateObject private var model = GPSMapModel()
     @State private var expanded = false
 
@@ -48,7 +48,7 @@ struct GPSMapPanel: View {
                     MapCompass()
                     MapScaleView()
                 }
-                .frame(height: 200)
+                .frame(height: 168)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
@@ -66,7 +66,7 @@ struct GPSMapPanel: View {
                 }
             }
         }
-        .padding(12)
+        .padding(expanded ? 12 : 10)
         .background(Color(.systemGray).opacity(0.12))
         .cornerRadius(12)
         .onAppear {
@@ -126,7 +126,8 @@ struct GPSMapPanel: View {
                                 Text(file.identificationLine)
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
-                                    .lineLimit(2)
+                                    .lineLimit(1)
+                                    .help(file.identificationLine)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }

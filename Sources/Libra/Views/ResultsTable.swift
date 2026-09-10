@@ -17,15 +17,22 @@ struct ResultsTable: View {
     var body: some View {
         Group {
             if files.isEmpty && results.isEmpty {
-                Text("No files yet. Drop a folder or files above.")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "film.stack")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.yellow.opacity(0.7))
+                    Text("No videos yet")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("Drop a folder or videos above.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.vertical, 8)
             } else {
                 List(selection: $selectedKey) {
                     if !files.isEmpty {
-                        Section("Scanned Files") {
+                        Section("Videos") {
                             ForEach(Array(files.enumerated()), id: \.element.path) { index, file in
                                 resultRow(
                                     index: index + 1,
@@ -134,6 +141,8 @@ struct ResultsTable: View {
                 Text(detail)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .help(detail)
                 if let error {
                     Text(error)
                         .font(.system(size: 11))

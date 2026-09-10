@@ -105,7 +105,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .iphoneSorter: return "Split videos into iPhone, Other Apple, and Not Apple folders."
         case .provid, .vidres, .keepName, .promax, .maxvid:
-            return "Rename files, or nest folders by resolution, orientation, and FPS."
+            return "Rename videos, or nest folders by resolution, orientation, and FPS."
         case .oneMin: return "Stamp sequential 60-second creation times. Needs ffmpeg."
         case .slomo: return "Write slowed copies into a SloMo folder. Needs ffmpeg."
         case .gps: return "Sort into city folders from location, or No-GPS when location is missing."

@@ -130,8 +130,12 @@ struct PhotoSweepView: View {
             }
 
             DropZone(
-                title: "Drop a folder",
-                subtitle: "We’ll list photos (JPG, HEIC, PNG, …) so you can move them out.",
+                title: "Drop photos here",
+                subtitle: state.photos.isEmpty
+                    ? "Folders or stills. We’ll list JPG, HEIC, PNG so you can move them out."
+                    : "Drop more, or use Open Folder / Select Photos.",
+                compact: !state.photos.isEmpty,
+                selectTitle: "Select Photos…",
                 onDrop: { paths in
                     beginScan(paths)
                 },
@@ -145,10 +149,20 @@ struct PhotoSweepView: View {
             }
 
             if state.photos.isEmpty {
-                Text(state.recap ?? "No photos yet.")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.yellow.opacity(0.7))
+                    Text(state.recap ?? "No photos yet")
+                        .font(.system(size: 14, weight: .semibold))
+                    if state.recap == nil {
+                        Text("Drop a mixed folder above to pull stills out of the video library.")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.vertical, 8)
             } else {
                 List {
                     Section("\(state.photos.count) photos") {
@@ -164,7 +178,8 @@ struct PhotoSweepView: View {
                                     Text(file.identificationLine)
                                         .font(.system(size: 11))
                                         .foregroundColor(.secondary)
-                                        .lineLimit(2)
+                                        .lineLimit(1)
+                                        .help(file.identificationLine)
                                 }
                                 Spacer()
                             }
@@ -196,6 +211,7 @@ struct PhotoSweepView: View {
                 Text(state.dryRun ? "Preview only — nothing will be changed." : "Live — photos will move.")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(state.dryRun ? .yellow : .orange)
+                    .lineLimit(2)
 
                 Spacer()
 
@@ -213,13 +229,14 @@ struct PhotoSweepView: View {
                 .accessibilityLabel("Move photos out")
             }
 
-            if let recap = state.recap {
+            if let recap = state.recap, !state.photos.isEmpty {
                 Text(recap)
                     .font(.system(size: 13, weight: .medium))
+                    .lineLimit(3)
                     .textSelection(.enabled)
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.ignoresSafeArea())
     }

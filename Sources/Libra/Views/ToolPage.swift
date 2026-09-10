@@ -42,7 +42,11 @@ struct ToolPage: View {
 
                 DropZone(
                     title: "Drop videos here",
-                    subtitle: "Folders or video files. Photos are set aside in the Photos tab.",
+                    subtitle: hasMedia
+                        ? "Drop more, or use Open Folder / Select Videos."
+                        : "Folders or videos. Mixed photos get a Photos tab.",
+                    compact: hasMedia,
+                    selectTitle: "Select Videos…",
                     onDrop: { paths in
                         guard !state.running else { return }
                         beginScan(paths)
@@ -55,12 +59,14 @@ struct ToolPage: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel("Drop videos here")
 
-                workspaceTabs
+                if !state.photos.isEmpty || workspace == .photos {
+                    workspaceTabs
+                }
 
-                if workspace == .video {
-                    videoWorkspace
-                } else {
+                if workspace == .photos {
                     photosWorkspace
+                } else {
+                    videoWorkspace
                 }
 
                 footer
@@ -84,6 +90,10 @@ struct ToolPage: View {
                 workspace = .video
             }
         }
+    }
+
+    private var hasMedia: Bool {
+        !state.files.isEmpty || !state.photos.isEmpty
     }
 
     private var usesPrefixField: Bool {
@@ -118,7 +128,7 @@ struct ToolPage: View {
 
     private var workspaceTabs: some View {
         HStack(spacing: 0) {
-            tab(.video, label: "Video")
+            tab(.video, label: "Videos")
             tab(.photos, label: state.photos.isEmpty ? "Photos" : "Photos \(state.photos.count)")
             Spacer()
         }
@@ -143,12 +153,14 @@ struct ToolPage: View {
 
     @ViewBuilder
     private var videoWorkspace: some View {
-        CountPills(files: state.filteredFiles, tool: tool) { filter in
-            browserFilter = filter
+        if !state.filteredFiles.isEmpty {
+            CountPills(files: state.filteredFiles, tool: tool) { filter in
+                browserFilter = filter
+            }
         }
 
         if state.filteredFiles.contains(where: \.hasCoordinates) {
-            GPSMapPanel(files: state.filteredFiles, startsExpanded: true)
+            GPSMapPanel(files: state.filteredFiles, startsExpanded: tool == .gps)
         }
 
         if tool.isSortRenameFamily {
@@ -288,7 +300,8 @@ struct ToolPage: View {
                             Text(file.identificationLine)
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
-                                .lineLimit(2)
+                                .lineLimit(1)
+                                .help(file.identificationLine)
                         }
                     }
                     .contentShape(Rectangle())
@@ -301,7 +314,7 @@ struct ToolPage: View {
             }
             .listStyle(.inset(alternatesRowBackgrounds: true))
             .scrollContentBackground(.hidden)
-            .background(Color.white.opacity(0.04))
+            .background(Color(.systemGray).opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
             HStack {
@@ -319,6 +332,7 @@ struct ToolPage: View {
             if let recap = state.recap ?? state.message {
                 Text(recap)
                     .font(.system(size: 13, weight: .medium))
+                    .lineLimit(3)
                     .textSelection(.enabled)
             }
 
@@ -339,6 +353,7 @@ struct ToolPage: View {
                 Text(state.previewLiveCaption)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(state.dryRun ? .yellow : .orange)
+                    .lineLimit(2)
 
                 Spacer()
 

@@ -9,7 +9,7 @@ struct LibraApp: App {
         Window("Libra", id: "main") {
             LibraView()
         }
-        .defaultSize(width: 900, height: 880)
+        .defaultSize(width: 900, height: 860)
         .windowResizability(.contentMinSize)
 
         Settings {
@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let fileMenu = NSMenu(title: "File")
         fileMenu.addItem(withTitle: "Open Folder…", action: #selector(openFolder), keyEquivalent: "o")
-        let selectItem = NSMenuItem(title: "Select Files…", action: #selector(selectFiles), keyEquivalent: "o")
+        let selectItem = NSMenuItem(title: "Select Videos…", action: #selector(selectFiles), keyEquivalent: "o")
         selectItem.keyEquivalentModifierMask = [.command, .shift]
         fileMenu.addItem(selectItem)
         let fileMenuItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")

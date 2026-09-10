@@ -30,6 +30,12 @@ final class MediaIdentificationTests: XCTestCase {
         XCTAssertFalse(line.localizedCaseInsensitiveContains("mov"))
         XCTAssertFalse(line.localizedCaseInsensitiveContains("mp4"))
         XCTAssertEqual(file.identificationLine, line)
+        let fpsIndex = line.range(of: "30 fps")!.lowerBound
+        let deviceIndex = line.range(of: "iPhone 15 Pro")!.lowerBound
+        let gpsIndex = line.range(of: "GPS")!.lowerBound
+        XCTAssertTrue(line.range(of: "1080p")!.lowerBound < fpsIndex)
+        XCTAssertTrue(fpsIndex < deviceIndex)
+        XCTAssertTrue(deviceIndex < gpsIndex)
     }
 
     func testLine_photoSkipsFpsAndShowsPixels() {

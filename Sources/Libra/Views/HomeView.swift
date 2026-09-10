@@ -51,6 +51,7 @@ struct HomeView: View {
 struct ToolCard: View {
     let tool: Tool
     let onTap: () -> Void
+    @State private var hovering = false
 
     var body: some View {
         Button(action: onTap) {
@@ -73,20 +74,21 @@ struct ToolCard: View {
                 Text(tool.description)
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
-                    .lineLimit(4)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.white.opacity(0.06))
+            .background(Color.white.opacity(hovering ? 0.11 : 0.06))
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(hovering ? Color.yellow.opacity(0.45) : Color.white.opacity(0.08), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
         .accessibilityLabel(tool.title)
         .accessibilityHint(tool.description)
     }

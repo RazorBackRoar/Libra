@@ -32,7 +32,7 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 - **Dry Run first** — bright yellow **Preview only** toggle; Desktop reports named `Libra Sorter Dry Run 1.txt` (tool name swaps per mode)
 - **Home grid** — Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, and Photos Only
 - **Libra Sorter** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
-- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; opens whenever scanned videos have coordinates; click a filename to open the video
+- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; expanded on the GPS tool, collapsed on the others (coordinates stay on each row); click a filename to open the video
 - **GPS** — city folders from coordinates on Write, `No-GPS` when location is missing; Preview uses `GPS` / `No-GPS` folders
 - **Optional date / camera folders** — extra sort keys on the sort tools
 - **Duplicates** — likely extras (same size, duration, resolution, fps, codec) go in a Duplicates folder
@@ -54,7 +54,7 @@ Requires macOS 14+ on Apple Silicon. ffmpeg / ffprobe via Homebrew when transfor
 ## Usage
 
 1. Open **Libra** and pick a tool from the home grid (use **Photos Only** to move stills out)
-2. Drop a folder or video files, or use Open Folder / Select Files
+2. Drop a folder or videos, or use Open Folder / Select Videos
 3. Leave **Preview only** on to plan the run; turn it off and press **Write** to change files (confirm first)
 4. Use **Undo last run** if a live pass wasn’t what you wanted
 5. Use the City / GPS Map pins to inspect locations; click a filename to open the video

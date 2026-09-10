@@ -8,9 +8,6 @@ enum MediaIdentification {
         if let resolution = resolutionLabel(for: file) {
             parts.append(resolution)
         }
-        if !file.orientation.isEmpty, file.orientation != "Unknown" {
-            parts.append(file.orientation)
-        }
         if file.fps > 0 {
             parts.append("\(FileNaming.fpsBucket(file.fps)) fps")
         }
@@ -19,6 +16,9 @@ enum MediaIdentification {
         }
         if let gps = gpsLabel(for: file) {
             parts.append(gps)
+        }
+        if !file.orientation.isEmpty, file.orientation != "Unknown" {
+            parts.append(file.orientation)
         }
         if file.durationSec > 0 {
             parts.append(durationLabel(file.durationSec))

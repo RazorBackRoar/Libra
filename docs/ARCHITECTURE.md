@@ -45,7 +45,7 @@ Home is a 3×2 grid: Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuste
 
 Destructive operations are preview-only by default, require an explicit **Write** (or Move photos) plus a confirmation dialog when that setting is on, and log an in-memory undo journal for the current run. Turning Preview off does not start a write. `FileOps` rejects symlinks and checks physical path containment before any move/copy/delete, independent of the UI confirmations.
 
-- GPS Sorter preview uses `GPS` / `No-GPS` folders. Reverse-geocode (city names) runs on Write. The map geocodes when expanded. Identification rows always show coordinates when present.
+- GPS Sorter preview uses `GPS` / `No-GPS` folders. Reverse-geocode (city names) runs on Write. The map starts expanded on the GPS tool only; other tools keep it collapsed so identification rows stay the GPS surface. The map geocodes when expanded. Identification rows always show coordinates when present.
 - 1-Min-Adjuster inplace mode writes the new file, then moves the original to Trash (not a permanent delete).
 - Photos Only uses the same large-scan confirm as video tools. Photo undo goes through `UndoApply`.
 

@@ -29,7 +29,7 @@ enum MediaBrowserFilter: Hashable, Identifiable {
 
     var title: String {
         switch self {
-        case .all: return "All Files"
+        case .all: return "All videos"
         case .resolution(let label): return label
         case .gps: return "Has location"
         case .appleMake: return "Apple make"
@@ -78,20 +78,20 @@ struct CountPills: View {
             HStack(spacing: 8) {
                 pill(filter: .all, label: "Videos", value: files.count)
                 if tool == .iphoneSorter {
-                    pill(filter: .iPhoneModel, label: "iPhone", value: files.filter { $0.hasiPhoneModel }.count)
-                    pill(filter: .otherApple, label: "Other Apple", value: files.filter { $0.hasAppleMake && !$0.hasiPhoneModel }.count)
-                    pill(filter: .notApple, label: "Not Apple", value: files.filter { !$0.hasAppleMake && !$0.hasiPhoneModel }.count)
+                    shownPill(filter: .iPhoneModel, label: "iPhone", value: files.filter { $0.hasiPhoneModel }.count)
+                    shownPill(filter: .otherApple, label: "Other Apple", value: files.filter { $0.hasAppleMake && !$0.hasiPhoneModel }.count)
+                    shownPill(filter: .notApple, label: "Not Apple", value: files.filter { !$0.hasAppleMake && !$0.hasiPhoneModel }.count)
                 } else {
                     ForEach(VideoInfo.resolutionClasses, id: \.self) { label in
-                        pill(
+                        shownPill(
                             filter: .resolution(label),
                             label: label,
                             value: files.filter { $0.resolutionClass == label }.count
                         )
                     }
-                    pill(filter: .gps, label: "Has location", value: files.filter { $0.hasGPS }.count)
-                    pill(filter: .appleDevice, label: "Apple device", value: files.filter { $0.isApple }.count)
-                    pill(
+                    shownPill(filter: .gps, label: "Has location", value: files.filter { $0.hasGPS }.count)
+                    shownPill(filter: .appleDevice, label: "Apple device", value: files.filter { $0.isApple }.count)
+                    shownPill(
                         filter: .duplicates,
                         label: "Likely duplicates",
                         value: DuplicateDetector.extraCount(in: files),
@@ -99,6 +99,13 @@ struct CountPills: View {
                     )
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func shownPill(filter: MediaBrowserFilter, label: String, value: Int, help: String? = nil) -> some View {
+        if value > 0 {
+            pill(filter: filter, label: label, value: value, help: help)
         }
     }
 
@@ -137,7 +144,7 @@ struct CountPill: View {
         .buttonStyle(.plain)
         .disabled(value == 0 || action == nil)
         .opacity(value == 0 ? 0.55 : 1)
-        .help(helpText ?? (value == 0 ? "No \(label.lowercased()) videos" : "Browse \(label.lowercased()) videos"))
+        .help(helpText ?? (value == 0 ? "No \(label.lowercased())" : "Browse \(label.lowercased())"))
         .accessibilityLabel("\(value) \(label)")
     }
 }
