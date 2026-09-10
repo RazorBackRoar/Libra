@@ -35,6 +35,9 @@ struct VideoInfo: Identifiable, Equatable {
 
     var isApple: Bool { hasAppleMake || hasiPhoneModel }
 
+    /// Resolution, fps, device, GPS — filename/container stay on the title line.
+    var identificationLine: String { MediaIdentification.line(for: self) }
+
     var hasCoordinates: Bool {
         guard let latitude, let longitude else { return false }
         return (-90...90).contains(latitude) && (-180...180).contains(longitude)

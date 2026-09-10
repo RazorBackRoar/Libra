@@ -15,6 +15,7 @@ final class PhotoSweepState: ObservableObject {
 
     var canUndo: Bool { !undoRecords.isEmpty && !running }
 
+    var confirmDiscover: (@Sendable (Int) async -> Bool)?
     private var task: Task<Void, Never>?
 
     func startScan(paths: [String], settings: AppSettings) {
@@ -25,6 +26,7 @@ final class PhotoSweepState: ObservableObject {
         results = []
         undoRecords = []
         AppState.shared.rememberLastFolder(from: paths)
+        let confirm = confirmDiscover
         task = Task { [weak self] in
             guard let self else { return }
             let outcome = await ScannerService.scan(
@@ -32,7 +34,8 @@ final class PhotoSweepState: ObservableObject {
                 extensions: settings.imageExtensions,
                 progress: { done, total in
                     await MainActor.run { self.progress = (done, total) }
-                }
+                },
+                confirmDiscover: confirm
             )
             self.photos = outcome.supported
             self.results = outcome.unsupported
@@ -95,18 +98,9 @@ final class PhotoSweepState: ObservableObject {
         running = true
         let records = undoRecords
         undoRecords = []
-        var restored = 0
-        var failed = 0
-        for record in records.reversed() {
-            let originalDir = (record.originalPath as NSString).deletingLastPathComponent
-            let result = FileOps.moveFile(
-                from: record.resultPath,
-                to: record.originalPath,
-                dryRun: false,
-                withinRoot: originalDir
-            )
-            if result.status == .success { restored += 1 } else { failed += 1 }
-        }
+        let outcome = UndoApply.apply(records)
+        let restored = outcome.restored
+        let failed = outcome.failed
         running = false
         recap = failed == 0
             ? "Undid \(restored) photo move\(restored == 1 ? "" : "s")."
@@ -167,10 +161,10 @@ struct PhotoSweepView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("\(file.name).\(file.ext)")
                                         .font(.system(size: 13, weight: .semibold))
-                                    Text(file.dir)
+                                    Text(file.identificationLine)
                                         .font(.system(size: 11))
                                         .foregroundColor(.secondary)
-                                        .lineLimit(1)
+                                        .lineLimit(2)
                                 }
                                 Spacer()
                             }
@@ -240,7 +234,25 @@ struct PhotoSweepView: View {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
+        state.confirmDiscover = { count in
+            await MainActor.run {
+                confirmFileCount(count, paths: paths)
+            }
+        }
         state.startScan(paths: paths, settings: settingsStore.settings)
+    }
+
+    private func confirmFileCount(_ count: Int, paths: [String]) -> Bool {
+        guard let warning = ScanSafety.fileCountWarning(count: count, paths: paths) else {
+            return true
+        }
+        let alert = NSAlert()
+        alert.messageText = "Scan this many items?"
+        alert.informativeText = warning
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Scan")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     private func browse(files: Bool) {

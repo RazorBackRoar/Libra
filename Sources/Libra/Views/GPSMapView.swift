@@ -118,11 +118,17 @@ struct GPSMapPanel: View {
                         Button {
                             MediaOpen.open(file.path)
                         } label: {
-                            Text(file.name + "." + file.ext)
-                                .font(.system(size: 11))
-                                .foregroundColor(.yellow)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(file.name + "." + file.ext)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.yellow)
+                                    .lineLimit(1)
+                                Text(file.identificationLine)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(2)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(.plain)
                         .help("Open \(file.name).\(file.ext)")

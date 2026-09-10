@@ -346,6 +346,9 @@ final class ToolState: ObservableObject {
             done: progress.done,
             total: progress.total
         )
+        if previewPass, tool == .gps {
+            summary += " City names fill in on Write."
+        }
         if previewPass, let reportURL = DryRunReport.write(tool: tool, results: runResults) {
             summary += " Report: \(reportURL.lastPathComponent)"
         }
@@ -460,23 +463,24 @@ final class ToolState: ObservableObject {
 
     private func gpsSort(target: [VideoInfo]) async {
         let extras = DuplicateDetector.extraPaths(in: target)
-        var clusters = GPSMapClustering.cluster(files: target)
-        for index in clusters.indices {
-            if shouldStop() { return }
-            let name = await GPSGeocoder.reverseGeocode(
-                latitude: clusters[index].latitude,
-                longitude: clusters[index].longitude
-            )
-            clusters[index].placeName = name
-            try? await Task.sleep(nanoseconds: 250_000_000)
-        }
-        clusters = GPSMapClustering.mergeByPlaceName(clusters)
-
         var cityByPath: [String: String] = [:]
-        for cluster in clusters {
-            let folder = GPSGeocoder.folderName(for: cluster.placeName)
-            for file in cluster.files {
-                cityByPath[file.path] = folder
+        if !previewPass {
+            var clusters = GPSMapClustering.cluster(files: target)
+            for index in clusters.indices {
+                if shouldStop() { return }
+                let name = await GPSGeocoder.reverseGeocode(
+                    latitude: clusters[index].latitude,
+                    longitude: clusters[index].longitude
+                )
+                clusters[index].placeName = name
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+            clusters = GPSMapClustering.mergeByPlaceName(clusters)
+            for cluster in clusters {
+                let folder = GPSGeocoder.folderName(for: cluster.placeName)
+                for file in cluster.files {
+                    cityByPath[file.path] = folder
+                }
             }
         }
 
@@ -619,12 +623,12 @@ final class ToolState: ObservableObject {
                 if mode != "copies",
                    written.status == .success,
                    output != file.path {
-                    let removed = FileOps.deleteFile(file.path, dryRun: false)
+                    let removed = FileOps.trashFile(file.path, dryRun: false)
                     if removed.status != .success {
                         written = OperationResult(
                             path: file.path,
                             status: .failed,
-                            reason: "Wrote \(output) but could not remove original: \(removed.reason ?? "unknown error")",
+                            reason: "Wrote \(output) but could not move original to Trash: \(removed.reason ?? "unknown error")",
                             outputPath: output
                         )
                     }

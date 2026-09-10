@@ -187,4 +187,32 @@ final class FileOpsTests: XCTestCase {
         let outsideItems = try FileManager.default.contentsOfDirectory(atPath: outside.path)
         XCTAssertTrue(outsideItems.isEmpty)
     }
+
+    func testTrashFile_dryRunDoesNotMove() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("libra-trash-dry-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let source = dir.appendingPathComponent("clip.mov").path
+        FileManager.default.createFile(atPath: source, contents: Data("keep".utf8))
+
+        let result = FileOps.trashFile(source, dryRun: true)
+        XCTAssertEqual(result.status, .success)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source))
+    }
+
+    func testTrashFile_movesExistingFileOutOfPlace() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("libra-trash-live-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let source = dir.appendingPathComponent("clip.mov").path
+        FileManager.default.createFile(atPath: source, contents: Data("keep".utf8))
+
+        let result = FileOps.trashFile(source, dryRun: false)
+        XCTAssertEqual(result.status, .success)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source))
+    }
 }

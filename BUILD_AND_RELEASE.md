@@ -54,7 +54,7 @@ build/Release/Libra.dmg
 1. Ensure `main` is green (CI `swift build`).
 2. Confirm version in `Sources/Libra/Resources/version.json`.
 3. Run `./scripts/build-mac.sh`.
-4. Install/smoke-test by mounting `build/Release/Libra.dmg` and dragging `Libra.app` to `/Applications`.
+4. Local output is `build/Release/Libra.dmg` plus `~/Desktop/Libra.dmg`. Do not mount the DMG from this guide; the owner double-clicks the Desktop copy and drags **Libra.app** to `/Applications`.
 5. Publish a GitHub Release with title `Libra vX.Y.Z` and attach `build/Release/Libra.dmg`.
 6. Tag `vX.Y.Z` to match `Sources/Libra/Resources/version.json`.
 
@@ -69,7 +69,7 @@ build/Release/Libra.dmg
 |---------|-------------|
 | `swift test` fails without XCTest | Install full Xcode.app, not only CLT |
 | Gatekeeper blocks launch | Right-click → **Open** (ad-hoc signed builds) |
-| Stale `/Applications` copy | Mount `build/Release/Libra.dmg` and drag `Libra.app` to `/Applications` |
+| Stale `/Applications` copy | Use the Desktop `Libra.dmg` and drag `Libra.app` to `/Applications` |
 | Window size restored huge | Quit app; relaunch after upgrading (defaults may cache old frames) |
 
 ## Related Docs

@@ -285,10 +285,10 @@ struct ToolPage: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(file.name).\(file.ext)")
                                 .font(.system(size: 13, weight: .semibold))
-                            Text(file.dir)
+                            Text(file.identificationLine)
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
-                                .lineLimit(1)
+                                .lineLimit(2)
                         }
                     }
                     .contentShape(Rectangle())

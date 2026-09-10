@@ -124,6 +124,19 @@ enum FileOps {
         }
     }
 
+    /// Moves `path` to the Trash. Use when replacing a user's original file.
+    static func trashFile(_ path: String, dryRun: Bool) -> OperationResult {
+        if dryRun {
+            return OperationResult(path: path, status: .success, reason: "Dry-run move to Trash")
+        }
+        do {
+            try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+            return OperationResult(path: path, status: .success)
+        } catch {
+            return OperationResult(path: path, status: .failed, reason: error.localizedDescription)
+        }
+    }
+
     /// Prefer incrementing a trailing padded index (`… 001` → `… 002`) instead of ` (1)`.
     static func uniquePath(for path: String, reserved: Set<String> = []) -> String {
         let fileManager = FileManager.default

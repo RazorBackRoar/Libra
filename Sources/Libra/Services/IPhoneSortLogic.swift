@@ -9,7 +9,6 @@ enum IPhoneSortLogic {
 
     struct Classification {
         let folder: Folder
-        let markers: String
         let note: String
 
         var isIPhoneFolder: Bool { folder == .iPhone }
@@ -24,11 +23,6 @@ enum IPhoneSortLogic {
         } else {
             folder = .notApple
         }
-        let markers = FileNaming.metadataMarkers(
-            hasAppleMake: hasAppleMake,
-            hasiPhoneModel: hasiPhoneModel,
-            hasGPS: false
-        )
         let note: String
         if make.isEmpty && model.isEmpty {
             switch folder {
@@ -42,6 +36,6 @@ enum IPhoneSortLogic {
         } else {
             note = "Make=\(make.isEmpty ? "—" : make) · Model=\(model.isEmpty ? "—" : model)"
         }
-        return Classification(folder: folder, markers: markers, note: note)
+        return Classification(folder: folder, note: note)
     }
 }

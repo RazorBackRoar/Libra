@@ -30,7 +30,7 @@ struct ResultsTable: View {
                                 resultRow(
                                     index: index + 1,
                                     title: file.name + "." + file.ext,
-                                    detail: detailLine(for: file),
+                                    detail: file.identificationLine,
                                     error: file.error,
                                     warning: file.warning
                                 )
@@ -176,45 +176,5 @@ struct ResultsTable: View {
         case .skipped, .pending:
             return .secondary
         }
-    }
-
-    private func detailLine(for file: VideoInfo) -> String {
-        var parts: [String] = []
-        if !file.resolutionClass.isEmpty && file.resolutionClass != "Unknown" {
-            parts.append(file.resolutionClass)
-        }
-        if !file.orientation.isEmpty && file.orientation != "Unknown" {
-            parts.append(file.orientation)
-        }
-        if !file.codec.isEmpty {
-            parts.append(file.codec)
-        }
-        if file.durationSec > 0 {
-            parts.append(formatDuration(file.durationSec))
-        }
-        parts.append(formatSize(file.sizeBytes))
-        let markers = FileNaming.metadataMarkers(
-            hasAppleMake: file.hasAppleMake,
-            hasiPhoneModel: file.hasiPhoneModel,
-            hasGPS: file.hasGPS
-        )
-        if !markers.isEmpty {
-            parts.append(markers)
-        }
-        if !file.make.isEmpty || !file.model.isEmpty {
-            parts.append([file.make, file.model].filter { !$0.isEmpty }.joined(separator: " "))
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private func formatDuration(_ seconds: Double) -> String {
-        let m = Int(seconds) / 60
-        let s = Int(seconds) % 60
-        return "\(m):\(String(format: "%02d", s))"
-    }
-
-    private func formatSize(_ bytes: Int64) -> String {
-        let mb = Double(bytes) / (1024 * 1024)
-        return String(format: "%.1f MB", mb)
     }
 }

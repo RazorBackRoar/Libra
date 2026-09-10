@@ -19,37 +19,6 @@ enum GPSCoordinateParser {
         return validated(latitude: signedLat, longitude: signedLon)
     }
 
-    static func coordinates(fromExiftool fields: [String: Any]) -> Coordinates? {
-        guard let lat = doubleValue(fields["GPSLatitude"]),
-              let lon = doubleValue(fields["GPSLongitude"]) else {
-            return nil
-        }
-        return validated(latitude: lat, longitude: lon)
-    }
-
-    static func coordinates(fromFfprobeTags tags: [String: Any]) -> Coordinates? {
-        let keys = [
-            "com.apple.quicktime.location.ISO6709",
-            "location",
-            "location-eng",
-            "com.apple.quicktime.location.name"
-        ]
-        for key in keys {
-            if let value = tags[key] as? String,
-               let coords = parseISO6709(value) {
-                return coords
-            }
-        }
-        for (key, value) in tags {
-            let lower = key.lowercased()
-            guard lower.contains("location") || lower.contains("iso6709"),
-                  let string = value as? String,
-                  let coords = parseISO6709(string) else { continue }
-            return coords
-        }
-        return nil
-    }
-
     /// Parses QuickTime-style ISO 6709 strings such as `+37.3349-122.0090/` or `+37.33-122.00+12.0/`.
     static func parseISO6709(_ raw: String) -> Coordinates? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -63,6 +63,11 @@ struct CategoryBrowserView: View {
                                 .font(.system(size: 14, weight: .semibold))
                                 .lineLimit(1)
 
+                            Text(file.identificationLine)
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                                .textSelection(.enabled)
+
                             Text(file.path)
                                 .font(.system(size: 12, design: .monospaced))
                                 .foregroundColor(.secondary)
@@ -139,9 +144,10 @@ struct CategoryBrowserView: View {
                                     .foregroundColor(.red)
                                     .lineLimit(1)
                             } else {
-                                Text(file.resolutionClass)
+                                Text(file.identificationLine)
                                     .font(.system(size: 10))
                                     .foregroundColor(.secondary)
+                                    .lineLimit(2)
                             }
                         }
                     }

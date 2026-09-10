@@ -29,17 +29,18 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 
 - **Drag-and-drop tools** — drop a folder to scan; Dry Run previews automatically
 - **Undo last run** — put moved files back (or delete created copies)
-- **Dry Run first** — bright yellow toggle; Desktop reports named `Libra Sorter Dry Run 1.txt` (tool name swaps per mode)
+- **Dry Run first** — bright yellow **Preview only** toggle; Desktop reports named `Libra Sorter Dry Run 1.txt` (tool name swaps per mode)
 - **Home grid** — Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, and Photos Only
 - **Libra Sorter** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
-- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; collapsed on sort tools, full on GPS Sorter; click a filename to open the video
-- **GPS** — city folders from coordinates, `No-GPS` when missing
+- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; opens whenever scanned videos have coordinates; click a filename to open the video
+- **GPS** — city folders from coordinates on Write, `No-GPS` when location is missing; Preview uses `GPS` / `No-GPS` folders
 - **Optional date / camera folders** — extra sort keys on the sort tools
-- **Duplicates** — likely extras (same size, duration, name) go in a Duplicates folder
+- **Duplicates** — likely extras (same size, duration, resolution, fps, codec) go in a Duplicates folder
+- **Identification** — each row shows resolution, fps, iPhone/Apple, and GPS coordinates (not the container; the filename already has that)
 - **iPhone Model Sort** — iPhone / Other Apple / Not Apple (videos)
 - **Transform** — Slo-Mo copies and 1-Min-Adjuster sequential timestamps (these need ffmpeg)
 - **Resilient import** — cancelable scans; per-file probe failures don’t stall the batch
-- **Local-first organize** — sort, rename, and file moves stay on your Mac. City names on the GPS map use Apple reverse-geocode when you open the map (or run GPS Sorter). Check for Updates talks to GitHub when you ask.
+- **Local-first organize** — sort, rename, and file moves stay on your Mac. City names on the GPS map use Apple reverse-geocode when you open the map, or when you Write on GPS. Check for Updates talks to GitHub when you ask.
 - **Native SwiftUI** — Apple Silicon macOS app, ad-hoc signed DMG
 
 ## Install

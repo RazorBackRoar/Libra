@@ -107,12 +107,20 @@ enum FfmpegOps {
             )
             if output.exitCode == 0 {
                 do {
-                    if FileManager.default.fileExists(atPath: outputPath) {
-                        try FileManager.default.removeItem(atPath: outputPath)
+                    var dest = outputPath
+                    if FileManager.default.fileExists(atPath: dest) {
+                        dest = FileOps.uniquePath(for: dest)
                     }
-                    try FileManager.default.moveItem(atPath: tmp, toPath: outputPath)
+                    if let withinRoot, !FileOps.destinationIsSafe(dest, within: withinRoot) {
+                        return OperationResult(
+                            path: filePath,
+                            status: .failed,
+                            reason: "Destination is outside the selected folder (symlink)"
+                        )
+                    }
+                    try FileManager.default.moveItem(atPath: tmp, toPath: dest)
                     movedToOutput = true
-                    return OperationResult(path: filePath, status: .success, outputPath: outputPath)
+                    return OperationResult(path: filePath, status: .success, outputPath: dest)
                 } catch {
                     return OperationResult(
                         path: filePath,

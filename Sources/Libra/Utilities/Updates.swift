@@ -24,9 +24,19 @@ final class Updates {
             return cached
         }
 
-        let url = URL(string: "https://api.github.com/repos/\(Brand.githubOrg)/\(Brand.githubRepo)/releases/latest")!
+        guard let url = URL(string: "https://api.github.com/repos/\(Brand.githubOrg)/\(Brand.githubRepo)/releases/latest") else {
+            return UpdateResult(
+                currentVersion: currentVersion,
+                latestVersion: currentVersion,
+                updateAvailable: false,
+                downloadURL: nil,
+                releaseNotes: nil,
+                releaseDate: nil,
+                error: "Invalid update-check URL"
+            )
+        }
         var request = URLRequest(url: url)
-        request.setValue(Brand.githubRepo + "-update-checker/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
 
         do {
