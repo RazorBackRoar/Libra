@@ -8,8 +8,8 @@ import Foundation
 /// A non-empty prefix replaces the original name (with a space after it):
 /// `katie 720p W30 002.mp4` — not `katie 1E8B0D0F-… 720p W30 002.mp4`.
 enum FileNaming {
-    static let resolutionClasses = ["8K", "4K", "1440p", "FHD", "1080p", "HD", "720p", "SD"]
-    static let fpsBuckets = [24, 30, 60, 120]
+    static let resolutionClasses = ["4K", "QHD", "FHD", "1080p", "HD", "720p", "SD"]
+    static let fpsBuckets = [30, 60, 120]
 
     /// Zero-pad width: at least 3 digits (`001`), growing for larger batches.
     static func paddingWidth(forCount count: Int) -> Int {
@@ -20,6 +20,12 @@ enum FileNaming {
     static func fpsBucket(_ fps: Double) -> Int {
         guard fps > 0 else { return 30 }
         return fpsBuckets.min(by: { abs(Double($0) - fps) < abs(Double($1) - fps) }) ?? 30
+    }
+
+    /// Snap to nearest standard frame rate for filename generation.
+    /// Raw rate is preserved separately for display in identification rows.
+    static func fpsClass(_ fps: Float) -> Int {
+        fpsBucket(Double(fps))
     }
 
     /// Portrait → `V`, square → `S`, landscape/unknown → `W`.

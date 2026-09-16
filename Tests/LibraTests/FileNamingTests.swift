@@ -57,14 +57,17 @@ final class FileNamingTests: XCTestCase {
         XCTAssertEqual(name, "video 1080p V60 001.mp4")
     }
 
-    func testEightKAnd24FpsBuckets() {
-        XCTAssertEqual(FileNaming.resolutionLabel("8K"), "8K")
-        XCTAssertEqual(FileNaming.fpsBucket(24), 24)
+    func testEightKRetiredAnd24FpsSnapsTo30() {
+        XCTAssertEqual(FileNaming.resolutionLabel("4K"), "4K")
+        XCTAssertEqual(FileNaming.resolutionLabel("8K"), "SD")
+        XCTAssertEqual(FileNaming.fpsBucket(24), 30)
         XCTAssertEqual(FileNaming.fpsBucket(30), 30)
+        XCTAssertEqual(FileNaming.fpsBucket(60), 60)
+        XCTAssertEqual(FileNaming.fpsBucket(120), 120)
         let name = FileNaming.standardFileName(
             originalName: "Cinema",
             prefix: "",
-            resolutionClass: "8K",
+            resolutionClass: "4K",
             orientation: "landscape",
             fps: 24,
             hasAppleMake: false,
@@ -74,18 +77,19 @@ final class FileNamingTests: XCTestCase {
             padWidth: 3,
             ext: "mov"
         )
-        XCTAssertEqual(name, "Cinema 8K W24 001.mov")
+        XCTAssertEqual(name, "Cinema 4K W30 001.mov")
     }
 
-    func testSquareAnd1440p() {
+    func testSquareAndQHD() {
         XCTAssertEqual(FileNaming.orientationCode("square"), "S")
         XCTAssertEqual(FileNaming.orientationCode("portrait"), "V")
         XCTAssertEqual(FileNaming.orientationCode("landscape"), "W")
-        XCTAssertEqual(FileNaming.resolutionLabel("1440p"), "1440p")
+        XCTAssertEqual(FileNaming.resolutionLabel("QHD"), "QHD")
+        XCTAssertEqual(FileNaming.resolutionLabel("1440p"), "SD")
         let name = FileNaming.standardFileName(
             originalName: "Clip",
             prefix: "",
-            resolutionClass: "1440p",
+            resolutionClass: "QHD",
             orientation: "square",
             fps: 30,
             hasAppleMake: false,
@@ -95,6 +99,6 @@ final class FileNamingTests: XCTestCase {
             padWidth: 3,
             ext: "mov"
         )
-        XCTAssertEqual(name, "Clip 1440p S30 001.mov")
+        XCTAssertEqual(name, "Clip QHD S30 001.mov")
     }
 }
