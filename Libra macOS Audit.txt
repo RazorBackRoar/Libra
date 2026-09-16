@@ -1,0 +1,1231 @@
+# Libra — macOS Application Audit
+
+**Status: audit only. No files were modified, no branches or tags touched, nothing built, signed, or released.** I did not have time to finish every section of your master prompt; what follows is what I actually inspected, with the gaps marked.
+
+---
+
+## 1. Executive summary
+
+Libra is a native Swift/SwiftUI macOS media-organization app built with Swift Package Manager (no Xcode project, no third-party dependencies). It scans folders, probes media with AVFoundation/ImageIO, previews a plan, and — only on explicit Write — renames, sorts, or transforms files, keeping an in-memory undo journal.
+
+The engineering state is better than most projects this size: zero external dependencies, a real safety model (preview-first, containment checks, symlink rejection), genuine cancellation plumbing, and honest documentation about what is heuristic versus measured. Major architectural change is **not** warranted.
+
+The headline problem is a shipped functional regression: **both ffmpeg-backed tools cannot write output at all**, and preview masks it. Second is a version/provenance break: the DMG on disk is stamped `1.2.4` but contains code from 10 commits past the `v1.2.4` tag.
+
+---
+
+## 2. Technology stack (verified)
+
+| Item | Value | Evidence |
+|---|---|---|
+| Language | Swift, SwiftUI + AppKit interop | `Sources/Libra/**` |
+| Build | SwiftPM, `swift-tools-version: 6.3`, Swift **5** language mode | `Package.swift` |
+| Toolchain used | Apple Swift 6.3.3, target `arm64-apple-macosx26.0` | `.build/.../swift-version--*.txt` |
+| Deployment target | macOS 14.0 | `Package.swift`, Info.plist, `LC_BUILD_VERSION minos=14.0.0` |
+| SDK | macOS 26.5 | `LC_BUILD_VERSION sdk=26.5.0` |
+| Dependencies | **None** | `workspace-state.json` empty; `checkouts/`, `artifacts/` empty; no `Package.resolved` |
+| Architecture | arm64-only Mach-O (not universal, no x86_64) | `file` on debug, release, and shipped binaries |
+| Signing | Ad-hoc, **no hardened runtime**, no entitlements | CodeDirectory `flags=0x2` (ADHOC only), empty CMS blob, ident `com.razorbackroar.libra` |
+
+Apple Silicon: genuinely native. No Rosetta dependency, no Intel binaries, no x86-specific settings found. One caveat under §5.
+
+---
+
+## 3. Local ↔ GitHub ↔ release reconciliation
+
+The ZIP contains a working `.git`, so local state is verifiable:
+
+- `main` = `origin/main` = `d8e3ef2` (2026-09-12), **0 ahead / 0 behind**
+- Working tree clean except untracked `.vscode/` and `Icon`
+- Tags: `v1.0.1`, `v1.2.4`. `v1.2.4` → `4ed291c` (2026-08-20)
+- `main` is **10 commits ahead of the `v1.2.4` tag**
+- Local-only branch `safety/libra-baseline`, 3 commits behind main, no remote counterpart
+- `FETCH_HEAD` recorded `d8e3ef2` at Sep 15 22:00
+
+**GitHub state could not be independently verified** — I had no network access to github.com. Everything above is local git data, not live remote data. Published releases and release assets were not inspected.
+
+---
+
+## 4. Critical problems
+
+### 4.1 Slo-Mo and 1-Min-Adjuster cannot produce output — ESSENTIAL
+
+**Finding:** Every ffmpeg write fails. `runToUniqueOutput` writes to `outputPath + ".libra-tmp"` and passes no `-f` format flag, so ffmpeg cannot select a muxer.
+
+**Evidence:** `FfmpegOps.swift:88` builds the temp path; `:26–32` and `:56–63` pass it as the output argument with no `-f`. I reproduced it with the exact argument patterns (ffmpeg 6.1.1, Linux — **not** your macOS Homebrew build):
+
+```
+Unable to choose an output format for 'out.mp4.libra-tmp';
+use a standard extension for the filename or specify the format manually.
+exit code 234, no output file created
+```
+
+Regression introduced 2026-08-15 in `8f31074`; the prior version wrote straight to `outputPath` with a real extension. It is therefore in the shipped `v1.2.4`.
+
+**Why it went unnoticed:** the preview path short-circuits before ffmpeg (`ToolState.swift:607–613`, `:669–675`) and always reports success. Only a live Write hits it, surfacing as `"Error opening output files: Invalid argument"`.
+
+**Smallest fix:** keep the temp name but pass the real container explicitly — derive the muxer from the final extension and add `-f <fmt>`, or suffix as `<name>.libra-tmp.<ext>`.
+
+**Priority:** Essential · **Benefit:** Correctness · **Risk:** Low · **Confidence:** High
+
+### 4.2 Version/provenance mismatch on the built DMG — ESSENTIAL
+
+**Finding:** `build/Release/Libra.dmg` declares `1.2.4` but contains post-tag code.
+
+**Evidence:** Extracted the DMG; `Info.plist` and both `version.json` copies read `1.2.4`. Strings added in `d493a50` (`"Drop a folder or videos above."`, `"No videos in this category."`, `"Drop photos here"`, `"Select Photos"`) are **present** in the shipped Mach-O; strings removed in the same commit (`"Has location"`, `"Apple device"`) are **absent**. So the artifact is built from current `main`, 10 commits past `v1.2.4`.
+
+`version.json` is the single version authority, and `CFBundleVersion` and `CFBundleShortVersionString` are both set from it — there is no build number to disambiguate rebuilds.
+
+**Recommendation:** bump `version.json` before packaging; consider deriving `CFBundleVersion` from the commit count or short SHA so an artifact identifies its source.
+
+**Priority:** Essential · **Benefit:** Release integrity · **Risk:** Low · **Confidence:** High
+
+### 4.3 The release build cannot be reproduced from this repository — ESSENTIAL
+
+**Finding:** `scripts/build-mac.sh` depends on scripts outside the repo:
+
+```
+RAZORCORE_DIR="$(cd "$SCRIPT_DIR/../../.razorcore" && pwd)"
+"$RAZORCORE_DIR/patch-app-branding.sh" "$APP_PATH"
+"$RAZORCORE_DIR/package-dmg.sh" --app ... --dmg ...
+```
+
+`.razorcore` is the grandparent directory — not in the ZIP, not in git. With `set -e`, a clean clone fails at the `cd`. DMG layout, volume icon, and background all come from an unversioned external script.
+
+**Priority:** Essential · **Benefit:** Release integrity, Maintainability · **Risk:** Low · **Confidence:** High · *Potential shared RazorBackRoar standard.*
+
+### 4.4 Preferences menu item probably does nothing — ESSENTIAL
+
+`AppDelegate.showSettings()` sends `Selector(("showPreferencesWindow:"))` (`LibraApp.swift:126`). Apple renamed this to `showSettingsWindow:` for apps built against the macOS 13+ SDK — this app is built against **26.5**. Because `buildMenu()` replaces the entire main menu, this is the only route to the `Settings` scene (⌘,).
+
+The supported public API at your macOS 14 floor is `@Environment(\.openSettings)` or `SettingsLink`. Your own audit rules forbid private selectors; this is one.
+
+**Confidence:** Medium-High (static reasoning; not run).
+
+---
+
+## 5. Other confirmed findings
+
+| # | Finding | Evidence | Priority |
+|---|---|---|---|
+| 1 | `break` inside `switch` exits the switch, not the loop — after a cancellation error the scan keeps enqueueing tasks | `Scanner.swift:137, :141` | Recommended |
+| 2 | Retain cycle: `ToolState.confirmDiscover` → closure → `ToolPage` → `StateObject` → `ToolState`. Leaks each tool's scan results on Back | `ToolPage.swift:465–469` | Recommended |
+| 3 | "Find Homebrew installs" loops without `break`, so `/usr/local/bin` (Intel prefix) wins over `/opt/homebrew/bin`. Contradicts `AppState.resolve`, which is first-match | `SettingsView.swift:64–68` vs `AppState.swift:39–43` | Recommended |
+| 4 | Six sites read `AppSettings.default.imageExtensions` instead of live settings. A user-added photo extension gets scanned, classified as a photo, then probed as **video** and fails | `Models.swift:33`, `MediaProbe.swift:59`, `GPSMapModel.swift:18,93`, `CategoryBrowserView.swift:166,208` | Recommended |
+| 5 | Settings text fields write `settings.json` and re-resolve ffmpeg on **every keystroke**; mid-typing states produce invalid extension lists | `SettingsView.swift:48–51` | Recommended |
+| 6 | Undo and photo moves run synchronously on `@MainActor` — UI freezes, "Undoing…" never renders | `ToolState.swift:190–205`, `:169` | Recommended |
+| 7 | Debounced auto-preview writes a **new numbered Desktop report on every option change**; `nextReportURL` stats from 1 upward each time | `ToolState.swift:352`, `:143–151`, `DryRunReport.swift:65–73` | Recommended |
+| 8 | iPhone Model Sort applies date/camera subfolders its own UI never exposes | `ToolState.swift:567` vs `showsExtraFolderToggles` | Recommended |
+| 9 | Geocode failure silently dumps files into a generic `GPS` folder with no warning | `GPSGeocoder.swift:29–31` + `ToolState.swift:500–506` | Recommended |
+| 10 | `brew install ffmpeg` result discarded (`_ = try? await`); if brew is absent the user sees nothing | `AppState.swift:61–65` | Recommended |
+| 11 | Hardcoded personal folder marker `"MetaBurn & Libra Test"` disables safety warnings for any path containing it — shipped in release | `ScanSafety.swift:4–10` | Recommended |
+| 12 | `libra.log` grows without rotation; a new `ISO8601DateFormatter` and open/seek/write/close per line, on the main actor | `Logging.swift:22–40` | Recommended |
+| 13 | Undo of a created copy uses `removeItem`, not `trashItem` — inconsistent with the documented Trash-first safety model | `UndoApply.swift:19` | Optional |
+| 14 | `codesign --force --deep --sign -` — `--deep` is deprecated and unnecessary (no nested code) | `build-mac.sh` | Optional |
+| 15 | Copyright year from `$(date +%Y)` at build time → non-deterministic output | `build-mac.sh` | Optional |
+
+### Performance (analysis only — nothing profiled)
+
+- **Per-file progress** hops to the main actor and mutates `@Published` once per file (`Scanner.swift:146` → `ToolState.swift:243–250`), re-evaluating `videoWorkspace` each time. That re-runs `orderedResults` (full sort, `ResultsTable.swift:8–15`), `DuplicateDetector.extraPaths` (`ToolPage.swift:79`) and `CountPills`. Coalescing progress to ~10/sec is the single highest-value fix.
+- **`commitMove` copy-on-write:** `reservedSnapshot` stays in scope while `reserved.insert(...)` mutates, forcing a Set copy per file — O(N²). `ToolState.swift:396–401`.
+- **Directory walk** uses legacy `enumerator(atPath:)` plus `fileExists` **and** `isSymlinkOrAlias` (which does `.isAliasFileKey`) per entry. `enumerator(at:includingPropertiesForKeys:)` with prefetched keys is the modern equivalent. `Scanner.swift:222–232`.
+- **DateFormatter churn:** new formatter per file in `extraFolderParts` (`ToolState.swift:698`) and per metadata item in `parseDate`/`parseExifDate` (`MediaProbe.swift:496–512`).
+- **Clustering** allocates a `CLLocation` inside the inner comparison loop, with an O(C³)-worst-case merge. `GPSMapModel.swift:130–134, 195–201`.
+- `-c:v libx264` ignores the Apple Silicon media engine; `h264_videotoolbox` is the ARM-native option, with a quality trade-off. `FfmpegOps.swift:30`.
+
+### Accuracy (your §14) — see also §24 for the authoritative resolution/FPS classification spec
+
+Identification rows show `FileNaming.fpsBucket(file.fps)` — a snapped 24/30/60/120 bucket, not the probed rate. A 29.97 fps clip reads "30 fps". The README promises "fps". `MediaIdentification.swift:12`. Separately, `fps` comes from `.nominalFrameRate`, which is approximate for variable-frame-rate video — worth stating rather than implying precision.
+
+**Resolution classification is now fully specified in §24**, including the seven-bucket scheme (SD, 720p, HD, 1080p, FHD, QHD, 4K), boundary logic, ±2px tolerance rules, and the check order that makes it work. FPS snapping rules (snap to nearest of 30/60/120) are also defined there with edge-case tables from real data.
+
+---
+
+## 6. Already good — leave alone
+
+- **Zero third-party dependencies.** Nothing to audit, patch, or bloat the bundle.
+- **Safety model.** `FileOps` rejects symlinks/aliases and checks *physical* containment independently of UI confirmations. `moveItem` never overwrites.
+- **Preview-first flow.** Turning Preview off starts a preview, never a write — matches your stated requirement exactly.
+- **Duplicate detection is honestly labeled** a heuristic in code, UI, and docs.
+- **Network honesty.** Only `api.github.com`, only on request, cached 1h. CLGeocoder needs no location permission, so no Info.plist location key is required — correct as-is.
+- **ProcessRunner** guards continuation resumption properly and does SIGTERM → grace → SIGKILL.
+- **AVFoundation/ImageIO instead of shelling out to ffprobe** — right call for a native app.
+
+---
+
+## 7. Dead code (verified by full-repo search, per your §3)
+
+`FileOps.renameFile`, `FileOps.copyFile`, `ToolState.selected`, `AppState.ffprobePath` / `missingFfprobe` / `AppSettings.ffprobePath` (resolved at launch, never consumed), `LibraCommands.cancelWork` (subscribed, never posted — suggests a missing Cancel menu item), `Log.shared.debug/warn/error` (zero call sites), `IPhoneSortLogic.isIPhoneFolder`, `VideoInfo.resolutionFolder`/`orientationFolder`.
+
+---
+
+## 8. Derived vs authoritative
+
+- `.build/` is stale derived output — it still contains `Ffprobe.swift.o` for a source file that no longer exists.
+- `build/assets/`, `build/main/`, `main-window.html`, `settings-window.html` are **leftover Electron/Vite bundles** (4.2 MB). Gitignored, so not in the repo, but present on disk; `build-mac.sh` only cleans named `.app`/`.dmg` paths. None of it reaches the DMG — I verified the bundle contains only `Info.plist`, `MacOS/Libra`, `AppIcon.icns`, `version.json`, the SwiftPM resource bundle, and `_CodeSignature`.
+- Root `Libra.png` is gitignored, yet `build-mac.sh` regenerates `Libra.icns` from it when `uv` is present — the icon source is outside version control.
+
+---
+
+## 9. Documentation defects
+
+- `BUILD_AND_RELEASE.md` says "swift-tools 5.10+"; `Package.swift` requires **6.3**.
+- README's "First launch — right-click → **Open**" is stale for macOS 15+, where Apple removed that Gatekeeper bypass for ad-hoc/unsigned apps. **I could not verify this against current Apple documentation** (no network) — please confirm before changing the text. Given the macOS 26.5 SDK, most users will be affected.
+- `FileNaming.fpsBucket`'s doc comment says "30, 60, or 120"; `fpsBuckets` includes 24.
+- `MediaClassification` labels 1923–2557px as **"FHD"**, ranked above "1080p" — conventionally FHD *is* 1080p. Intentional per the docstring, but confusing. **§24 replaces this with the authoritative seven-bucket scheme.**
+
+---
+
+## 10. Not covered
+
+I ran out of room before finishing: full review of `Tests/LibraTests` (14 files), `scripts/verify-iphone-sorter.sh` and `iphone_verify_main.swift`, `PhotoSweepView`, `GPSMapView`, `CategoryBrowserView` in full, `.cursor/` and `.jules/` config, and independent verification that `macos-26` and `actions/checkout@v7` are valid CI identifiers. CI itself (`ci.yml`) runs `swift build` + `swift test` on `macos-26` with `contents: read` and cancel-in-progress concurrency — it does **no** packaging, signing, or release work, so every release is a manual local build.
+
+Nothing was run, built, signed, notarized, packaged, uploaded, or installed.
+
+---
+
+## 11. Final recommendation
+
+**Needs minor improvements.** The architecture is sound and should be preserved. Fix in this order: (1) the ffmpeg muxer regression, (2) version/provenance before the next release, (3) vendor or document `.razorcore`, (4) the Settings selector, then the performance and consistency items. No refactor, no new dependencies, no architectural change is justified by the evidence.
+
+Say the word and I'll finish the sections I skipped, or write up any finding as a concrete diff.
+
+Continuing — here are the sections I left open, plus two corrections to Part 1.
+
+---
+
+## 12. Corrections to Part 1
+
+**The "FHD" bucket is intentional and tested, not a defect.** `MediaClassificationTests.swift:6–13` contains `testResolution_1080pIsNotFHD`, which explicitly asserts `2048×1080 → "FHD"` and `1920×1080 → "1080p"`. This is a deliberate, locked-down contract. Withdraw it as a finding; only the README/docs never explain the distinction to users, which is a documentation gap at most. **Note: §24 now provides the authoritative replacement for these old bucket names and their boundaries.**
+
+**The Gatekeeper claim is now verified.** Apple confirmed on its developer site that "In macOS Sequoia, users will no longer be able to Control-click to override Gatekeeper when opening software that isn't signed correctly or notarized," and users must instead go to System Settings > Privacy & Security to review the software before allowing it. Before Sequoia, Control-clicking an app in Finder was the standard override; Apple removed that bypass. Libra requires macOS 14+ and is built against the 26.5 SDK, so most users land on 15 or 26 and the README instruction fails them. Note Libra is *ad-hoc signed*, not unsigned — ad-hoc local signing satisfies the Apple Silicon signing requirement, and the Privacy & Security path applies to signed-but-not-notarized apps — so "Open Anyway" should work; it's the instruction that's wrong, not the distribution model.
+
+---
+
+## 13. CI/CD review — now verified
+
+Both identifiers I flagged as unverifiable are correct and current:
+
+- `runs-on: macos-26` is valid. macOS 26 Arm64 maps to the `macos-26` label and is an arm64 image, and it reached general availability on 26 February 2026. **CI builds on Apple Silicon, matching the target architecture** — that's a real strength, not an accident.
+- `actions/checkout@v7` is current: v7.0.1 is the latest release, and v7 is generally available and refuses common pwn-request patterns by default. Your weekly `dependabot.yml` for github-actions is what keeps it there — that config is doing its job.
+
+Workflow assessment (`ci.yml`): triggers on push/PR to `main` only; `permissions: contents: read` (correctly minimal); `cancel-in-progress` concurrency; no secrets consumed; no path filters (fine for a small repo). `swift test` works here because GitHub's macOS images ship Xcode, even though your docs correctly note that Command Line Tools alone can't run XCTest locally.
+
+**Gaps:** no packaging, signing, or release job; no caching of `.build`; no `swift build -c release` (so a release-only compile break wouldn't surface until you package by hand); nothing pins a Swift/Xcode version, so a runner image bump to a newer default Xcode can change your toolchain silently. Given `Package.swift` requires `swift-tools-version: 6.3`, an image rollback would hard-fail the build. One `xcode-select` step or a `swift --version` assertion would make that explicit. Relevant context: the macOS 14 Sonoma runner images entered deprecation and become fully unsupported by 2 November, so there is no hosted runner left that matches your macOS 14 deployment floor — CI can only prove it *compiles* for 14, never that it *runs* on 14.
+
+---
+
+## 14. Testing review
+
+74 test functions across 14 XCTest files, ~1,300 lines. Quality is genuinely good where coverage exists: `FileOpsTests` (18 tests) covers symlink rejection, parent-symlink escape, never-overwrite, reserved-set batching, and the padded-index uniquifier; `ScannerServiceTests` covers cancellation-preserves-partial-results and continue-after-one-failure; `ProcessRunnerTests` covers timeout, cancellation, and stderr pipe drain. That is real regression protection on the dangerous paths.
+
+**The coverage gap is exactly where the shipped bug lives.** `FfmpegOps` has one test — `testFfmpegOpsTimeoutCalculations`, pure arithmetic on `timeout(durationSec:factor:)`. Nothing tests argument construction or the output path, which is why §4.1 shipped. Also untested: `DryRunReport`, `PhotoMover`, `Updates.compareVersions` (pure and trivially testable), `AppState` dependency resolution, `Resources.bundle`, `Logging`.
+
+**Three test-hygiene defects, all confirmed by reading:**
+
+1. **The test suite writes files to your real Desktop.** `testScheduleRerunPreviewsWhenLiveToggleOff` (`ToolStateTests.swift:22–32`) sets `state.files = [stubVideo()]` and sleeps 700 ms — past the 450 ms debounce — so a real preview pass runs, reaching `applyRunRecap` → `DryRunReport.write` → `~/Desktop/Libra Sorter Dry Run N.txt`. Every `swift test` run leaves another numbered file on the Desktop, locally and on CI.
+2. **Tests mutate real persisted user settings.** `testMovePhotosOutRefusesDestinationInsideSource:51` calls `SettingsStore.shared.update { $0.lastFolder = "/Trip" }`, which writes `~/Library/Application Support/Libra/settings.json` and never restores it. Singleton state also leaks between tests in-process.
+3. **A fire-and-forget Task.** `testStartScanClearsUndoRecords` calls `startScan(paths: ["/tmp/empty-scan"])` and returns without awaiting; the scan Task outlives the test.
+
+`Libra.progress.md` claims "Full `swift test` — 17/17 passed". There are now 74 test functions — the claim is stale by a wide margin. The same file asserts "No personal Desktop paths remain in source/tests", which is **false**: `Tests/LibraTests/ScanSafetyTests.swift` has `/Users/home/Desktop/MetaBurn & Libra Test/videos` at lines 6, 8, and 23.
+
+---
+
+## 15. Diagnostics review
+
+Only `Log.shared.info` is ever called — two sites, both in `ToolState`. `debug`, `warn`, and `error` have **zero** call sites repo-wide. So a failed move, a metadata probe failure, a geocode failure, and an ffmpeg error all vanish without a log line; the user gets a UI string and nothing persists. Given §4.1 shipped silently, that matters.
+
+The dual-sink design (os.log `Logger` + a file) duplicates the timestamp and level that `os_log` already records. The file sink has no rotation or size cap, builds an `ISO8601DateFormatter` per line, and does open/seek/write/close per line — on the main actor, since `Log` is `@MainActor`. Low volume today because almost nothing logs; it would become a main-thread I/O problem the moment you add per-file logging.
+
+No sensitive data is logged. `AppInfoProvider.printStartupInfo()`'s `print()` banner is documented as intentional in AGENTS.md, and I'm leaving it alone as instructed.
+
+---
+
+## 16. Agent / governance layer — a live contradiction
+
+Your most recent commit on `main` (`d8e3ef2`, "docs(jules): retire sentinel/bolt/palette daily audit contract (#100)") states in AGENTS.md: *"Daily sentinel / bolt / palette audit branches are retired. Do not create `sentinel-*`, `bolt-*`, or `palette-*` branches."*
+
+But `.jules/sentinel.md`, `.jules/bolt.md`, and `.jules/palette.md` are still present and still instruct agents: *"Always use the prefix `sentinel-` for automated security PRs"* (and equivalents for `bolt-`/`palette-`). The retirement landed in AGENTS.md only. An agent reading its own contract file gets the opposite instruction.
+
+Two related concerns:
+
+- **`.jules/bolt.md` carries a standing instruction that would break your overwrite protection.** Its recorded "learning" recommends replacing `FileManager.default.fileExists` loops with a cached `contentsOfDirectory` Set, and explicitly acknowledges the case-sensitivity behavior change. The only such loop in the codebase is `FileOps.uniquePath` — the function that stops Libra from colliding with the user's existing files. Applying that "learning" would trade a correct check for a stale in-memory snapshot in the one place where being wrong destroys data.
+- **`.jules/config.json` sets `auto_approve_plans: true` and `suggestions.auto_execute: true`**, and AGENTS.md reinforces it ("Do not pause or wait for human plan approval on routine refactoring"). This repo's core function is moving and trashing the user's files. Both §4.1 (the ffmpeg regression) and the `Scanner.swift` `break` bug arrived via bulk autosync commits with generated messages like "Update src, tests, docs (19 files)" — messages that make review by diff-reading effectively impossible.
+
+**Recommendation:** delete or rewrite the three `.jules/*.md` files to match AGENTS.md; remove the `FileOps.uniquePath` "learning"; set `auto_approve_plans: false` for changes touching `Services/FileOps.swift`, `Services/FfmpegOps.swift`, `Services/UndoApply.swift`, `scripts/`, and `.github/`. *Potential shared RazorBackRoar standard.*
+
+---
+
+## 17. Duplication: two implementations of "move photos out"
+
+`LibraView` routes `.photoSweep` to `PhotoSweepView` and everything else to `ToolPage`. `PhotoSweepState` (287-line file) re-implements `photos`/`results`/`running`/`recap`/`dryRun`/`progress`/`undoRecords`, `startScan`, `moveOut`, `undoLastRun`, `beginScan`, `confirmFileCount`, and `browse` — all of which `ToolState` + `ToolPage` already have for the Photos tab.
+
+Safety has **not** drifted: both check `ScanSafety.destinationIsInsideSource` and both honour `requireConfirmToWrite`. Behaviour has:
+
+| | `ToolState.movePhotosOut` | `PhotoSweepState.moveOut` |
+|---|---|---|
+| Removing moved photos | `Set`-based, O(N) (`:176–177`) | nested `contains`, **O(N²)** (`:85–87`) |
+| Results array | `append(contentsOf:)` | `results = moved` (replaces) |
+| Desktop Dry Run report | written | **not** written |
+
+That last row contradicts the README's "Desktop reports … (tool name swaps per mode)" for the Photos Only tile. Not urgent, but this is the kind of drift that eventually produces a real safety divergence. Consolidating on `ToolState` with `tool == .photoSweep` is the smaller long-term liability.
+
+---
+
+## 18. File-by-file change map
+
+| # | File · symbol | Current | Proposed | Priority | Benefit | Risk | Conf. |
+|---|---|---|---|---|---|---|---|
+| 1 | `FfmpegOps.runToUniqueOutput:88` | temp path `out + ".libra-tmp"`, no `-f` | keep temp name, pass `-f <muxer>` derived from the final extension | Essential | Correctness | Low | High |
+| 2 | `Sources/Libra/Resources/version.json` | `1.2.4`, 10 commits stale | bump before packaging; tag to match | Essential | Release integrity | Low | High |
+| 3 | `scripts/build-mac.sh` `RAZORCORE_DIR` | external `../../.razorcore` | vendor `package-dmg.sh` + `patch-app-branding.sh` into `scripts/`, or submodule them | Essential | Release integrity | Low | High |
+| 4 | `LibraApp.showSettings:126` | `Selector(("showPreferencesWindow:"))` | `@Environment(\.openSettings)` (macOS 14+) | Essential | macOS integration | Low | Med-High |
+| 5 | `Scanner.swift:137,141` | `break` exits the `switch` | labeled `break outer` (the pattern already used correctly in `GPSMapModel:204`) | Recommended | Correctness | Low | High |
+| 6 | `ToolPage.beginScan:465` | closure captures view → retain cycle | capture `[paths]` + a static method; clear `confirmDiscover` in `finishIdle()` | Recommended | Resources | Low | Med-High |
+| 7 | `SettingsView.detect:64` | last match wins → Intel prefix | add `break` after the first match | Recommended | Apple Silicon | Low | High |
+| 8 | 6× `AppSettings.default.imageExtensions` | ignores user settings | thread live settings through, or one `MediaKinds.isImage(ext:)` reading `SettingsStore` | Recommended | Correctness | Low | High |
+| 9 | `SettingsView:48–51` | disk write per keystroke | debounce ~500 ms or commit on `onSubmit`/focus loss; reject empty extension lists | Recommended | Reliability | Low | High |
+| 10 | `ToolState.undoLastRun:196`, `movePhotosOut:169`, `PhotoSweepState` | sync file I/O on `@MainActor` | `await Task.detached` with progress, as `commitMove` already does | Recommended | UX, Reliability | Low | High |
+| 11 | `ToolState.applyRunRecap:352` | report written on every debounced preview | write only on user-initiated preview, or reuse the run's report file | Recommended | UX | Low | High |
+| 12 | `ToolState.iphoneSort:567` | applies hidden date/camera folders | gate on `showsExtraFolderToggles`, or expose the toggles | Recommended | Correctness | Low | High |
+| 13 | `GPSGeocoder:29` / `ToolState:500` | geocode failure silently → `GPS` folder | count failures, surface "N locations could not be named" in the recap | Recommended | Accuracy | Low | High |
+| 14 | `AppState.installDependencies:63` | `_ = try? await` | surface exit code/stderr; check brew exists first | Recommended | UX | Low | High |
+| 15 | `ScanSafety:4–9` | hardcoded `"MetaBurn & Libra Test"` bypass | env var or debug-only `#if DEBUG` | Recommended | Security | Low | High |
+| 16 | `ToolState.commitMove:396` | `reservedSnapshot` forces COW per file | pass only the values needed, or move the reserved set into the detached context | Recommended | Performance | Low | Med |
+| 17 | `Scanner.walkDirectory:222` | `enumerator(atPath:)` + per-entry `fileExists` + alias check | `enumerator(at:includingPropertiesForKeys:)` with prefetched keys | Recommended | Performance | Med | Med |
+| 18 | `Scanner:146` → `ToolState:243` | main-actor hop + `@Published` per file | coalesce to ~10/sec | Recommended | Performance | Low | Med |
+| 19 | `ResultsTable.orderedResults:8` | full sort inside `body` | cache, or sort once per results change | Recommended | Performance | Low | Med |
+| 20 | `ToolState.extraFolderParts:698`, `MediaProbe:496–512` | formatter per file / per metadata item | `static let` formatters (one per format string) | Recommended | Performance | Low | High |
+| 21 | `MediaIdentification:12` | shows bucketed fps as "fps" | show probed fps (e.g. `29.97 fps`); keep the bucket for filenames | Recommended | Accuracy | Low | High |
+| 22 | `.jules/*.md`, `.jules/config.json` | contradict AGENTS.md; unsafe "learning" | align with AGENTS.md; drop the `uniquePath` learning; disable auto-execute for file-op paths | Recommended | Reliability | Low | High |
+| 23 | `ToolStateTests:22,51` | writes real Desktop + settings | inject a report directory and a settings store; restore in `tearDown` | Recommended | Reliability | Low | High |
+| 24 | `build-mac.sh` `codesign` | `--force --deep --sign -` | drop `--deep` (no nested code) | Optional | macOS integration | Low | High |
+| 25 | `build-mac.sh` `$(date +%Y)` | non-deterministic | use `Brand.copyrightFull`'s year or a fixed value | Optional | Release integrity | Low | High |
+| 26 | `UndoApply:19` | `removeItem` | `trashItem`, matching the rest of the safety model | Optional | Reliability | Low | High |
+| 27 | Dead symbols (§7) | `renameFile`, `copyFile`, `ToolState.selected`, `ffprobePath`/`missingFfprobe`, `cancelWork`, `isIPhoneFolder`, `resolutionFolder`, `orientationFolder` | delete; or wire `cancelWork` to an Edit-menu Cancel item | Optional | Maintainability | Low | High |
+| 28 | `LibraApp.buildMenu:81` | empty Window menu; no Services/Hide Others/Select All | add standard items; set `NSApp.windowsMenu` | Optional | macOS integration | Low | High |
+| 29 | `Updates.checkForUpdates:38` | no request timeout | `timeoutIntervalForRequest = 10` | Optional | UX | Low | High |
+| 30 | `Logging.write:23` | formatter per line, no rotation | static formatter; cap/rotate at ~5 MB; start using `warn`/`error` | Optional | Performance | Low | High |
+| 31 | `FfmpegOps.sloMo:30` | `-c:v libx264` | offer `h264_videotoolbox` (ARM media engine) with a documented quality trade-off | Optional | Performance | Med | Med |
+| 32 | `Libra.progress.md`, `BUILD_AND_RELEASE.md`, README | stale test count, wrong tools version, wrong Gatekeeper instruction, false "no personal paths" claim | correct all four | Recommended | Maintainability | Low | High |
+| 33 | `MediaClassification.resolutionClass` | old 8-bucket scheme (8K/4K/1440p/1080p/FHD/720p/HD/SD) with ambiguous boundaries | replace with the 7-bucket scheme defined in §24 (4K/QHD/FHD/1080p/HD/720p/SD) | Recommended | Accuracy, Clarity | Low | High |
+| 34 | `FileNaming.resolutionClasses` | lists old bucket names; fallback is `"SD"` | update to match §24's seven bucket names; fallback to `"SD"` remains correct | Recommended | Correctness | Low | High |
+| 35 | `FileNaming.fpsBucket` / `fpsBuckets` | includes 24fps bucket; doc comment says "30, 60, or 120" | snap to nearest of [30, 60, 120] only, per §24's FPS rules | Recommended | Accuracy, Consistency | Low | High |
+| 36 | `MediaClassificationTests` | `testResolution_1080pIsNotFHD`, `testResolution_otherBuckets` assert old bucket names | rewrite as `testResolutionBucketBoundaries` per §24's boundary crossover tests | Recommended | Correctness | Low | High |
+
+---
+
+## 19. Implementation order
+
+1. **#1** alone, with a test. It's the only thing users can currently hit that makes a feature useless.
+2. **#23** next — the test fixes must land before you add tests for #1, or your suite keeps littering the Desktop.
+3. **#5, #7, #12, #13, #14** — small, independent correctness fixes, each verifiable in isolation.
+4. **#8** as one change. Six call sites, one helper; splitting it risks half-migrated semantics.
+5. **#2 + #3 + #24 + #25** together as a release-integrity pass, then cut a tagged release from it. Do this before the performance work so you have a clean provenance baseline to compare against.
+6. **#4, #28** — menu/settings correctness.
+7. **#33 + #34 + #35 + #36** together as the resolution/FPS naming overhaul per §24. These four changes are tightly coupled — the bucket names, the boundary logic, the FPS snap list, and the tests must all move in one commit.
+8. **#18 → #19 → #16 → #17 → #20** in that order. #18 alone may make #19 and #16 unobservable; measure after each.
+9. **#6, #10, #11** — resource and responsiveness.
+10. **#22** whenever, but before you next let an agent touch `Services/`.
+11. **#26, #27, #29, #30, #31, #32** — cleanup.
+
+Do **not** consolidate `PhotoSweepState` into `ToolState` (§17) in the same pass as anything else. It touches the write path.
+
+---
+
+## 20. Verification plan
+
+| Change | How to verify |
+|---|---|
+| #1 ffmpeg | Unit-test the argument builder: assert the output arg ends in a real container extension or that `-f` is present. Then a live Write of one `.mov`, one `.mp4`, and one `.webm` through both Slo-Mo and 1-Min-Adjuster; confirm files appear and `ffprobe` reads them. `.webm` is the case that will expose the libx264/container mismatch separately from the muxer bug. |
+| #2 version | `plutil -p Libra.app/Contents/Info.plist` after packaging; `git describe --tags` must equal `CFBundleShortVersionString`. |
+| #3 razorcore | `git clone` to a scratch dir, `./scripts/build-mac.sh`, confirm a DMG is produced without touching anything outside the clone. |
+| #4 settings | Launch, press ⌘, — the Settings window must appear. Also verify from the app menu item. |
+| #5 scanner break | Extend `ScannerServiceTests` with an injected probe that throws `CancellationError` mid-batch; assert no tasks are enqueued after cancellation and `terminal == .cancelled`. |
+| #6 retain cycle | `deinit` print on `ToolState`, or Instruments Allocations: open a tool, scan, press Back, repeat 5×; the ToolState count must not grow. |
+| #7 Intel prefix | On a Mac with both prefixes populated, click "Find Homebrew installs" and assert `/opt/homebrew/bin/ffmpeg`; `file $(which ffmpeg)` to confirm arm64. |
+| #8 extensions | Add `avif` to Photo extensions in Settings, scan a folder containing one, confirm it lands in the Photos tab with no "Could not read video metadata". |
+| #16–#20 performance | Time a scan of the same 5,000-file fixture before and after each change. **Nothing here has been profiled** — treat every expected gain as a hypothesis until you have numbers. Instruments Time Profiler on the main thread during a scan is the right instrument. |
+| #31 videotoolbox | Encode the same clip both ways; compare wall-clock, `powermetrics` energy, and visual quality at matched bitrate before adopting. |
+| #33–#36 naming | Run the resolution classifier against the 834-video fixture from §24 and confirm every file lands in the expected bucket. Run `swift test` and confirm the new boundary tests pass. Visually inspect folder names and identification rows for all seven buckets. |
+| Packaging (all) | `codesign -dv --verbose=4 Libra.app` (expect ad-hoc, no team ID); `codesign --verify --deep --strict`; `lipo -archs Libra.app/Contents/MacOS/Libra` → `arm64`; `otool -l \| grep -A4 LC_BUILD_VERSION` → minos 14.0. |
+| Release | Download the published DMG fresh, confirm the version string matches the tag, and confirm the grep-for-strings provenance check I used in §4.2 matches the tagged source. |
+| Regression | Full `swift test` green, plus a live run of Libra Sorter over a copied fixture folder with Undo afterwards — the only end-to-end proof that the write path still works. |
+
+---
+
+## 21. Recommended build / release architecture
+
+Keep the local script as the developer path; add CI as the artifact authority:
+
+```
+version.json bump  →  commit  →  tag vX.Y.Z  →  push tag
+     ↓
+CI (macos-26, arm64) on tag:
+  swift build -c release   →  swift test
+  scripts/build-mac.sh     (now self-contained per #3)
+  codesign --sign - (ad-hoc, no --deep)
+  verify: lipo -archs == arm64 · Info.plist version == tag · codesign --verify
+  create GitHub Release, attach Libra.dmg
+```
+
+Three properties this buys you that the current process cannot: the artifact provenance is a tag, not a timestamp; the version/architecture/signature checks are enforced rather than remembered; and `swift build -c release` is exercised on every tag instead of only when you happen to package.
+
+Notarization is the one thing that would remove the Gatekeeper friction entirely — it needs a paid Apple Developer account, and it's a legitimate choice to keep skipping it. If you do skip it, fix the README instruction (§12) rather than leaving users stuck.
+
+---
+
+## 22. Potential shared RazorBackRoar standards
+
+Worth extracting across apps, each because it solves a problem you actually hit here:
+
+1. **Version → tag → artifact verification** (§21) — `version.json` as SSOT plus a CI assertion that Info.plist matches the tag. Directly prevents §4.2.
+2. **Self-contained packaging** — no script may reach outside its repo. Prevents §4.3.
+3. **A subprocess-argument contract** — any tool invoking an external binary writes to a temp path that preserves the real extension, or passes an explicit format. Prevents §4.1 in every app that shells out.
+4. **Agent governance** — one source of truth for agent rules (AGENTS.md), auto-execute disabled for file-operation, packaging, and release paths. Prevents §16.
+5. **Test isolation** — no test may write to `~/Desktop` or mutate real Application Support. Prevents §14.
+
+---
+
+---
+
+### Final audit verdict (reconfirmed)
+
+**Needs minor improvements.** One shipped functional regression, one release-integrity break, one reproducibility break, one probably-dead menu item — all small, localized fixes. The architecture, safety model, dependency posture, and Apple Silicon story are sound and should be left alone.
+
+Nothing in this session was run, built, signed, notarized, packaged, uploaded, or installed. The only executions were on my side: `unzip`, `git` reads, `7z` on a copy of the DMG, a Mach-O signature parse, and the ffmpeg muxer reproduction in §4.1 — none of which touched your project files.
+
+## 23. Native metadata pipeline specification
+
+Correct. You don't need FFmpeg for this.
+
+For a native Swift/macOS video metadata reader, I'd keep the entire metadata pipeline Apple-native:
+
+* AVFoundation — video/container metadata, tracks, duration, resolution, frame rate, codec, HDR, creation date, location metadata, camera metadata where embedded.
+* Core Media — precise timing, format descriptions, media characteristics.
+* Foundation — file URLs, filesystem creation/modification dates, file size.
+* Core Location — interpret GPS coordinates and optionally convert them into a human-readable location.
+* ImageIO — useful when metadata is actually EXIF/image metadata rather than QuickTime metadata.
+* Uniform Type Identifiers (UTType) — determine the media/container type.
+
+For your use case, the architecture should essentially be:
+
+Video file
+    ↓
+AVAsset
+    ↓
+AVMetadata / AVAsset metadata
+    ├── Camera make
+    ├── Camera model
+    ├── Lens
+    ├── Creation date
+    ├── GPS latitude
+    ├── GPS longitude
+    └── Location
+    ↓
+AVAssetTrack
+    ├── Resolution
+    ├── Frame rate
+    ├── Codec
+    ├── HDR
+    └── Color information
+    ↓
+Foundation
+    ├── File creation date
+    ├── Modification date
+    └── File size
+
+No FFmpeg, no ffprobe, no shelling out to an external executable.
+
+For an ARM-native macOS app, that's also the cleaner approach because the metadata reader is implemented directly against Apple's frameworks rather than carrying an enormous third-party multimedia stack.
+
+One important distinction: metadata availability depends on what the video actually contains. An iPhone video may contain camera/GPS/date metadata, while a downloaded or re-encoded video may contain only some of those fields. Your reader should therefore treat every field as optional rather than assuming it exists.
+
+For Libra specifically, I would use Apple's APIs to determine the authoritative values for resolution and frame rate, rather than trying to parse those values from filenames or relying on FFmpeg.
+
+I need you to fix Libra’s video metadata handling and related video-processing behavior. Work through this entire specification in order, step by step, and do not skip, simplify, or omit any requirement below.
+
+The goal is to make Libra a fully native Swift/macOS video organizer using Apple’s native frameworks for video inspection and metadata. Do not use FFmpeg, ffprobe, or any external multimedia command-line tool.
+
+### 23.1 Use Apple-native frameworks only
+
+For video metadata and video characteristics, use Apple's native frameworks:
+
+* AVFoundation for video/container metadata, media tracks, duration, resolution, frame rate, codec information, HDR information, creation date, GPS/location metadata, camera information, and other metadata exposed by the media file.
+* Core Media for precise media timing, format descriptions, and media characteristics.
+* Foundation for file URLs, filesystem attributes, file size, filesystem creation/modification dates, and related file information.
+* Core Location when GPS coordinates need to be interpreted or converted into a human-readable geographic location.
+* ImageIO where appropriate for metadata that is actually stored as image/EXIF metadata rather than QuickTime/video metadata.
+* Uniform Type Identifiers (UTType) for identifying supported media/container types.
+
+Do not introduce FFmpeg or ffprobe as a dependency or fallback.
+
+### 23.2 Create a dedicated video metadata reader
+
+Libra should have a clear, dedicated Swift component responsible for extracting metadata from each video.
+
+Use a normalized metadata model so Libra gets a consistent representation regardless of whether the source is an iPhone MOV, MP4, or another supported video container.
+
+The metadata model must support optional values because not every video contains every metadata field.
+
+Do not assume that camera information, GPS, creation dates, lens information, or other metadata will always exist.
+
+### 23.3 Read camera information
+
+When the source video contains camera metadata, extract it using Apple's media metadata APIs.
+
+Support, where available:
+
+* Camera make
+* Camera model
+* Camera/lens model
+* Lens information
+* Camera identifier
+* Focal length
+* ISO
+* Shutter-related information
+* Other camera metadata exposed by the video
+
+For example:
+
+Camera
+Make: Apple
+Model: iPhone 16 Pro Max
+Lens: Main Camera
+Focal Length: 24 mm equivalent
+
+Do not fabricate missing information. If the source does not contain a particular field, represent it as unavailable.
+
+### 23.4 Read date and time metadata
+
+Extract the video's embedded creation date/time from the media metadata when available.
+
+Also obtain the filesystem dates separately through Foundation.
+
+Keep these concepts separate:
+
+* Embedded media creation date
+* Filesystem creation date
+* Filesystem modification date
+
+Do not silently substitute the filesystem date for the embedded media creation date.
+
+The metadata model must make it possible for Libra to know which date came from the video and which date came from the filesystem.
+
+### 23.5 Read GPS metadata
+
+When GPS metadata exists in the video, extract:
+
+* Latitude
+* Longitude
+* Any additional location metadata exposed by the file
+
+Use Core Location where appropriate to interpret the coordinates.
+
+If the video contains a human-readable location name, preserve it.
+
+If only coordinates exist, retain the coordinates rather than pretending a location name exists.
+
+If the video has no GPS metadata, leave the location fields unavailable.
+
+### 23.6 Read video duration
+
+Use AVFoundation/Core Media to determine the video's duration.
+
+Do not use filename parsing or external command-line utilities.
+
+The normalized metadata must expose duration in a form that Libra can reliably use for display and processing.
+
+### 23.7 Read resolution correctly
+
+Resolution must come from the actual video track.
+
+Use AVAsset/AVAssetTrack and the relevant format information to determine the video's actual dimensions.
+
+Support values such as:
+
+3840 × 2160
+1920 × 1080
+1280 × 720
+
+Do not infer resolution from the filename when the actual video track can provide it.
+
+Do not assume that a filename containing 4K, 1080p, HD, etc. is authoritative.
+
+The actual encoded media characteristics must be the source of truth.
+
+**Once the raw resolution is obtained, classify it into one of the seven buckets defined in §24.**
+
+### 23.8 Read frame rate correctly
+
+Frame rate must come from the actual video track/media format.
+
+Support fractional and common video frame rates, including:
+
+23.976 fps
+24 fps
+29.97 fps
+30 fps
+59.94 fps
+60 fps
+
+Do not round values prematurely.
+
+For example, preserve 59.94 rather than displaying it as 60 when the underlying media reports 59.94.
+
+This is particularly important for Libra's filename-generation logic because frame rate is part of the information Libra uses when organizing videos.
+
+**For filename generation and folder naming, snap the raw frame rate to the nearest of [30, 60, 120] as defined in §24. The raw rate is preserved for display; the snapped rate is used for filenames.**
+
+### 23.9 Read codec information
+
+Use AVFoundation/Core Media to identify the actual video codec/format.
+
+The metadata reader should distinguish relevant codecs such as HEVC/H.265, H.264, and other formats supported by Apple's media frameworks.
+
+Use the actual media track rather than guessing from the filename extension.
+
+### 23.10 Read HDR and color information
+
+Where the source media exposes it, inspect the video's HDR/SDR and color characteristics.
+
+Support information such as:
+
+* HDR vs SDR
+* Color space
+* Transfer characteristics
+* Video range
+* Other relevant media/color properties exposed by Core Media and AVFoundation
+
+Do not invent HDR information when it cannot be established from the source.
+
+### 23.11 Read orientation correctly
+
+Account for the video's orientation/transform.
+
+Do not assume that the raw encoded dimensions alone represent the way the video should be displayed.
+
+A video may have encoded dimensions that need to be interpreted together with its preferred transform.
+
+Libra should distinguish between the underlying encoded dimensions and the effective displayed orientation where necessary.
+
+**For filename generation, use the orientation rules defined in §24: V (portrait) when height > width, W (landscape) otherwise, applied after the preferred transform.**
+
+### 23.12 Read audio information where available
+
+The metadata reader should also be capable of inspecting the video's audio track when one exists.
+
+Support information such as:
+
+* Audio format
+* Codec
+* Sample rate
+* Channel count
+* Other relevant audio-track information exposed by AVFoundation/Core Media
+
+If a video has no audio track, handle that normally.
+
+### 23.13 Read filesystem information
+
+Use Foundation for filesystem-level information, including:
+
+* File size
+* Filesystem creation date
+* Filesystem modification date
+* File URL/path
+* Uniform Type Identifier where appropriate
+
+Keep filesystem metadata separate from embedded media metadata.
+
+### 23.14 Do not use FFmpeg
+
+This requirement is absolute.
+
+Do not:
+
+* Install FFmpeg
+* Install ffprobe
+* Shell out to FFmpeg
+* Shell out to ffprobe
+* Parse FFmpeg output
+* Use FFmpeg as a fallback
+* Add an FFmpeg package merely to obtain metadata
+
+Libra must obtain the required metadata through Apple's native frameworks.
+
+### 23.15 Use metadata as the source of truth for Libra's organizer
+
+Libra's video-organization functionality uses metadata when generating filenames.
+
+The metadata pipeline must reliably provide:
+
+* Resolution
+* Frame rate
+* Video characteristics
+* Camera information where applicable
+* Creation information where applicable
+* Location information where applicable
+
+Do not duplicate independent metadata-parsing logic throughout the application.
+
+The organizer must consume the normalized metadata produced by the dedicated metadata reader.
+
+### 23.16 Preserve Libra's existing filename convention
+
+Do not redesign the existing filename convention.
+
+Libra's filename system uses the resolution first, followed by the video/frame-rate information and the existing emoji markers.
+
+For example:
+
+movie HD V/60 🍎📱🌍 022.mov
+
+The existing naming behavior must remain intact unless a specific part of it is being corrected by this specification.
+
+Do not remove or arbitrarily rename:
+
+* Resolution
+* V/ video/frame-rate component
+* 🍎
+* 📱
+* 🌍
+* Numbering structure
+
+The metadata reader must provide accurate source information to this existing naming system rather than replacing the naming system.
+
+**The resolution bucket names are now defined in §24 (SD, 720p, HD, 1080p, FHD, QHD, 4K). The frame rate component uses §24's snap-to-nearest-of-[30,60,120] rule. The orientation component uses §24's V/W rule.**
+
+### 23.17 Handle missing metadata safely
+
+Metadata is not guaranteed to exist in every video.
+
+Every metadata field must therefore be optional and handled safely.
+
+Examples:
+
+* No GPS → do not crash.
+* No camera model → do not invent one.
+* No creation date → do not claim one exists.
+* No lens metadata → leave it unavailable.
+* No audio track → handle normally.
+* Unsupported metadata key → ignore it safely.
+* Missing format description → handle the failure cleanly.
+* Corrupt/incomplete media → report the error cleanly instead of crashing Libra.
+
+### 23.18 Keep metadata extraction separate from the UI
+
+Do not put all metadata extraction directly inside SwiftUI views.
+
+The UI should consume the normalized metadata model.
+
+The architecture should approximately be:
+
+Video URL
+   ↓
+VideoMetadataReader
+   ↓
+AVAsset / AVFoundation
+   ↓
+Core Media
+   ↓
+Normalized VideoMetadata
+   ↓
+Libra Organizer
+   ↓
+Filename generation / sorting / organization
+   ↓
+SwiftUI interface
+
+Foundation filesystem information and Core Location interpretation should feed into the same normalized model where appropriate.
+
+### 23.19 Preserve native Apple Silicon behavior
+
+Libra is intended to be a native macOS application.
+
+Keep the implementation native Swift and compatible with Apple Silicon.
+
+Do not introduce unnecessary cross-platform multimedia libraries simply to obtain metadata that Apple's frameworks already expose.
+
+### 23.20 Test with real videos
+
+After implementing the changes, test the metadata reader against representative real-world videos, especially videos originating from iPhones.
+
+Verify that Libra correctly identifies, where present:
+
+Camera make
+Camera model
+Lens
+GPS
+Location
+Embedded creation date
+Filesystem creation date
+Filesystem modification date
+Duration
+Resolution
+Frame rate
+Codec
+HDR/SDR
+Color information
+Orientation
+Audio information
+File size
+Container/type
+
+Verify specifically that a video reported as 59.94 fps is not incorrectly converted to 60 fps merely because 60 is more convenient.
+
+Verify that a 3840 × 2160 video is detected from the actual media track rather than from its filename.
+
+Verify that metadata missing from the source does not produce fabricated values.
+
+### 23.21 Do not make unrelated changes
+
+Do not use this work as an excuse to redesign Libra.
+
+Do not perform unrelated refactoring, UI redesign, filename redesign, dependency replacement, or feature changes.
+
+Fix the metadata/video-information pipeline and connect it cleanly to the existing Libra functionality.
+
+Preserve existing behavior wherever this specification does not explicitly require a change.
+
+### 23.22 Final metadata architecture
+
+When finished, Libra should have a clean native metadata pipeline equivalent to:
+
+                    VIDEO FILE
+                        │
+                        ▼
+                 ┌───────────────┐
+                 │  AVFoundation │
+                 │    AVAsset    │
+                 └───────┬───────┘
+                         │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+     Container       Video Track     Metadata
+          │              │              │
+          ▼              ▼              ▼
+       Duration      Resolution      Camera
+       File type     Frame rate      Creation date
+       File info     Codec           GPS
+                      HDR/SDR         Location
+                      Color           Lens
+                      Orientation     Other metadata
+                         │
+                         ▼
+                ┌──────────────────┐
+                │  VideoMetadata   │
+                │      Model       │
+                └────────┬─────────┘
+                         │
+             ┌───────────┴───────────┐
+             ▼                       ▼
+       Libra Organizer          SwiftUI UI
+             │
+             ▼
+      Existing filename
+        generation
+             │
+             ▼
+       Organized video
+
+The fundamental requirement is that Libra becomes a native Swift/macOS video metadata reader and organizer using Apple's AVFoundation, Core Media, Foundation, Core Location, ImageIO, and UTType APIs where appropriate, with no FFmpeg or ffprobe anywhere in the implementation.
+
+Work through the requirements in the exact order presented above. Inspect Libra's existing implementation before changing it, preserve existing functionality, make the smallest targeted changes necessary, and verify each stage before moving to the next one.
+
+---
+
+## 24. Resolution, frame rate, and orientation classification — the authoritative naming spec
+
+> Derived from scanning an actual video library of 834 files using AVFoundation's `naturalSize`, `preferredTransform`, and `nominalFrameRate`. Every rule in this section was validated against that dataset. This section is the single source of truth for how Libra classifies resolution, frame rate, and orientation. §23.7, §23.8, §23.11, and §23.16 all defer to these rules.
+
+### 24.1 The naming format
+
+```
+Apple [Resolution] [Orientation][FPS] [PaddedNumber]
+```
+
+**Example:** `Apple 1080p W60 001` → An Apple-sourced, 1080p, wide (landscape), 60fps video, file #001.
+
+### 24.2 Examples from each bucket
+
+#### 4K — 123 videos
+
+| # | Raw Resolution | Long Edge | Orientation | Raw FPS | → Named |
+|---|---------------|-----------|-------------|---------|---------|
+| 006 | 2160×3840 | 3840 | V | 59.973 | `Apple 4K V60 006` |
+| 022 | 3840×2160 | 3840 | W | 59.997 | `Apple 4K W60 022` |
+| 045 | 3840×2160 | 3840 | W | 29.980 | `Apple 4K W30 045` |
+| 067 | 3840×2160 | 3840 | W | 30.000 | `Apple 4K W30 067` |
+
+#### QHD — 1 video
+
+| # | Raw Resolution | Long Edge | Orientation | Raw FPS | → Named |
+|---|---------------|-----------|-------------|---------|---------|
+| 456 | 2560×1600 | 2560 | W | 44.101 | `Apple QHD W30 456` |
+
+> Only one video in the entire 834-file library hit this bucket — a Mac screen recording at exactly 2560px wide. This is the rarest bucket by far.
+
+#### FHD — 53 videos
+
+| # | Raw Resolution | Long Edge | Orientation | Raw FPS | → Named |
+|---|---------------|-----------|-------------|---------|---------|
+| 014 | 1126×2436 | 2436 | V | 59.850 | `Apple FHD V60 014` |
+| 110 | 1126×2436 | 2436 | V | 55.529 | `Apple FHD V60 110` |
+| 225 | 2436×1126 | 2436 | W | 45.292 | `Apple FHD W30 225` |
+| 774 | 1290×2796 | 2796 | V | 60.002 | `Apple FHD V60 774` |
+
+> FHD is dominated by iPhone X screen recordings (1126×2436, long edge 2436) and one iPhone 14 Pro screen recording (1290×2796, long edge 2796). These all sit between 1922 and 2558 on the long edge.
+
+#### 1080p — 440 videos
+
+| # | Raw Resolution | Long Edge | Orientation | Raw FPS | → Named |
+|---|---------------|-----------|-------------|---------|---------|
+| 001 | 1920×1080 | 1920 | W | 59.974 | `Apple 1080p W60 001` |
+| 002 | 1080×1920 | 1920 | V | 29.997 | `Apple 1080p V30 002` |
+| 009 | 1920×1080 | 1920 | W | 59.928 | `Apple 1080p W60 009` |
+| 036 | 1920×1200 | 1920 | W | 30.786 | `Apple 1080p W30 036` |
+| 073 | 1440×1920 | 1920 | V | 30.000 | `Apple 1080p V30 073` |
+
+> This is the dominant bucket — over half of all videos. Includes standard 1920×1080, portrait 1080×1920, and oddball aspect ratios like 1920×1200 and 1440×1920 where the long edge still hits 1920 ±2px.
+
+#### HD — 12 videos
+
+| # | Raw Resolution | Long Edge | Orientation | Raw FPS | → Named |
+|---|---------------|-----------|-------------|---------|---------|
+| 233 | 1916×1080 | 1916 | W | 59.940 | `Apple HD W60 233` |
+| 196 | 1910×1074 | 1910 | W | 59.895 | `Apple HD W60 196` |
+| 310 | 1744×1308 | 1744 | W | 23.825 | `Apple HD W30 310` |
+| 443 | 1620×1080 | 1620 | W | 29.966 | `Apple HD W30 443` |
+| 536 | 1898×1600 | 1898 | W | 44.690 | `Apple HD W30 536` |
+
+> HD is the "doesn't quite fit anywhere else" bucket for long edges between 1283 and 1917. Mostly iPad screen recordings (1744×1308) and slightly-cropped 1080p content (1916, 1910).
+
+#### 720p — 164 videos
+
+| # | Raw Resolution | Long Edge | Orientation | Raw FPS | → Named |
+|---|---------------|-----------|-------------|---------|---------|
+| 003 | 720×1280 | 1280 | V | 30.000 | `Apple 720p V30 003` |
+| 042 | 1280×720 | 1280 | W | 30.000 | `Apple 720p W30 042` |
+| 032 | 1278×718 | 1278 | W | 29.999 | `Apple 720p W30 032` |
+
+> Almost all 720p videos are exactly 1280×720 or 720×1280 (portrait). The 1278×718 variants are encoder-rounded copies that fall within the ±2px tolerance.
+
+#### SD — 41 videos
+
+| # | Raw Resolution | Long Edge | Orientation | Raw FPS | → Named |
+|---|---------------|-----------|-------------|---------|---------|
+| 038 | 128×224 | 224 | V | 15.000 | `Apple SD V30 038` |
+| 088 | 480×854 | 854 | V | 30.005 | `Apple SD V30 088` |
+| 137 | 320×568 | 568 | V | 29.992 | `Apple SD V30 137` |
+| 145 | 444×960 | 960 | V | 30.000 | `Apple SD V30 145` |
+| 220 | 960×540 | 960 | W | 30.000 | `Apple SD W30 220` |
+| 200 | 568×320 | 568 | W | 30.000 | `Apple SD W30 200` |
+
+> SD catches everything with a long edge below 1278. Includes old social media downloads (480×854), iMessage clips (128×224), and standard 540p/480p content.
+
+### 24.3 Logic breakdown
+
+The naming system has four components, each determined by a single, independent rule. No component depends on another — they can be evaluated in any order.
+
+#### 24.3.1 Resolution bucket
+
+**Input:** `width` and `height` (integers, pixels)
+**Derived value:** `longEdge = max(width, height)`
+**Output:** One of 7 strings
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  RESOLUTION LOGIC                    │
+│                                                      │
+│   longEdge = max(width, height)                      │
+│                                                      │
+│   if longEdge ≥ 3840         → "4K"                  │
+│   if |longEdge − 2560| ≤ 2  → "QHD"                 │
+│   if |longEdge − 1920| ≤ 2  → "1080p"               │
+│   if longEdge > 1920         → "FHD"                 │
+│   if |longEdge − 1280| ≤ 2  → "720p"                │
+│   if longEdge > 1280         → "HD"                  │
+│   else                       → "SD"                  │
+└─────────────────────────────────────────────────────┘
+```
+
+**Why this order matters:**
+
+The checks are **not** a simple "nearest standard" lookup. Order matters because tolerance checks must run **before** range checks:
+
+1. `≥ 3840` catches all 4K and above (including 8K, 5K — they're all "4K" now)
+2. `|longEdge − 2560| ≤ 2` catches exactly 2558–2562 **before** the next range check could grab it
+3. `|longEdge − 1920| ≤ 2` catches exactly 1918–1922 **before** `> 1920` grabs it
+4. `> 1920` is the FHD range — everything between 1922 (exclusive) and 2558 (exclusive)
+5. `|longEdge − 1280| ≤ 2` catches exactly 1278–1282 **before** `> 1280` grabs it
+6. `> 1280` is the HD range — everything between 1282 (exclusive) and 1918 (exclusive)
+7. `else` is SD — everything below 1278
+
+**The ±2px tolerance:**
+
+Three standards get a ±2px tolerance window: **2560**, **1920**, **1280**. This exists because video encoders sometimes round dimensions by 1–2 pixels for alignment (H.264/H.265 macroblock boundaries). From the real data:
+
+| Standard | Tolerance window | Seen in dataset |
+|----------|-----------------|-----------------|
+| 2560 | 2558–2562 | 2560 ✓ |
+| 1920 | 1918–1922 | 1920 ✓, 1918 (not seen), 1922 (not seen) |
+| 1280 | 1278–1282 | 1280 ✓, 1278 ✓ |
+
+**4K has no tolerance window.** It uses `≥ 3840`, not `|longEdge − 3840| ≤ 2`. This is intentional — there's no meaningful resolution "just below" 4K that should round up. Everything from 3840 to infinity is 4K.
+
+**The seven buckets visualized on a number line:**
+
+```
+Long edge:  0          1278  1282       1918  1922       2558  2562       3840        ∞
+            ├────SD────┤720p├───HD──────┤1080p├───FHD────┤ QHD ├───4K──────────────────┤
+                       ±2px             ±2px             ±2px
+```
+
+**What the dataset actually contains:**
+
+| Bucket | Long edges seen | Source devices |
+|--------|----------------|----------------|
+| 4K | 3840 | iPhones (4K mode), some cameras |
+| QHD | 2560 | Mac screen recording (1 video) |
+| FHD | 2436, 2796 | iPhone X/14 Pro screen recordings |
+| 1080p | 1920 | iPhones (1080p mode), screen recordings |
+| HD | 1620, 1744, 1898, 1910, 1916 | iPad screen recordings, cropped exports |
+| 720p | 1278, 1280 | Social media downloads, older recordings |
+| SD | 128–960 | iMessage clips, social media, thumbnails |
+
+#### 24.3.2 Orientation
+
+**Input:** `width` and `height` (integers, pixels)
+**Output:** `V` (vertical/portrait) or `W` (wide/landscape)
+
+```
+if height > width → "V"
+else              → "W"
+```
+
+Square videos (width == height) fall to `W`. This almost never happens in practice — zero instances in the 834-file dataset.
+
+| Orientation | Count | Percentage | Typical sources |
+|-------------|-------|------------|-----------------|
+| V (portrait) | 465 | 55.8% | Phone recordings held vertically, phone screen recordings |
+| W (landscape) | 369 | 44.2% | Phone held horizontally, Mac/iPad screen recordings, cameras |
+
+#### 24.3.3 Frame rate
+
+**Input:** `nominalFrameRate` (Float, from AVFoundation)
+**Output:** One of three integers: `30`, `60`, or `120`
+
+```
+Snap to whichever of [30, 60, 120] is nearest:
+
+  |fps − 30| vs |fps − 60| vs |fps − 120|  → pick smallest distance
+```
+
+**Why snap, don't round:**
+
+Raw frame rates from AVFoundation are almost never exactly 30.000 or 60.000. They're NTSC-derived fractional rates or slight encoding variations:
+
+| What it actually is | Raw value seen | Snaps to |
+|---------------------|---------------|----------|
+| 30fps (NTSC 30/1.001) | 29.970 | 30 |
+| 30fps (exact) | 30.000 | 30 |
+| 30fps (slight drift) | 29.890–30.090 | 30 |
+| 60fps (NTSC 60/1.001) | 59.940 | 60 |
+| 60fps (exact) | 60.000 | 60 |
+| 60fps (slight drift) | 59.634–60.007 | 60 |
+| 120fps | 119.950 | 120 |
+| 24fps (film) | 23.999, 24.000 | 30 |
+| 15fps (iMessage) | 15.000 | 30 |
+| ~48fps (slo-mo crop?) | 48.195 | 60 |
+
+**Edge cases from the real dataset:**
+
+| Raw FPS | Distance to 30 | Distance to 60 | Snaps to | Source |
+|---------|----------------|----------------|----------|--------|
+| 15.000 | 15 | 45 | **30** | iMessage micro-clips (128×224) |
+| 18.903 | 11.1 | 41.1 | **30** | Unknown (possibly corrupted) |
+| 23.825 | 6.2 | 36.2 | **30** | iPad screen recording |
+| 41.149 | 11.1 | 18.9 | **30** | Unknown social media clip |
+| 44.101 | 14.1 | 15.9 | **30** | Mac screen recording (QHD) |
+| 44.690 | 14.7 | 15.3 | **30** | iPad screen recording |
+| 45.292 | 15.3 | 14.7 | **60** | Crossover point — barely 60 |
+| 48.195 | 18.2 | 11.8 | **60** | Slo-mo crop artifact |
+| 51.230 | 21.2 | 8.8 | **60** | Screen recording (variable rate) |
+| 54.197 | 24.2 | 5.8 | **60** | Screen recording (variable rate) |
+| 119.950 | 90.0 | 60.0 | **120** | iPhone slo-mo at 120fps |
+
+The snap boundary between 30 and 60 is at exactly **45fps**. A video at 44.9fps snaps to 30; at 45.1fps it snaps to 60. In this dataset, `44.690` → 30 and `45.292` → 60. Both are screen recordings with variable frame rates — neither is "really" 30 or 60, but snapping is the best we can do without analyzing every frame.
+
+| Snapped FPS | Count | Percentage |
+|-------------|-------|------------|
+| 30 | 262 | 31.4% |
+| 60 | 571 | 68.5% |
+| 120 | 1 | 0.1% |
+
+#### 24.3.4 Padded number
+
+**Input:** Sequential index (1-based)
+**Output:** Zero-padded to 3 digits
+
+```
+index 1   → "001"
+index 42  → "042"
+index 834 → "834"
+```
+
+This is purely sequential — the order comes from the filesystem enumeration, not from any metadata sort. In a real implementation, this would be the file's position after sorting by whatever the user chose (date, name, etc.).
+
+### 24.4 Combined logic — pseudocode
+
+```
+function classifyVideo(width, height, rawFPS):
+    // 1. Resolution
+    long = max(width, height)
+    if long >= 3840:            resolution = "4K"
+    else if |long - 2560| <= 2: resolution = "QHD"
+    else if |long - 1920| <= 2: resolution = "1080p"
+    else if long > 1920:        resolution = "FHD"
+    else if |long - 1280| <= 2: resolution = "720p"
+    else if long > 1280:        resolution = "HD"
+    else:                       resolution = "SD"
+
+    // 2. Orientation
+    orientation = (height > width) ? "V" : "W"
+
+    // 3. Frame rate
+    fps = nearest([30, 60, 120], rawFPS)
+
+    return resolution, orientation, fps
+
+function generateName(width, height, rawFPS, index):
+    res, ori, fps = classifyVideo(width, height, rawFPS)
+    return "Apple {res} {ori}{fps} {index:03d}"
+```
+
+### 24.5 Swift implementation (for Libra)
+
+These are the exact functions to wire into Libra. `resolutionClass` replaces the old 8-bucket function in `MediaClassification.swift`. `fpsClass` replaces `fpsBucket` in `FileNaming.swift`. `orientation` is new or replaces the existing orientation logic.
+
+```swift
+/// Seven fixed tiers. Long edge decides the bucket; the three named
+/// standards (QHD, 1080p, 720p) keep a ±2px tolerance for encoder
+/// rounding. Everything else falls into the range bucket between the
+/// two standards it sits between. 8K is retired — everything ≥3840 is 4K.
+static func resolutionClass(width: Int, height: Int) -> String {
+    guard width > 0, height > 0 else { return "Unknown" }
+    let long = max(width, height)
+    if long >= 3840              { return "4K" }
+    if abs(long - 2560) <= 2     { return "QHD" }
+    if abs(long - 1920) <= 2     { return "1080p" }
+    if long > 1920               { return "FHD" }
+    if abs(long - 1280) <= 2     { return "720p" }
+    if long > 1280               { return "HD" }
+    return "SD"
+}
+
+/// Snap to nearest standard frame rate for filename generation.
+/// Raw rate is preserved separately for display in identification rows.
+static func fpsClass(_ fps: Float) -> Int {
+    let targets = [30, 60, 120]
+    return targets.min(by: { abs(Float($0) - fps) < abs(Float($1) - fps) })!
+}
+
+/// V = portrait (height > width), W = landscape (width >= height).
+static func orientation(width: Int, height: Int) -> String {
+    return height > width ? "V" : "W"
+}
+```
+
+**Files affected by this change:**
+
+| File | What changes |
+|------|-------------|
+| `Sources/Libra/Services/MediaClassification.swift` | Replace `resolutionClass(width:height:)` with the function above |
+| `Sources/Libra/Services/FileNaming.swift` | Update `resolutionClasses` array to `["4K", "QHD", "FHD", "1080p", "HD", "720p", "SD"]`; update `fpsBuckets` to `[30, 60, 120]` (remove 24); update fallback in `resolutionLabel` to `"SD"` |
+| `Tests/LibraTests/MediaClassificationTests.swift` | Delete `testResolution_1080pIsNotFHD` and `testResolution_otherBuckets`; add `testResolutionBucketBoundaries` (see §24.6) |
+| `Sources/Libra/Services/MediaIdentification.swift` | Verify bucket names display correctly in identification rows |
+| `Sources/Libra/Models/OrganizeLayout.swift` | Verify folder names use new bucket strings |
+
+**Retired strings — grep and remove all references:**
+
+```bash
+grep -rn '"FHD"\|"HD"\|"SD"\|"1440p"\|"QHD"\|"8K"' Sources Tests scripts docs
+```
+
+Wait — `FHD`, `HD`, `SD`, and `QHD` are now *active* bucket names in the new scheme. The strings to retire are only `"1440p"` and `"8K"`. The old *meaning* of `FHD`/`HD`/`SD` changes (they now have precise boundary definitions), so any test assertion or documentation that describes the old meaning must be updated, but the strings themselves are kept.
+
+### 24.6 Boundary crossover tests
+
+These tests verify every boundary transition point. They replace the old `testResolution_1080pIsNotFHD` and `testResolution_otherBuckets`.
+
+```swift
+func testResolutionBucketBoundaries() {
+    // Fixed standards, with tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 3840, height: 2160), "4K")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 7680, height: 4320), "4K")  // 8K folds into 4K
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 2560, height: 1440), "QHD")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 2558, height: 1440), "QHD") // tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 2562, height: 1440), "QHD") // tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1920, height: 1080), "1080p")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1918, height: 1080), "1080p") // tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1922, height: 1080), "1080p") // tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1280, height: 720), "720p")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1278, height: 720), "720p")   // tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1282, height: 720), "720p")   // tolerance
+
+    // FHD: between 1080p tolerance and QHD tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1923, height: 1080), "FHD") // just outside 1080p tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 2557, height: 1440), "FHD") // just below QHD tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 2436, height: 1125), "FHD") // iPhone X screen recording
+
+    // HD: between 720p tolerance and 1080p tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1283, height: 720), "HD") // just outside 720p tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1600, height: 900), "HD")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1917, height: 1080), "HD") // just below 1080p tolerance
+
+    // SD: below 720p tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1277, height: 720), "SD") // just below 720p tolerance
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 640, height: 480), "SD")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 128, height: 224), "SD") // iMessage clip
+
+    // Portrait: long edge is max(w, h)
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 1080, height: 1920), "1080p")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 720, height: 1280), "720p")
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 2160, height: 3840), "4K")
+
+    // Unknown / zero
+    XCTAssertEqual(MediaClassification.resolutionClass(width: 0, height: 0), "Unknown")
+}
+```
+
+### 24.7 Full dataset summary
+
+```
+834 videos classified
+
+RESOLUTION                  ORIENTATION           FRAME RATE
+┌──────────┬───────┐        ┌───────┬─────┐       ┌───────┬─────┐
+│ 4K       │  123  │        │ V     │ 465 │       │ 30fps │ 262 │
+│ QHD      │    1  │        │ W     │ 369 │       │ 60fps │ 571 │
+│ FHD      │   53  │        └───────┴─────┘       │120fps │   1 │
+│ 1080p    │  440  │                               └───────┴─────┘
+│ HD       │   12  │
+│ 720p     │  164  │
+│ SD       │   41  │
+└──────────┴───────┘
+```
+
+### 24.8 Most common naming combinations
+
+| Rank | Name pattern | Count | What they are |
+|------|-------------|-------|---------------|
+| 1 | `Apple 1080p W60` | ~180 | Standard iPhone landscape 60fps |
+| 2 | `Apple 1080p V60` | ~140 | Standard iPhone portrait 60fps |
+| 3 | `Apple 720p V30` | ~100 | Social media downloads (portrait) |
+| 4 | `Apple 4K W60` | ~60 | iPhone 4K landscape |
+| 5 | `Apple 4K V60` | ~50 | iPhone 4K portrait |
+| 6 | `Apple 720p W30` | ~40 | Social media downloads (landscape) |
+| 7 | `Apple 1080p V30` | ~30 | Older iPhone recordings |
+| 8 | `Apple FHD V60` | ~40 | iPhone X screen recordings |
+| 9 | `Apple SD V30` | ~30 | iMessage clips, tiny downloads |
+| 10 | `Apple 1080p W30` | ~20 | Older iPhone/screen recordings |
