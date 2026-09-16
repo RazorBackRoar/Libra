@@ -1,3 +1,6 @@
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 import XCTest
 
 @testable import Libra
@@ -114,6 +117,64 @@ final class MediaProbeTests: XCTestCase {
 
         // §23.10 — SDR fixture must not produce a fabricated HDR flag.
         XCTAssertNotEqual(info.isHDR, true)
+    }
+
+    // Step 10.4 — the image path must check `make` as well as `model`, matching
+    // the video path: a photo whose Make field itself says "iPhone" must
+    // classify the same as the identical video.
+    private func makeJPEG(make: String, model: String?) throws -> URL {
+        let side = 4
+        let pixels = Data([UInt8](repeating: 200, count: side * side * 3))
+        let provider = CGDataProvider(data: pixels as CFData)!
+        let image = CGImage(
+            width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 24,
+            bytesPerRow: side * 3, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false,
+            intent: .defaultIntent)!
+
+        var tiff: [String: Any] = [kCGImagePropertyTIFFMake as String: make]
+        if let model { tiff[kCGImagePropertyTIFFModel as String] = model }
+        let properties = [kCGImagePropertyTIFFDictionary as String: tiff] as CFDictionary
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("libra-img-\(UUID().uuidString).jpg")
+        let dest = CGImageDestinationCreateWithURL(
+            url as CFURL, UTType.jpeg.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, image, properties)
+        XCTAssertTrue(CGImageDestinationFinalize(dest))
+        return url
+    }
+
+    func testImageWithIPhoneMakeClassifiesLikeVideo() async throws {
+        let url = try makeJPEG(make: "Apple iPhone", model: nil)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let info = try await MediaProbe.probe(filePath: url.path)
+        XCTAssertNil(info.error)
+        XCTAssertTrue(info.hasAppleMake)
+        // Old image path checked model only → this was false ("Other Apple").
+        XCTAssertTrue(info.hasiPhoneModel)
+        XCTAssertEqual(
+            IPhoneSortLogic.classify(
+                hasAppleMake: info.hasAppleMake, hasiPhoneModel: info.hasiPhoneModel,
+                make: info.make, model: info.model
+            ).folder, .iPhone)
+    }
+
+    func testImageWithPlainAppleMakeIsOtherAppleNotIPhone() async throws {
+        let url = try makeJPEG(make: "Apple", model: "iPad Pro")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let info = try await MediaProbe.probe(filePath: url.path)
+        XCTAssertTrue(info.hasAppleMake)
+        // Checking make must not over-match: "Apple" contains no "iphone".
+        XCTAssertFalse(info.hasiPhoneModel)
+        XCTAssertEqual(
+            IPhoneSortLogic.classify(
+                hasAppleMake: info.hasAppleMake, hasiPhoneModel: info.hasiPhoneModel,
+                make: info.make, model: info.model
+            ).folder, .otherApple)
     }
 
     func testFailedProbeStillReportsFilesystemDates() async throws {
