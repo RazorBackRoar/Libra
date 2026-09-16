@@ -187,6 +187,7 @@ final class ToolState: ObservableObject {
         }.value
         running = false
         results.append(contentsOf: moved)
+        for result in moved { logFailure(result) }
         let ok = moved.filter { $0.status == .success }.count
         if dry {
             recap = "Preview: \(ok) photo\(ok == 1 ? "" : "s") would move out."
@@ -306,6 +307,9 @@ final class ToolState: ObservableObject {
             }
             if failures > 0 {
                 parts.append("\(failures) metadata failure\(failures == 1 ? "" : "s")")
+                Log.shared.warn(
+                    "Scan: \(failures) metadata failure(s), e.g. \(outcome.supported.first { $0.error != nil }?.error ?? "unknown")",
+                    scope: "scan")
             }
             if warnings > 0 {
                 parts.append("\(warnings) metadata warning\(warnings == 1 ? "" : "s")")
@@ -382,6 +386,8 @@ final class ToolState: ObservableObject {
         if !previewPass, tool == .gps, unresolvedLocationCount > 0 {
             summary +=
                 " \(unresolvedLocationCount) location\(unresolvedLocationCount == 1 ? "" : "s") could not be named — filed under GPS."
+            Log.shared.warn(
+                "Geocode unresolved for \(unresolvedLocationCount) cluster(s)", scope: "run")
         }
         if previewPass, reportThisPass,
             let reportURL = DryRunReport.write(tool: tool, results: runResults)
@@ -441,7 +447,14 @@ final class ToolState: ObservableObject {
         }.value
         if let output = result.outputPath { reserved.insert(output) }
         noteUndo(kind: kind, from: from, result: result)
+        logFailure(result)
         return result
+    }
+
+    private func logFailure(_ result: OperationResult) {
+        guard result.status == .failed else { return }
+        let name = (result.path as NSString).lastPathComponent
+        Log.shared.warn("\(name): \(result.reason ?? "unknown error")", scope: "run")
     }
 
     private func sort(target: [VideoInfo]) async {
@@ -703,6 +716,7 @@ final class ToolState: ObservableObject {
             if let out = result.outputPath { reserved.insert(out) }
             noteUndo(
                 kind: mode == "copies" ? .createdCopy : .moved, from: file.path, result: result)
+            logFailure(result)
             results.append(result)
             advanceProgress()
             if result.status == .cancelled { return }
@@ -753,6 +767,7 @@ final class ToolState: ObservableObject {
             }
             if let out = result.outputPath { reserved.insert(out) }
             noteUndo(kind: .createdCopy, from: file.path, result: result)
+            logFailure(result)
             results.append(result)
             advanceProgress()
             if result.status == .cancelled { return }

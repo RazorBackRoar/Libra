@@ -531,7 +531,7 @@ enum MediaProbe {
         let make = preferredValue(makeValues)
         let model = preferredValue(modelValues)
         let hasAppleMake = DeviceMetadata.hasAppleMake(in: makeValues)
-        let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues)
+        let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues + makeValues)
         let embeddedCreation = embeddedImageCreationDate(properties: properties)
         let fileDates = fileSystemDates(filePath)
 

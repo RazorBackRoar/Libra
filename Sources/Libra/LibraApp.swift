@@ -172,8 +172,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.post(name: LibraCommands.selectFiles, object: nil)
     }
 
-    @objc func undoLastRun() {
-        if NSApp?.keyWindow?.firstResponder is NSTextView { return }
+    @objc func undoLastRun(_ sender: Any? = nil) {
+        if NSApp?.keyWindow?.firstResponder is NSTextView {
+            NSApp?.sendAction(Selector(("undo:")), to: nil, from: sender)
+            return
+        }
         NotificationCenter.default.post(name: LibraCommands.undoLastRun, object: nil)
     }
 

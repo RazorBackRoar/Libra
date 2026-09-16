@@ -86,6 +86,10 @@ final class PhotoSweepState: ObservableObject {
                 PhotoMover.move(toMove, to: dest, dryRun: dry)
             }.value
             results = moved
+            for result in moved where result.status == .failed {
+                let name = (result.path as NSString).lastPathComponent
+                Log.shared.warn("\(name): \(result.reason ?? "unknown error")", scope: "run")
+            }
             let ok = moved.filter { $0.status == .success }.count
             if dry {
                 recap = "Preview: \(ok) photo\(ok == 1 ? "" : "s") would move to \(dest)."
