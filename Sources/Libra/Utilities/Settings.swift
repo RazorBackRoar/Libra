@@ -4,25 +4,31 @@ import Foundation
 final class SettingsStore: ObservableObject {
     static let shared = SettingsStore()
 
+    /// Test seam: when set, load/save use this file instead of Application Support.
+    static var fileURLOverride: URL?
+
     @Published var settings: AppSettings = .default
 
-    private let fileURL: URL
+    private var fileURL: URL {
+        Self.fileURLOverride
+            ?? Paths.applicationSupportDirectory().appendingPathComponent("settings.json")
+    }
 
     private init() {
         Paths.ensureDirectory(Paths.applicationSupportDirectory())
-        fileURL = Paths.applicationSupportDirectory().appendingPathComponent("settings.json")
         load()
     }
 
     func load() {
         if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode(AppSettings.self, from: data) {
+            let decoded = try? JSONDecoder().decode(AppSettings.self, from: data)
+        {
             settings = decoded
         }
     }
 
     func save() {
-        Paths.ensureDirectory(Paths.applicationSupportDirectory())
+        Paths.ensureDirectory(fileURL.deletingLastPathComponent())
         if let data = try? JSONEncoder().encode(settings) {
             try? data.write(to: fileURL, options: .atomic)
         }

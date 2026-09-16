@@ -14,8 +14,6 @@ enum FfmpegOps {
         durationSec: Double = 0,
         withinRoot: String? = nil
     ) async -> OperationResult {
-        let multiplier = 1.0 / factor
-        let setpts = "PTS*\(multiplier)"
         return await runToUniqueOutput(
             filePath: filePath,
             outputPath: outputPath,
@@ -23,15 +21,19 @@ enum FfmpegOps {
             timeout: timeout(durationSec: durationSec, factor: factor),
             withinRoot: withinRoot,
             arguments: { tmp in
-                [
-                    "-i", filePath,
-                    "-vf", setpts,
-                    "-an",
-                    "-c:v", "libx264",
-                    "-y", tmp
-                ]
+                sloMoArguments(input: filePath, output: tmp, factor: factor)
             }
         )
+    }
+
+    static func sloMoArguments(input: String, output: String, factor: Double) -> [String] {
+        [
+            "-i", input,
+            "-vf", "PTS*\(1.0 / factor)",
+            "-an",
+            "-c:v", "libx264",
+            "-y", output,
+        ]
     }
 
     static func adjustTimestamp(
@@ -42,11 +44,6 @@ enum FfmpegOps {
         durationSec: Double = 0,
         withinRoot: String? = nil
     ) async -> OperationResult {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let timeString = formatter.string(from: creationTime)
         let result = await runToUniqueOutput(
             filePath: filePath,
             outputPath: outputPath,
@@ -54,18 +51,39 @@ enum FfmpegOps {
             timeout: timeout(durationSec: durationSec, factor: 1),
             withinRoot: withinRoot,
             arguments: { tmp in
-                [
-                    "-i", filePath,
-                    "-metadata", "creation_time=\(timeString)",
-                    "-c", "copy",
-                    "-y", tmp
-                ]
+                adjustTimestampArguments(input: filePath, output: tmp, creationTime: creationTime)
             }
         )
         if result.status == .success, let dest = result.outputPath {
-            try? FileManager.default.setAttributes([.creationDate: creationTime], ofItemAtPath: dest)
+            try? FileManager.default.setAttributes(
+                [.creationDate: creationTime], ofItemAtPath: dest)
         }
         return result
+    }
+
+    static func adjustTimestampArguments(input: String, output: String, creationTime: Date)
+        -> [String]
+    {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return [
+            "-i", input,
+            "-metadata", "creation_time=\(formatter.string(from: creationTime))",
+            "-c", "copy",
+            "-y", output,
+        ]
+    }
+
+    /// ffmpeg selects its muxer from the output extension, so the temp name
+    /// keeps the real container extension last: `name.libra-tmp.mp4`.
+    static func temporaryOutputPath(for outputPath: String) -> String {
+        let ns = outputPath as NSString
+        let ext = ns.pathExtension
+        let stem = (ns.lastPathComponent as NSString).deletingPathExtension
+        let name = ext.isEmpty ? "\(stem).libra-tmp" : "\(stem).libra-tmp.\(ext)"
+        return (ns.deletingLastPathComponent as NSString).appendingPathComponent(name)
     }
 
     private static func runToUniqueOutput(
@@ -85,7 +103,7 @@ enum FfmpegOps {
         }
         let dir = (outputPath as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        let tmp = FileOps.uniquePath(for: outputPath + ".libra-tmp")
+        let tmp = FileOps.uniquePath(for: temporaryOutputPath(for: outputPath))
         if let withinRoot, !FileOps.destinationIsSafe(tmp, within: withinRoot) {
             return OperationResult(
                 path: filePath,
@@ -147,7 +165,8 @@ enum FfmpegOps {
     }
 
     private static func ffmpegFailureReason(_ stderr: String) -> String {
-        let lines = stderr
+        let lines =
+            stderr
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }

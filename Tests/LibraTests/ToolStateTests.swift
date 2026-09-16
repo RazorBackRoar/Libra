@@ -1,13 +1,38 @@
 import XCTest
+
 @testable import Libra
 
+@MainActor
 final class ToolStateTests: XCTestCase {
 
-    @MainActor
-    func testStartScanClearsUndoRecords() {
+    private var tempDir: URL!
+    private var savedSettings: AppSettings!
+
+    override func setUp() async throws {
+        tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("libra-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        // Redirect report + settings writes to the temp dir so the real
+        // Desktop and ~/Library/Application Support/Libra are never touched.
+        SettingsStore.fileURLOverride = tempDir.appendingPathComponent("settings.json")
+        DryRunReport.reportDirectoryOverride = tempDir
+        savedSettings = SettingsStore.shared.settings
+    }
+
+    override func tearDown() async throws {
+        // Restore in-memory state; the real settings.json was never written.
+        SettingsStore.shared.settings = savedSettings
+        SettingsStore.fileURLOverride = nil
+        DryRunReport.reportDirectoryOverride = nil
+        try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    func testStartScanClearsUndoRecords() async {
         let state = ToolState(tool: .vidres)
         state.undoRecords = [
-            UndoRecord(kind: .moved, originalPath: "/Trip1/clip.mov", resultPath: "/Trip1/1080p/clip 001.mov"),
+            UndoRecord(
+                kind: .moved, originalPath: "/Trip1/clip.mov",
+                resultPath: "/Trip1/1080p/clip 001.mov")
         ]
 
         state.startScan(
@@ -16,9 +41,14 @@ final class ToolStateTests: XCTestCase {
         )
 
         XCTAssertTrue(state.undoRecords.isEmpty)
+
+        // Wait out the spawned scan Task so it cannot outlive the test.
+        for _ in 0..<500 where state.running {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertFalse(state.running)
     }
 
-    @MainActor
     func testScheduleRerunPreviewsWhenLiveToggleOff() async {
         let state = ToolState(tool: .vidres)
         state.dryRun = false
@@ -31,7 +61,6 @@ final class ToolStateTests: XCTestCase {
         XCTAssertFalse(state.canWrite && state.running)
     }
 
-    @MainActor
     func testStartWriteRefusesWhenPreviewOnly() {
         let state = ToolState(tool: .vidres)
         state.dryRun = true
@@ -44,7 +73,6 @@ final class ToolStateTests: XCTestCase {
         XCTAssertTrue(state.undoRecords.isEmpty)
     }
 
-    @MainActor
     func testMovePhotosOutRefusesDestinationInsideSource() {
         let state = ToolState(tool: .provid)
         state.photos = [stubVideo(path: "/Trip/stills/IMG_0001.heic", ext: "heic")]

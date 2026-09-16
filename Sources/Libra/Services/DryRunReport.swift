@@ -1,12 +1,17 @@
 import Foundation
 
 enum DryRunReport {
+    /// Where numbered reports are written. Production = the user's Desktop.
+    /// Tests override this so `swift test` never touches the real Desktop.
+    static var reportDirectoryOverride: URL?
+
     /// Writes a clean before/after listing to the Desktop as
     /// `Libra Sorter Dry Run 1.txt` (tool title in the name), then `2`, `3`, …
     /// without overwriting existing files.
     @discardableResult
     static func write(tool: Tool, results: [OperationResult]) -> URL? {
-        let entries = results.compactMap { result -> (before: String, after: String, folder: String?, note: String?)? in
+        let entries = results.compactMap {
+            result -> (before: String, after: String, folder: String?, note: String?)? in
             let before = result.path
             if let output = result.outputPath {
                 let folder = (output as NSString).deletingLastPathComponent
@@ -29,7 +34,7 @@ enum DryRunReport {
             "Generated: \(formatter.string(from: Date()))",
             "Items: \(entries.count)",
             "",
-            String(repeating: "-", count: 72)
+            String(repeating: "-", count: 72),
         ]
 
         for (index, entry) in entries.enumerated() {
@@ -56,9 +61,12 @@ enum DryRunReport {
     }
 
     private static func nextReportURL(tool: Tool) -> URL {
-        let desktop = FileManager.default.homeDirectoryForCurrentUser
+        let desktop =
+            reportDirectoryOverride
+            ?? FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Desktop", isDirectory: true)
-        let labeled = tool.title.hasPrefix(Brand.displayName)
+        let labeled =
+            tool.title.hasPrefix(Brand.displayName)
             ? tool.title
             : "\(Brand.displayName) \(tool.title)"
         let base = "\(labeled) Dry Run"
