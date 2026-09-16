@@ -7,7 +7,9 @@ final class SettingsStore: ObservableObject {
     /// Test seam: when set, load/save use this file instead of Application Support.
     static var fileURLOverride: URL?
 
-    @Published var settings: AppSettings = .default
+    @Published var settings: AppSettings = .default {
+        didSet { MediaKinds.sync(with: settings) }
+    }
 
     private var fileURL: URL {
         Self.fileURLOverride

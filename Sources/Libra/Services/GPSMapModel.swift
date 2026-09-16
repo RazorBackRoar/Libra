@@ -1,5 +1,5 @@
-import Foundation
 import CoreLocation
+import Foundation
 import MapKit
 import SwiftUI
 
@@ -15,8 +15,7 @@ struct GPSLocationCluster: Identifiable, Hashable {
     }
 
     var photoCount: Int {
-        let images = Set(AppSettings.default.imageExtensions)
-        return files.filter { images.contains($0.ext.lowercased()) }.count
+        files.filter { MediaKinds.isImage(ext: $0.ext) }.count
     }
 
     var videoCount: Int {
@@ -90,11 +89,10 @@ enum GPSMediaCounts {
     }
 
     static func totals(in files: [VideoInfo]) -> (photos: Int, videos: Int) {
-        let images = Set(AppSettings.default.imageExtensions)
         var photos = 0
         var videos = 0
         for file in files {
-            if images.contains(file.ext.lowercased()) {
+            if MediaKinds.isImage(ext: file.ext) {
                 photos += 1
             } else {
                 videos += 1
@@ -115,7 +113,9 @@ enum GPSMapClustering {
         }
 
         let points: [Point] = files.compactMap { file in
-            guard file.hasCoordinates, let lat = file.latitude, let lon = file.longitude else { return nil }
+            guard file.hasCoordinates, let lat = file.latitude, let lon = file.longitude else {
+                return nil
+            }
             return Point(file: file, location: CLLocation(latitude: lat, longitude: lon))
         }
         .sorted { $0.file.path < $1.file.path }
@@ -142,11 +142,12 @@ enum GPSMapClustering {
                 working[bestIndex].lonSum += point.location.coordinate.longitude
                 working[bestIndex].files.append(point.file)
             } else {
-                working.append((
-                    latSum: point.location.coordinate.latitude,
-                    lonSum: point.location.coordinate.longitude,
-                    files: [point.file]
-                ))
+                working.append(
+                    (
+                        latSum: point.location.coordinate.latitude,
+                        lonSum: point.location.coordinate.longitude,
+                        files: [point.file]
+                    ))
             }
         }
 
@@ -220,7 +221,8 @@ enum GPSMapClustering {
         var byPlace: [String: [GPSLocationCluster]] = [:]
         for cluster in input {
             guard let place = cluster.placeName?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !place.isEmpty else {
+                !place.isEmpty
+            else {
                 unnamed.append(cluster)
                 continue
             }
@@ -236,7 +238,8 @@ enum GPSMapClustering {
             let files = group.flatMap(\.files).sorted { $0.path < $1.path }
             let weight = Double(max(files.count, 1))
             let latitude = group.reduce(0.0) { $0 + $1.latitude * Double($1.files.count) } / weight
-            let longitude = group.reduce(0.0) { $0 + $1.longitude * Double($1.files.count) } / weight
+            let longitude =
+                group.reduce(0.0) { $0 + $1.longitude * Double($1.files.count) } / weight
             merged.append(
                 GPSLocationCluster(
                     id: "city:\(place)",
@@ -257,10 +260,11 @@ enum GPSMapClustering {
     static func fittingPosition(for clusters: [GPSLocationCluster]) -> MapCameraPosition {
         guard let first = clusters.first else { return .automatic }
         if clusters.count == 1 {
-            return .region(MKCoordinateRegion(
-                center: first.coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
-            ))
+            return .region(
+                MKCoordinateRegion(
+                    center: first.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                ))
         }
         var minLat = first.latitude
         var maxLat = first.latitude
@@ -293,7 +297,8 @@ extension GPSMapModel {
         geocodeTask = Task { [weak self] in
             for cluster in pending {
                 if Task.isCancelled { return }
-                let name = await GPSGeocoder.reverseGeocode(latitude: cluster.latitude, longitude: cluster.longitude)
+                let name = await GPSGeocoder.reverseGeocode(
+                    latitude: cluster.latitude, longitude: cluster.longitude)
                 guard let self, !Task.isCancelled else { return }
                 if let name {
                     self.placeNameCache[cluster.id] = name
@@ -306,7 +311,8 @@ extension GPSMapModel {
                         self.placeNameCache[merged.id] = merged.placeName
                     }
                     if let selectedClusterID = self.selectedClusterID,
-                       !self.clusters.contains(where: { $0.id == selectedClusterID }) {
+                        !self.clusters.contains(where: { $0.id == selectedClusterID })
+                    {
                         self.selectedClusterID = nil
                     }
                     self.cameraPosition = GPSMapClustering.fittingPosition(for: self.clusters)

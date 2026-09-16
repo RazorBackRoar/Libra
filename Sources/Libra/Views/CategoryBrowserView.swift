@@ -1,6 +1,6 @@
-import SwiftUI
 import AVKit
 import AppKit
+import SwiftUI
 
 struct CategoryBrowserView: View {
     let title: String
@@ -120,14 +120,16 @@ struct CategoryBrowserView: View {
     }
 
     private var fileList: some View {
-        List(selection: Binding(
-            get: { files.indices.contains(index) ? files[index].id : nil },
-            set: { newID in
-                if let newID, let i = files.firstIndex(where: { $0.id == newID }) {
-                    index = i
+        List(
+            selection: Binding(
+                get: { files.indices.contains(index) ? files[index].id : nil },
+                set: { newID in
+                    if let newID, let i = files.firstIndex(where: { $0.id == newID }) {
+                        index = i
+                    }
                 }
-            }
-        )) {
+            )
+        ) {
             Section("\(title) · \(files.count)") {
                 ForEach(Array(files.enumerated()), id: \.element.id) { offset, file in
                     HStack(alignment: .top, spacing: 6) {
@@ -163,8 +165,7 @@ struct CategoryBrowserView: View {
 
     @ViewBuilder
     private func mediaPane(for file: VideoInfo) -> some View {
-        let imageExts = Set(AppSettings.default.imageExtensions)
-        if imageExts.contains(file.ext.lowercased()) {
+        if MediaKinds.isImage(ext: file.ext) {
             if let nsImage = NSImage(contentsOfFile: file.path) {
                 Image(nsImage: nsImage)
                     .resizable()
@@ -205,8 +206,7 @@ struct CategoryBrowserView: View {
     private func loadPlayer() {
         tearDownPlayer()
         guard let file = current else { return }
-        let imageExts = Set(AppSettings.default.imageExtensions)
-        guard !imageExts.contains(file.ext.lowercased()) else { return }
+        guard !MediaKinds.isImage(ext: file.ext) else { return }
         guard file.error == nil else { return }
         guard FileManager.default.fileExists(atPath: file.path) else { return }
 
@@ -259,10 +259,10 @@ private final class ArrowKeyMonitor: ObservableObject {
         stop()
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             switch event.keyCode {
-            case 123, 126: // left, up
+            case 123, 126:  // left, up
                 DispatchQueue.main.async { self?.onLeft?() }
                 return nil
-            case 124, 125: // right, down
+            case 124, 125:  // right, down
                 DispatchQueue.main.async { self?.onRight?() }
                 return nil
             default:

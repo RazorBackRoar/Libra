@@ -8,9 +8,7 @@ final class AppState: ObservableObject {
 
     @Published var settings = SettingsStore.shared.settings
     @Published var ffmpegPath: String?
-    @Published var ffprobePath: String?
     @Published var missingFfmpeg = false
-    @Published var missingFfprobe = false
     @Published var depMessage: String? = nil
 
     private init() {
@@ -19,9 +17,7 @@ final class AppState: ObservableObject {
 
     func resolveDependencies() {
         ffmpegPath = resolve(command: "ffmpeg", override: settings.ffmpegPath)
-        ffprobePath = resolve(command: "ffprobe", override: settings.ffprobePath)
         missingFfmpeg = ffmpegPath == nil
-        missingFfprobe = ffprobePath == nil
         depMessage =
             missingFfmpeg
             ? "Needs ffmpeg to create transformed media."

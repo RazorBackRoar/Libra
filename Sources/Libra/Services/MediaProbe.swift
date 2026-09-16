@@ -2,6 +2,7 @@ import AVFoundation
 import CoreMedia
 import Foundation
 import ImageIO
+import UniformTypeIdentifiers
 
 enum DeviceMetadata {
     static func hasAppleMake(in values: [String]) -> Bool {
@@ -32,13 +33,13 @@ enum DeviceMetadata {
 
     static let makeKeys = [
         "make", "Make", "com.apple.quicktime.make", "com.apple.quicktime.Make",
-        "device_make", "DeviceMake", "camera_make", "CameraMake", "Artist"
+        "device_make", "DeviceMake", "camera_make", "CameraMake", "Artist",
     ]
 
     static let modelKeys = [
         "model", "Model", "com.apple.quicktime.model", "com.apple.quicktime.Model",
         "device_model", "DeviceModel", "camera_model", "CameraModel",
-        "com.apple.quicktime.camera.model"
+        "com.apple.quicktime.camera.model",
     ]
 }
 
@@ -52,12 +53,12 @@ enum MediaProbe {
 
         var size: Int64 = 0
         if let attrs = try? FileManager.default.attributesOfItem(atPath: filePath),
-           let s = attrs[.size] as? Int64 {
+            let s = attrs[.size] as? Int64
+        {
             size = s
         }
 
-        let imageExts = Set(AppSettings.default.imageExtensions)
-        if imageExts.contains(ext) {
+        if MediaKinds.isImage(ext: ext) {
             return probeImage(filePath: filePath, name: name, dir: dir, ext: ext, size: size)
         }
         return try await probeVideoWithTimeout(
@@ -159,6 +160,15 @@ enum MediaProbe {
             let durationSec = duration.isNumeric ? CMTimeGetSeconds(duration) : 0
             let formatDescriptions = try await track.load(.formatDescriptions)
             let codec = codecName(from: formatDescriptions.first)
+            let hdr = hdrFlag(from: formatDescriptions.first)
+
+            var audioCodec: String? = nil
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            if let audioTrack = audioTracks.first,
+                let desc = try await audioTrack.load(.formatDescriptions).first
+            {
+                audioCodec = audioCodecName(from: desc)
+            }
 
             var makeValues: [String] = []
             var modelValues: [String] = []
@@ -175,18 +185,24 @@ enum MediaProbe {
 
                 if creation == nil, let date {
                     creation = date
-                } else if creation == nil, identifier.contains("creation") || common.contains("creation") {
+                } else if creation == nil,
+                    identifier.contains("creation") || common.contains("creation")
+                {
                     creation = parseDate(string)
                 }
 
                 if !string.isEmpty {
-                    if identifier.contains("make") || common == "make" || identifier.hasSuffix(".make") {
+                    if identifier.contains("make") || common == "make"
+                        || identifier.hasSuffix(".make")
+                    {
                         makeValues.append(string)
                     }
                     if identifier.contains("model") || common == "model" {
                         modelValues.append(string)
                     }
-                    if identifier.contains("location") || identifier.contains("iso6709") || common.contains("location") {
+                    if identifier.contains("location") || identifier.contains("iso6709")
+                        || common.contains("location")
+                    {
                         locationStrings.append(string)
                     }
                 }
@@ -195,31 +211,50 @@ enum MediaProbe {
             if let make = await metadataString(metadataGroups, identifier: .quickTimeMetadataMake) {
                 makeValues.insert(make, at: 0)
             }
-            if let model = await metadataString(metadataGroups, identifier: .quickTimeMetadataModel) {
+            if let model = await metadataString(metadataGroups, identifier: .quickTimeMetadataModel)
+            {
                 modelValues.insert(model, at: 0)
             }
-            if let loc = await metadataString(metadataGroups, identifier: .quickTimeMetadataLocationISO6709) {
+            if let loc = await metadataString(
+                metadataGroups, identifier: .quickTimeMetadataLocationISO6709)
+            {
                 locationStrings.insert(loc, at: 0)
             }
             if creation == nil {
-                creation = await metadataDate(metadataGroups, identifier: .commonIdentifierCreationDate)
+                creation = await metadataDate(
+                    metadataGroups, identifier: .commonIdentifierCreationDate)
             }
             if creation == nil {
-                creation = await metadataDate(metadataGroups, identifier: .quickTimeMetadataCreationDate)
+                creation = await metadataDate(
+                    metadataGroups, identifier: .quickTimeMetadataCreationDate)
+            }
+            if creation == nil {
+                // Movie-header (mvhd) creation date — an AVMetadataItem, not a
+                // metadata-list entry.
+                if let item = try? await asset.load(.creationDate) {
+                    creation = await metadataDate(item)
+                }
             }
 
             var latitude: Double?
             var longitude: Double?
+            var locationName: String? = nil
             for raw in locationStrings {
                 if let coords = GPSCoordinateParser.parseISO6709(raw) {
-                    latitude = coords.latitude
-                    longitude = coords.longitude
-                    break
+                    if latitude == nil {
+                        latitude = coords.latitude
+                        longitude = coords.longitude
+                    }
+                } else if locationName == nil {
+                    // Non-coordinate location string — a human-readable name.
+                    locationName = raw
                 }
             }
 
+            let fileDates = fileSystemDates(filePath)
+            let creationTimeEmbedded = creation != nil
             if creation == nil {
-                creation = fileSystemCreationDate(filePath)
+                creation = fileDates.creation
             }
 
             let make = preferredValue(makeValues)
@@ -235,8 +270,10 @@ enum MediaProbe {
                 sizeBytes: size,
                 width: displayed.width,
                 height: displayed.height,
-                resolutionClass: MediaClassification.resolutionClass(width: displayed.width, height: displayed.height),
-                orientation: MediaClassification.orientation(width: displayed.width, height: displayed.height),
+                resolutionClass: MediaClassification.resolutionClass(
+                    width: displayed.width, height: displayed.height),
+                orientation: MediaClassification.orientation(
+                    width: displayed.width, height: displayed.height),
                 fps: fps,
                 durationSec: durationSec.isFinite ? durationSec : 0,
                 codec: codec,
@@ -250,7 +287,14 @@ enum MediaProbe {
                 longitude: longitude,
                 creationTime: creation,
                 error: nil,
-                warning: nil
+                warning: nil,
+                creationTimeEmbedded: creationTimeEmbedded,
+                fileCreationTime: fileDates.creation,
+                fileModificationTime: fileDates.modification,
+                locationName: locationName,
+                isHDR: hdr,
+                audioCodec: audioCodec,
+                typeIdentifier: UTType(filenameExtension: ext)?.identifier
             )
         } catch is CancellationError {
             throw CancellationError()
@@ -275,7 +319,9 @@ enum MediaProbe {
         return items
     }
 
-    private static func metadataString(_ items: [AVMetadataItem], identifier: AVMetadataIdentifier) async -> String? {
+    private static func metadataString(_ items: [AVMetadataItem], identifier: AVMetadataIdentifier)
+        async -> String?
+    {
         let matches = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: identifier)
         for item in matches {
             let value = await metadataString(item)
@@ -284,7 +330,9 @@ enum MediaProbe {
         return nil
     }
 
-    private static func metadataDate(_ items: [AVMetadataItem], identifier: AVMetadataIdentifier) async -> Date? {
+    private static func metadataDate(_ items: [AVMetadataItem], identifier: AVMetadataIdentifier)
+        async -> Date?
+    {
         let matches = AVMetadataItem.metadataItems(from: items, filteredByIdentifier: identifier)
         for item in matches {
             if let date = await metadataDate(item) { return date }
@@ -321,12 +369,38 @@ enum MediaProbe {
         }
     }
 
+    private static func audioCodecName(from description: CMFormatDescription) -> String? {
+        let raw = fourCCString(CMFormatDescriptionGetMediaSubType(description)).lowercased()
+        switch raw {
+        case "mp4a": return "aac"
+        case "alac": return "alac"
+        case "lpcm", "sowt", "twos": return "lpcm"
+        case "ac-3": return "ac3"
+        case "ec-3": return "eac3"
+        default: return raw.isEmpty ? nil : raw
+        }
+    }
+
+    /// nil when the transfer characteristic can't be established; true only for
+    /// declared HDR transfers (SMPTE ST 2084 PQ, HLG).
+    private static func hdrFlag(from description: CMFormatDescription?) -> Bool? {
+        guard let description,
+            let raw = CMFormatDescriptionGetExtension(
+                description,
+                extensionKey: kCMFormatDescriptionExtension_TransferFunction
+            ) as? String
+        else { return nil }
+        let transfer = raw.uppercased()
+        if transfer.contains("2084") || transfer.contains("HLG") { return true }
+        return false
+    }
+
     private static func fourCCString(_ value: FourCharCode) -> String {
         let bytes: [UInt8] = [
             UInt8((value >> 24) & 0xff),
             UInt8((value >> 16) & 0xff),
             UInt8((value >> 8) & 0xff),
-            UInt8(value & 0xff)
+            UInt8(value & 0xff),
         ]
         return String(bytes: bytes, encoding: .ascii)?.trimmingCharacters(in: .whitespaces) ?? ""
     }
@@ -339,7 +413,8 @@ enum MediaProbe {
         size: Int64,
         error: String
     ) -> VideoInfo {
-        VideoInfo(
+        let fileDates = fileSystemDates(filePath)
+        return VideoInfo(
             path: filePath,
             name: name,
             dir: dir,
@@ -360,11 +435,16 @@ enum MediaProbe {
             hasGPS: false,
             creationTime: nil,
             error: error,
-            warning: nil
+            warning: nil,
+            fileCreationTime: fileDates.creation,
+            fileModificationTime: fileDates.modification,
+            typeIdentifier: UTType(filenameExtension: ext)?.identifier
         )
     }
 
-    private static func probeImage(filePath: String, name: String, dir: String, ext: String, size: Int64) -> VideoInfo {
+    private static func probeImage(
+        filePath: String, name: String, dir: String, ext: String, size: Int64
+    ) -> VideoInfo {
         let url = URL(fileURLWithPath: filePath)
 
         func failed(_ message: String) -> VideoInfo {
@@ -389,7 +469,10 @@ enum MediaProbe {
                 hasGPS: false,
                 creationTime: fileSystemCreationDate(filePath),
                 error: message,
-                warning: nil
+                warning: nil,
+                fileCreationTime: fileSystemDates(filePath).creation,
+                fileModificationTime: fileSystemDates(filePath).modification,
+                typeIdentifier: UTType(filenameExtension: ext)?.identifier
             )
         }
 
@@ -414,27 +497,43 @@ enum MediaProbe {
         var longitude: Double?
 
         if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
-            if let make = tiff[kCGImagePropertyTIFFMake as String] as? String { makeValues.append(make) }
-            if let model = tiff[kCGImagePropertyTIFFModel as String] as? String { modelValues.append(model) }
+            if let make = tiff[kCGImagePropertyTIFFMake as String] as? String {
+                makeValues.append(make)
+            }
+            if let model = tiff[kCGImagePropertyTIFFModel as String] as? String {
+                modelValues.append(model)
+            }
         }
         if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any] {
-            makeValues.append(contentsOf: DeviceMetadata.collectStringValues(from: exif, keys: DeviceMetadata.makeKeys))
-            modelValues.append(contentsOf: DeviceMetadata.collectStringValues(from: exif, keys: DeviceMetadata.modelKeys))
+            makeValues.append(
+                contentsOf: DeviceMetadata.collectStringValues(
+                    from: exif, keys: DeviceMetadata.makeKeys))
+            modelValues.append(
+                contentsOf: DeviceMetadata.collectStringValues(
+                    from: exif, keys: DeviceMetadata.modelKeys))
         }
-        if let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any], !gps.isEmpty {
+        if let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
+            !gps.isEmpty
+        {
             if let coords = GPSCoordinateParser.coordinates(fromImageIOGPS: gps) {
                 latitude = coords.latitude
                 longitude = coords.longitude
             }
         }
 
-        makeValues.append(contentsOf: DeviceMetadata.collectStringValues(from: properties, keys: DeviceMetadata.makeKeys))
-        modelValues.append(contentsOf: DeviceMetadata.collectStringValues(from: properties, keys: DeviceMetadata.modelKeys))
+        makeValues.append(
+            contentsOf: DeviceMetadata.collectStringValues(
+                from: properties, keys: DeviceMetadata.makeKeys))
+        modelValues.append(
+            contentsOf: DeviceMetadata.collectStringValues(
+                from: properties, keys: DeviceMetadata.modelKeys))
 
         let make = preferredValue(makeValues)
         let model = preferredValue(modelValues)
         let hasAppleMake = DeviceMetadata.hasAppleMake(in: makeValues)
         let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues)
+        let embeddedCreation = embeddedImageCreationDate(properties: properties)
+        let fileDates = fileSystemDates(filePath)
 
         return VideoInfo(
             path: filePath,
@@ -444,7 +543,8 @@ enum MediaProbe {
             sizeBytes: size,
             width: pixelWidth,
             height: pixelHeight,
-            resolutionClass: MediaClassification.resolutionClass(width: pixelWidth, height: pixelHeight),
+            resolutionClass: MediaClassification.resolutionClass(
+                width: pixelWidth, height: pixelHeight),
             orientation: MediaClassification.orientation(width: pixelWidth, height: pixelHeight),
             fps: 0,
             durationSec: 0,
@@ -457,29 +557,39 @@ enum MediaProbe {
             hasGPS: latitude != nil,
             latitude: latitude,
             longitude: longitude,
-            creationTime: imageCreationDate(properties: properties, filePath: filePath),
+            creationTime: embeddedCreation ?? fileDates.creation,
             error: nil,
-            warning: nil
+            warning: nil,
+            creationTimeEmbedded: embeddedCreation != nil,
+            fileCreationTime: fileDates.creation,
+            fileModificationTime: fileDates.modification,
+            typeIdentifier: UTType(filenameExtension: ext)?.identifier
         )
     }
 
-    private static func imageCreationDate(properties: [String: Any], filePath: String) -> Date? {
+    private static func embeddedImageCreationDate(properties: [String: Any]) -> Date? {
         if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
-           let raw = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
-           let date = parseExifDate(raw) {
+            let raw = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String,
+            let date = parseExifDate(raw)
+        {
             return date
         }
         if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any],
-           let raw = tiff[kCGImagePropertyTIFFDateTime as String] as? String,
-           let date = parseExifDate(raw) {
+            let raw = tiff[kCGImagePropertyTIFFDateTime as String] as? String,
+            let date = parseExifDate(raw)
+        {
             return date
         }
-        return fileSystemCreationDate(filePath)
+        return nil
+    }
+
+    private static func fileSystemDates(_ path: String) -> (creation: Date?, modification: Date?) {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+        return (attrs?[.creationDate] as? Date, attrs?[.modificationDate] as? Date)
     }
 
     private static func fileSystemCreationDate(_ path: String) -> Date? {
-        let attrs = try? FileManager.default.attributesOfItem(atPath: path)
-        return attrs?[.creationDate] as? Date
+        fileSystemDates(path).creation
     }
 
     private static func preferredValue(_ values: [String]) -> String {

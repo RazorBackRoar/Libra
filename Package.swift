@@ -24,7 +24,10 @@ let package = Package(
             name: "LibraTests",
             dependencies: ["Libra"],
             path: "Tests/LibraTests",
+            resources: [
+                .process("Fixtures")
+            ],
             swiftSettings: [.swiftLanguageMode(.v5)]
-        )
+        ),
     ]
 )

@@ -29,8 +29,23 @@ struct VideoInfo: Identifiable, Equatable {
     var warning: String?
     var unsupported: Bool = false
 
+    /// True when `creationTime` came from embedded media metadata, false when it
+    /// fell back to the filesystem creation date.
+    var creationTimeEmbedded: Bool = false
+    /// Filesystem creation/modification dates — separate from embedded media dates.
+    var fileCreationTime: Date? = nil
+    var fileModificationTime: Date? = nil
+    /// Human-readable location name when the media carries one.
+    var locationName: String? = nil
+    /// nil when the transfer characteristic can't be established; true for PQ/HLG HDR.
+    var isHDR: Bool? = nil
+    /// Audio codec when the file has an audio track.
+    var audioCodec: String? = nil
+    /// Uniform Type Identifier derived from the container extension.
+    var typeIdentifier: String? = nil
+
     var isImage: Bool {
-        AppSettings.default.imageExtensions.contains(ext.lowercased())
+        MediaKinds.isImage(ext: ext)
     }
 
     var isApple: Bool { hasAppleMake || hasiPhoneModel }
@@ -108,7 +123,8 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
             return "Rename videos, or nest folders by resolution, orientation, and FPS."
         case .oneMin: return "Stamp sequential 60-second creation times. Needs ffmpeg."
         case .slomo: return "Write slowed copies into a SloMo folder. Needs ffmpeg."
-        case .gps: return "Sort into city folders from location, or No-GPS when location is missing."
+        case .gps:
+            return "Sort into city folders from location, or No-GPS when location is missing."
         case .photoSweep: return "Move stills out of mixed video folders."
         }
     }
@@ -185,7 +201,6 @@ struct ScanOutcome {
 
 struct AppSettings: Codable {
     var ffmpegPath: String?
-    var ffprobePath: String?
     var videoExtensions: [String]
     var imageExtensions: [String]
     var dryRunDefault: Bool
@@ -198,7 +213,6 @@ struct AppSettings: Codable {
 
     static let `default` = AppSettings(
         ffmpegPath: nil,
-        ffprobePath: nil,
         videoExtensions: ["mp4", "mov", "m4v", "mkv", "avi", "mts", "m2ts", "3gp", "webm"],
         imageExtensions: ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "webp"],
         dryRunDefault: true,
@@ -212,7 +226,6 @@ struct AppSettings: Codable {
 
     init(
         ffmpegPath: String?,
-        ffprobePath: String?,
         videoExtensions: [String],
         imageExtensions: [String],
         dryRunDefault: Bool,
@@ -224,7 +237,6 @@ struct AppSettings: Codable {
         sortDuplicatesIntoFolder: Bool
     ) {
         self.ffmpegPath = ffmpegPath
-        self.ffprobePath = ffprobePath
         self.videoExtensions = videoExtensions
         self.imageExtensions = imageExtensions
         self.dryRunDefault = dryRunDefault
@@ -239,15 +251,36 @@ struct AppSettings: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         ffmpegPath = try container.decodeIfPresent(String.self, forKey: .ffmpegPath)
-        ffprobePath = try container.decodeIfPresent(String.self, forKey: .ffprobePath)
-        videoExtensions = try container.decodeIfPresent([String].self, forKey: .videoExtensions) ?? Self.default.videoExtensions
-        imageExtensions = try container.decodeIfPresent([String].self, forKey: .imageExtensions) ?? Self.default.imageExtensions
+        videoExtensions =
+            try container.decodeIfPresent([String].self, forKey: .videoExtensions)
+            ?? Self.default.videoExtensions
+        imageExtensions =
+            try container.decodeIfPresent([String].self, forKey: .imageExtensions)
+            ?? Self.default.imageExtensions
         dryRunDefault = try container.decodeIfPresent(Bool.self, forKey: .dryRunDefault) ?? true
         lastFolder = try container.decodeIfPresent(String.self, forKey: .lastFolder)
-        requireConfirmToWrite = try container.decodeIfPresent(Bool.self, forKey: .requireConfirmToWrite) ?? true
+        requireConfirmToWrite =
+            try container.decodeIfPresent(Bool.self, forKey: .requireConfirmToWrite) ?? true
         defaultPrefix = try container.decodeIfPresent(String.self, forKey: .defaultPrefix) ?? ""
         sortByDate = try container.decodeIfPresent(Bool.self, forKey: .sortByDate) ?? false
         sortByCamera = try container.decodeIfPresent(Bool.self, forKey: .sortByCamera) ?? false
-        sortDuplicatesIntoFolder = try container.decodeIfPresent(Bool.self, forKey: .sortDuplicatesIntoFolder) ?? false
+        sortDuplicatesIntoFolder =
+            try container.decodeIfPresent(Bool.self, forKey: .sortDuplicatesIntoFolder) ?? false
+    }
+}
+
+enum MediaKinds {
+    /// Mirror of the user's photo extensions, refreshed by SettingsStore on every
+    /// settings mutation so nonisolated probe/model code can classify without
+    /// hopping to the main actor.
+    private(set) static var imageExtensions: Set<String> =
+        Set(AppSettings.default.imageExtensions)
+
+    static func sync(with settings: AppSettings) {
+        imageExtensions = Set(settings.imageExtensions.map { $0.lowercased() })
+    }
+
+    static func isImage(ext: String) -> Bool {
+        imageExtensions.contains(ext.lowercased())
     }
 }
