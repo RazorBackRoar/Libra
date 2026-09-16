@@ -5,6 +5,12 @@ enum DryRunReport {
     /// Tests override this so `swift test` never touches the real Desktop.
     static var reportDirectoryOverride: URL?
 
+    private static let headerFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
+
     /// Writes a clean before/after listing to the Desktop as
     /// `Libra Sorter Dry Run 1.txt` (tool title in the name), then `2`, `3`, …
     /// without overwriting existing files.
@@ -25,8 +31,7 @@ enum DryRunReport {
         guard !entries.isEmpty else { return nil }
 
         let url = nextReportURL(tool: tool)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let formatter = Self.headerFormatter
 
         var lines: [String] = [
             "\(tool.title.hasPrefix(Brand.displayName) ? tool.title : "\(Brand.displayName) \(tool.title)") Dry Run",

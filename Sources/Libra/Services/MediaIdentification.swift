@@ -9,7 +9,11 @@ enum MediaIdentification {
             parts.append(resolution)
         }
         if file.fps > 0 {
-            parts.append("\(FileNaming.fpsBucket(file.fps)) fps")
+            // Identification rows show the probed rate; the 30/60/120 bucket
+            // is for filenames only.
+            let fps = file.fps
+            let text = fps == fps.rounded() ? String(Int(fps)) : String(format: "%.2f", fps)
+            parts.append("\(text) fps")
         }
         if let device = deviceLabel(for: file) {
             parts.append(device)

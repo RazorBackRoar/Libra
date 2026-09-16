@@ -224,21 +224,32 @@ enum ScannerService {
         var found: [String] = []
         var unsupported: [OperationResult] = []
         let allowed = Set(extensions)
-        let enumerator = FileManager.default.enumerator(atPath: path)
-        while let item = enumerator?.nextObject() as? String {
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .isAliasFileKey]
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: URL(fileURLWithPath: path),
+                includingPropertiesForKeys: keys,
+                options: []
+            )
+        else { return (found, unsupported) }
+        for case let url as URL in enumerator {
             if Task.isCancelled {
                 throw CancellationError()
             }
 
-            let full = (path as NSString).appendingPathComponent(item)
-            var isDir: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: full, isDirectory: &isDir) else {
+            // standardizedFileURL preserves the caller's path spelling; `.path`
+            // resolves symlinked ancestors (e.g. /var -> /private/var).
+            let full = url.standardizedFileURL.path
+            guard let values = try? url.resourceValues(forKeys: Set(keys)) else {
                 continue
             }
+            let isDir = values.isDirectory == true
+            let isLinkOrAlias =
+                (values.isSymbolicLink == true) || (values.isAliasFile == true)
 
-            if FileOps.isSymlinkOrAlias(full) {
-                if isDir.boolValue {
-                    enumerator?.skipDescendants()
+            if isLinkOrAlias {
+                if isDir {
+                    enumerator.skipDescendants()
                 }
                 unsupported.append(
                     OperationResult(
@@ -249,9 +260,9 @@ enum ScannerService {
                 continue
             }
 
-            if isDir.boolValue {
+            if isDir {
                 if isBundleDirectory(full) {
-                    enumerator?.skipDescendants()
+                    enumerator.skipDescendants()
                     unsupported.append(
                         OperationResult(
                             path: full,
@@ -262,8 +273,7 @@ enum ScannerService {
                 continue
             }
 
-            let ext = (full as NSString).pathExtension.lowercased()
-            if allowed.contains(ext) {
+            if allowed.contains(url.pathExtension.lowercased()) {
                 found.append(full)
             }
         }

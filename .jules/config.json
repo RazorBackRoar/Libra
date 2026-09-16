@@ -1,7 +1,7 @@
 {
   "auto_approve_plans": true,
   "suggestions": {
-    "auto_execute": true,
+    "auto_execute": false,
     "max_concurrent_tasks": 2
   }
 }

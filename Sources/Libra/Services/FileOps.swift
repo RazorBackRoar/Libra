@@ -65,62 +65,18 @@ enum FileOps {
             )
         }
         if dryRun {
-            return OperationResult(path: from, status: .success, reason: "Dry-run move to \(target)", outputPath: target)
+            return OperationResult(
+                path: from, status: .success, reason: "Dry-run move to \(target)",
+                outputPath: target)
         }
         do {
             let dir = (target as NSString).deletingLastPathComponent
-            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
+            try FileManager.default.createDirectory(
+                atPath: dir, withIntermediateDirectories: true, attributes: nil)
             try FileManager.default.moveItem(atPath: from, toPath: target)
             return OperationResult(path: from, status: .success, outputPath: target)
         } catch {
             return OperationResult(path: from, status: .failed, reason: error.localizedDescription)
-        }
-    }
-
-    static func copyFile(
-        from: String,
-        to: String,
-        dryRun: Bool,
-        reserved: Set<String> = [],
-        withinRoot: String? = nil
-    ) -> OperationResult {
-        if isSymlinkOrAlias(from) {
-            return OperationResult(path: from, status: .skipped, reason: "Skipped symlink or alias")
-        }
-        let target = uniquePath(for: to, reserved: reserved)
-        if let withinRoot, !destinationIsSafe(target, within: withinRoot) {
-            return OperationResult(
-                path: from,
-                status: .skipped,
-                reason: "Skipped destination outside selected folder (symlink)"
-            )
-        }
-        if dryRun {
-            return OperationResult(path: from, status: .success, reason: "Dry-run copy to \(target)", outputPath: target)
-        }
-        do {
-            let dir = (target as NSString).deletingLastPathComponent
-            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true, attributes: nil)
-            try FileManager.default.copyItem(atPath: from, toPath: target)
-            return OperationResult(path: from, status: .success, outputPath: target)
-        } catch {
-            return OperationResult(path: from, status: .failed, reason: error.localizedDescription)
-        }
-    }
-
-    static func renameFile(from: String, to: String, dryRun: Bool, reserved: Set<String> = []) -> OperationResult {
-        moveFile(from: from, to: to, dryRun: dryRun, reserved: reserved)
-    }
-
-    static func deleteFile(_ path: String, dryRun: Bool) -> OperationResult {
-        if dryRun {
-            return OperationResult(path: path, status: .success, reason: "Dry-run delete")
-        }
-        do {
-            try FileManager.default.removeItem(atPath: path)
-            return OperationResult(path: path, status: .success)
-        } catch {
-            return OperationResult(path: path, status: .failed, reason: error.localizedDescription)
         }
     }
 
@@ -185,10 +141,14 @@ enum FileOps {
         return cleaned
     }
 
-    private static func trailingIndex(_ baseName: String) -> (prefix: String, number: Int, width: Int)? {
+    private static func trailingIndex(_ baseName: String) -> (
+        prefix: String, number: Int, width: Int
+    )? {
         guard let space = baseName.lastIndex(of: " ") else { return nil }
         let token = String(baseName[baseName.index(after: space)...])
-        guard !token.isEmpty, token.allSatisfy(\.isNumber), let value = Int(token) else { return nil }
+        guard !token.isEmpty, token.allSatisfy(\.isNumber), let value = Int(token) else {
+            return nil
+        }
         let prefix = String(baseName[...space])
         return (prefix, value, max(token.count, 3))
     }

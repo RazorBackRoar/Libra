@@ -603,22 +603,40 @@ enum MediaProbe {
         return 0
     }
 
-    private static func parseDate(_ value: String) -> Date? {
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = iso.date(from: value) { return date }
-        iso.formatOptions = [.withInternetDateTime]
-        if let date = iso.date(from: value) { return date }
-        return parseExifDate(value)
-    }
+    private static let iso8601Fractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 
-    private static func parseExifDate(_ raw: String) -> Date? {
+    private static let iso8601Plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let exifColonFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-        if let date = formatter.date(from: raw) { return date }
+        return formatter
+    }()
+
+    private static let exifDashFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter.date(from: raw)
+        return formatter
+    }()
+
+    private static func parseDate(_ value: String) -> Date? {
+        iso8601Fractional.date(from: value)
+            ?? iso8601Plain.date(from: value)
+            ?? parseExifDate(value)
+    }
+
+    private static func parseExifDate(_ raw: String) -> Date? {
+        exifColonFormatter.date(from: raw) ?? exifDashFormatter.date(from: raw)
     }
 
     private enum ProbeFailure: Error {

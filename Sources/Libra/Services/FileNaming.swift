@@ -28,13 +28,9 @@ enum FileNaming {
         fpsBucket(Double(fps))
     }
 
-    /// Portrait → `V`, square → `S`, landscape/unknown → `W`.
+    /// Portrait → `V`, everything else (incl. square) → `W` per the naming spec.
     static func orientationCode(_ orientation: String) -> String {
-        switch orientation.lowercased() {
-        case "portrait": return "V"
-        case "square": return "S"
-        default: return "W"
-        }
+        orientation.lowercased() == "portrait" ? "V" : "W"
     }
 
     /// Resolve a probed resolution class into a contract label.
@@ -67,7 +63,8 @@ enum FileNaming {
         ext: String
     ) -> String {
         var parts: [String] = []
-        let cleanedPrefix = FileOps.sanitizeFileName(prefix.trimmingCharacters(in: .whitespacesAndNewlines))
+        let cleanedPrefix = FileOps.sanitizeFileName(
+            prefix.trimmingCharacters(in: .whitespacesAndNewlines))
         let hasPrefix = !cleanedPrefix.isEmpty && cleanedPrefix != "file"
         if hasPrefix {
             parts.append(cleanedPrefix)
@@ -89,7 +86,9 @@ enum FileNaming {
         return "\(stem).\(ext.lowercased())"
     }
 
-    static func standardFileName(for file: VideoInfo, prefix: String = "", index: Int, padWidth: Int) -> String {
+    static func standardFileName(
+        for file: VideoInfo, prefix: String = "", index: Int, padWidth: Int
+    ) -> String {
         standardFileName(
             originalName: file.name,
             prefix: prefix,

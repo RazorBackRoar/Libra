@@ -50,10 +50,22 @@ final class FfmpegOpsTests: XCTestCase {
             factor: 0.25
         )
         XCTAssertEqual(args[args.firstIndex(of: "-i")! + 1], "/vids/in.mov")
-        XCTAssertTrue(args.contains("PTS*4.0"))
+        XCTAssertTrue(args.contains("setpts=PTS*4.0"))
         XCTAssertTrue(args.contains("-an"))
         XCTAssertEqual(args[args.firstIndex(of: "-c:v")! + 1], "libx264")
         XCTAssertTrue(args.contains("-y"))
+    }
+
+    func testSloMoArgumentsPickCodecByContainer() {
+        // H.264 cannot live in a WebM container — VP9 is used there instead.
+        let webm = FfmpegOps.sloMoArguments(
+            input: "/vids/in.webm", output: "/vids/out.libra-tmp.webm", factor: 0.5)
+        XCTAssertEqual(webm[webm.firstIndex(of: "-c:v")! + 1], "libvpx-vp9")
+        for ext in ["mp4", "mov", "mkv", "m4v"] {
+            let args = FfmpegOps.sloMoArguments(
+                input: "/vids/in.\(ext)", output: "/vids/out.libra-tmp.\(ext)", factor: 0.5)
+            XCTAssertEqual(args[args.firstIndex(of: "-c:v")! + 1], "libx264", "ext=\(ext)")
+        }
     }
 
     func testAdjustTimestampArgumentsEndAtExtensionPreservingTempPath() {

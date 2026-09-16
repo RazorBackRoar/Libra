@@ -4,8 +4,9 @@ struct ResultsTable: View {
     let files: [VideoInfo]
     let results: [OperationResult]
     @State private var selectedKey: String?
+    @State private var orderedResults: [OperationResult] = []
 
-    private var orderedResults: [OperationResult] {
+    private static func sortResults(_ results: [OperationResult]) -> [OperationResult] {
         results.sorted { lhs, rhs in
             let left = statusRank(lhs.status)
             let right = statusRank(rhs.status)
@@ -83,8 +84,12 @@ struct ResultsTable: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture { MediaOpen.open(result.outputPath ?? result.path) }
                                 .contextMenu {
-                                    Button("Open") { MediaOpen.open(result.outputPath ?? result.path) }
-                                    Button("Reveal in Finder") { MediaOpen.reveal(result.outputPath ?? result.path) }
+                                    Button("Open") {
+                                        MediaOpen.open(result.outputPath ?? result.path)
+                                    }
+                                    Button("Reveal in Finder") {
+                                        MediaOpen.reveal(result.outputPath ?? result.path)
+                                    }
                                 }
                             }
                         }
@@ -104,6 +109,8 @@ struct ResultsTable: View {
             return .handled
         }
         .help("Space opens the selected video")
+        .onAppear { orderedResults = Self.sortResults(results) }
+        .onChange(of: results) { _, new in orderedResults = Self.sortResults(new) }
     }
 
     private static func fileKey(_ path: String) -> String { "file:\(path)" }
@@ -165,7 +172,7 @@ struct ResultsTable: View {
         }
     }
 
-    private func statusRank(_ status: OperationStatus) -> Int {
+    private static func statusRank(_ status: OperationStatus) -> Int {
         switch status {
         case .failed: return 0
         case .cancelled: return 1

@@ -6,6 +6,10 @@ import os.log
 final class Log {
     static let shared = Log()
 
+    private static let timestampFormatter = ISO8601DateFormatter()
+    /// Rotate `libra.log` to `libra.1.log` past this size (one generation kept).
+    private static let maxLogBytes: UInt64 = 5 * 1024 * 1024
+
     private let fileURL: URL
     private let osLog = Logger(subsystem: Brand.appId, category: "app")
     private var hasSetup = false
@@ -20,12 +24,13 @@ final class Log {
     }
 
     private func write(level: String, message: String, scope: String) {
-        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let timestamp = Self.timestampFormatter.string(from: Date())
         let line = "[\(timestamp)] [\(level.uppercased())] [\(scope)] \(message)"
         osLog.log(level: level, "\(line)")
 
         guard hasSetup else { return }
         Paths.ensureLogsDirectory()
+        rotateIfNeeded()
         if let data = (line + "\n").data(using: .utf8) {
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 if let handle = try? FileHandle(forWritingTo: fileURL) {
@@ -39,14 +44,31 @@ final class Log {
         }
     }
 
-    func debug(_ message: String, scope: String = "app") { write(level: "debug", message: message, scope: scope) }
-    func info(_ message: String, scope: String = "app") { write(level: "info", message: message, scope: scope) }
-    func warn(_ message: String, scope: String = "app") { write(level: "warn", message: message, scope: scope) }
-    func error(_ message: String, scope: String = "app") { write(level: "error", message: message, scope: scope) }
+    private func rotateIfNeeded() {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+            let size = attrs[.size] as? UInt64, size > Self.maxLogBytes
+        else { return }
+        let rotated = fileURL.deletingLastPathComponent().appendingPathComponent("libra.1.log")
+        try? FileManager.default.removeItem(at: rotated)
+        try? FileManager.default.moveItem(at: fileURL, to: rotated)
+    }
+
+    func debug(_ message: String, scope: String = "app") {
+        write(level: "debug", message: message, scope: scope)
+    }
+    func info(_ message: String, scope: String = "app") {
+        write(level: "info", message: message, scope: scope)
+    }
+    func warn(_ message: String, scope: String = "app") {
+        write(level: "warn", message: message, scope: scope)
+    }
+    func error(_ message: String, scope: String = "app") {
+        write(level: "error", message: message, scope: scope)
+    }
 }
 
-private extension Logger {
-    func log(level: String, _ message: String) {
+extension Logger {
+    fileprivate func log(level: String, _ message: String) {
         switch level {
         case "debug": self.debug("\(message)")
         case "warn": self.warning("\(message)")

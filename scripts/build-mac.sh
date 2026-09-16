@@ -28,6 +28,16 @@ DMG_PATH="$RELEASE_DIR/${EXEC_NAME}.dmg"
 EXEC_PATH="$PROJECT_DIR/.build/release/$EXEC_NAME"
 RESOURCE_BUNDLE="$PROJECT_DIR/.build/release/${EXEC_NAME}_${EXEC_NAME}.bundle"
 
+# Packaging requires the shared razorcore helpers (locked DMG layout +
+# branding gate). Fail fast with a pointer instead of a half-built release.
+RAZORCORE_DIR="$(cd "$SCRIPT_DIR/../../.razorcore" 2>/dev/null && pwd || true)"
+if [[ -z "$RAZORCORE_DIR" || ! -f "$RAZORCORE_DIR/package-dmg.sh" ]]; then
+    echo "Error: razorcore packaging helpers not found." >&2
+    echo "Libra's DMG layout is owned by Apps/.razorcore (see docs/BUILD_AND_RELEASE.md)." >&2
+    echo "Build inside the RazorBackRoar workspace, or run 'swift build -c release' for the binary only." >&2
+    exit 1
+fi
+
 echo "Building Libra release..."
 cd "$PROJECT_DIR"
 
@@ -94,11 +104,13 @@ EOF
 chmod +x "$APP_PATH/Contents/MacOS/$EXEC_NAME"
 
 # Keep copyright year current via shared helper (does not touch DMG layout).
-RAZORCORE_DIR="$(cd "$SCRIPT_DIR/../../.razorcore" && pwd)"
+# package-dmg.sh fail-closes unless the plist carries the current year, so the
+# year stamp must stay date-derived — not a fixed literal.
 "$RAZORCORE_DIR/patch-app-branding.sh" "$APP_PATH"
 
 echo "Ad-hoc signing ${DISPLAY_NAME}.app..."
-codesign --force --deep --sign - "$APP_PATH"
+# No nested code in this bundle — --deep is deprecated and unnecessary.
+codesign --force --sign - "$APP_PATH"
 
 echo "Creating ${DISPLAY_NAME}.dmg with shared layout..."
 mkdir -p "$RELEASE_DIR"

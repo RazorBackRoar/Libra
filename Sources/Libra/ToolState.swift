@@ -6,7 +6,6 @@ final class ToolState: ObservableObject {
     let tool: Tool
 
     @Published var files: [VideoInfo] = []
-    @Published var selected: Set<String> = []
     @Published var results: [OperationResult] = []
     @Published var progress: (done: Int, total: Int) = (0, 0)
     @Published var progressName: String = ""
@@ -29,7 +28,16 @@ final class ToolState: ObservableObject {
     private var rerunTask: Task<Void, Never>?
     private var pendingUndo: [UndoRecord] = []
     private var previewPass = true
+    private var reportThisPass = true
     private var unresolvedLocationCount = 0
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
     var confirmDiscover: (@Sendable (Int) async -> Bool)?
 
     var canUndo: Bool { !undoRecords.isEmpty && !running }
@@ -102,7 +110,7 @@ final class ToolState: ObservableObject {
         }
     }
 
-    func startPreview() {
+    func startPreview(writeReport: Bool = true) {
         guard !files.isEmpty, !running else { return }
         running = true
         cancelling = false
@@ -111,6 +119,7 @@ final class ToolState: ObservableObject {
         recap = nil
         message = "Previewing…"
         previewPass = true
+        reportThisPass = writeReport
         activeTask = Task { [weak self] in
             await self?.performRun(ffmpegPath: AppState.shared.ffmpegPath ?? "")
         }
@@ -148,7 +157,7 @@ final class ToolState: ObservableObject {
         rerunTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 450_000_000)
             guard let self, !Task.isCancelled else { return }
-            self.startPreview()
+            self.startPreview(writeReport: false)
         }
     }
 
@@ -160,7 +169,7 @@ final class ToolState: ObservableObject {
         activeTask?.cancel()
     }
 
-    func movePhotosOut(to destDir: String) -> String? {
+    func movePhotosOut(to destDir: String) async -> String? {
         guard !photos.isEmpty, !running else { return nil }
         if ScanSafety.destinationIsInsideSource(
             dest: destDir, sourceRoot: SettingsStore.shared.settings.lastFolder)
@@ -170,10 +179,16 @@ final class ToolState: ObservableObject {
             message = reason
             return reason
         }
-        let moved = PhotoMover.move(photos, to: destDir, dryRun: dryRun)
+        running = true
+        let dry = dryRun
+        let toMove = photos
+        let moved = await Task.detached {
+            PhotoMover.move(toMove, to: destDir, dryRun: dry)
+        }.value
+        running = false
         results.append(contentsOf: moved)
         let ok = moved.filter { $0.status == .success }.count
-        if dryRun {
+        if dry {
             recap = "Preview: \(ok) photo\(ok == 1 ? "" : "s") would move out."
         } else {
             recap = "Moved \(ok) photo\(ok == 1 ? "" : "s") out of the video folders."
@@ -199,16 +214,16 @@ final class ToolState: ObservableObject {
         message = "Undoing last run…"
         let records = undoRecords
         undoRecords = []
-        let outcome = UndoApply.apply(records)
-        let restored = outcome.restored
-        let failed = outcome.failed
-        running = false
-        recap =
-            failed == 0
-            ? "Undid \(restored) change\(restored == 1 ? "" : "s")."
-            : "Undo finished: \(restored) restored, \(failed) failed."
-        message = recap
-        Log.shared.info(recap ?? "Undo finished", scope: "run")
+        Task {
+            let outcome = await Task.detached { UndoApply.apply(records) }.value
+            running = false
+            recap =
+                outcome.failed == 0
+                ? "Undid \(outcome.restored) change\(outcome.restored == 1 ? "" : "s")."
+                : "Undo finished: \(outcome.restored) restored, \(outcome.failed) failed."
+            message = recap
+            Log.shared.info(recap ?? "Undo finished", scope: "run")
+        }
     }
 
     private func continueAfterScan() async {
@@ -229,6 +244,7 @@ final class ToolState: ObservableObject {
         let priorSkips = results.filter { $0.status == .skipped }
         results = priorSkips
         previewPass = true
+        reportThisPass = true
         message = "Previewing…"
         await performRun(ffmpegPath: AppState.shared.ffmpegPath ?? "")
     }
@@ -238,6 +254,7 @@ final class ToolState: ObservableObject {
         cancelling = false
         progressName = ""
         activeTask = nil
+        confirmDiscover = nil
     }
 
     /// Returns `true` when the tool should auto-preview after this scan.
@@ -245,10 +262,12 @@ final class ToolState: ObservableObject {
         let imageExts = Set(settings.imageExtensions.map { $0.lowercased() })
         let exts = Array(Set(settings.videoExtensions + settings.imageExtensions))
 
+        let progressGate = ProgressGate()
         let outcome = await ScannerService.scan(
             paths: paths,
             extensions: exts,
             progress: { done, total in
+                guard progressGate.shouldFire(done: done, total: total) else { return }
                 await MainActor.run {
                     self.progress = (done, total)
                     if total > 0, self.message == "Finding supported videos…" {
@@ -364,7 +383,9 @@ final class ToolState: ObservableObject {
             summary +=
                 " \(unresolvedLocationCount) location\(unresolvedLocationCount == 1 ? "" : "s") could not be named — filed under GPS."
         }
-        if previewPass, let reportURL = DryRunReport.write(tool: tool, results: runResults) {
+        if previewPass, reportThisPass,
+            let reportURL = DryRunReport.write(tool: tool, results: runResults)
+        {
             summary += " Report: \(reportURL.lastPathComponent)"
         }
         recap = summary
@@ -410,12 +431,13 @@ final class ToolState: ObservableObject {
     ) async -> OperationResult {
         progressName = (from as NSString).lastPathComponent
         let dry = previewPass
-        let reservedSnapshot = reserved
         let root =
             SettingsStore.shared.settings.lastFolder ?? (from as NSString).deletingLastPathComponent
-        let result = await Task.detached {
+        // [reserved] keeps the set alive only for the task's duration, so the
+        // insert below mutates in place instead of copy-on-writing per file.
+        let result = await Task.detached { [reserved] in
             FileOps.moveFile(
-                from: from, to: planned, dryRun: dry, reserved: reservedSnapshot, withinRoot: root)
+                from: from, to: planned, dryRun: dry, reserved: reserved, withinRoot: root)
         }.value
         if let output = result.outputPath { reserved.insert(output) }
         noteUndo(kind: kind, from: from, result: result)
@@ -741,11 +763,7 @@ final class ToolState: ObservableObject {
         let settings = SettingsStore.shared.settings
         var parts: [String] = []
         if settings.sortByDate, let date = file.creationTime {
-            let formatter = DateFormatter()
-            formatter.calendar = Calendar(identifier: .gregorian)
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.dateFormat = "yyyy-MM-dd"
-            parts.append(formatter.string(from: date))
+            parts.append(Self.dayFormatter.string(from: date))
         }
         if settings.sortByCamera {
             let camera = FileOps.sanitizeFileName(
@@ -780,5 +798,19 @@ final class ToolState: ObservableObject {
             parts.append(contentsOf: extraFolderParts(for: file))
         }
         return parts.reduce(file.dir) { ($0 as NSString).appendingPathComponent($1) }
+    }
+}
+
+/// Throttles scan progress hops to ~10 Hz; the final update always passes.
+/// Scan progress arrives serially on the dequeue loop, so no locking is needed.
+private final class ProgressGate: @unchecked Sendable {
+    private var lastFire: CFAbsoluteTime = 0
+
+    func shouldFire(done: Int, total: Int) -> Bool {
+        if done >= total { return true }
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastFire >= 0.1 else { return false }
+        lastFire = now
+        return true
     }
 }

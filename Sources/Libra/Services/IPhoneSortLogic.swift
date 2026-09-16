@@ -10,11 +10,11 @@ enum IPhoneSortLogic {
     struct Classification {
         let folder: Folder
         let note: String
-
-        var isIPhoneFolder: Bool { folder == .iPhone }
     }
 
-    static func classify(hasAppleMake: Bool, hasiPhoneModel: Bool, make: String, model: String) -> Classification {
+    static func classify(hasAppleMake: Bool, hasiPhoneModel: Bool, make: String, model: String)
+        -> Classification
+    {
         let folder: Folder
         if hasiPhoneModel {
             folder = .iPhone

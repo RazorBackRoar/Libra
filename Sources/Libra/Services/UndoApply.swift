@@ -16,7 +16,7 @@ enum UndoApply {
                 )
                 if result.status == .success { restored += 1 } else { failed += 1 }
             case .createdCopy:
-                let result = FileOps.deleteFile(record.resultPath, dryRun: false)
+                let result = FileOps.trashFile(record.resultPath, dryRun: false)
                 if result.status == .success { restored += 1 } else { failed += 1 }
             }
         }

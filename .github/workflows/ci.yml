@@ -20,8 +20,15 @@ jobs:
       - name: Checkout Libra
         uses: actions/checkout@v7
 
+      # Runner image bumps silently change the toolchain — log it explicitly.
+      - name: Toolchain
+        run: swift --version
+
       - name: Build
         run: swift build
+
+      - name: Release build check
+        run: swift build -c release
 
       - name: Test
         run: swift test

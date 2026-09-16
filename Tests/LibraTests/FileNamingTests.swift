@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import Libra
 
 final class FileNamingTests: XCTestCase {
@@ -81,7 +82,8 @@ final class FileNamingTests: XCTestCase {
     }
 
     func testSquareAndQHD() {
-        XCTAssertEqual(FileNaming.orientationCode("square"), "S")
+        // Square falls to W per the §24 naming spec.
+        XCTAssertEqual(FileNaming.orientationCode("square"), "W")
         XCTAssertEqual(FileNaming.orientationCode("portrait"), "V")
         XCTAssertEqual(FileNaming.orientationCode("landscape"), "W")
         XCTAssertEqual(FileNaming.resolutionLabel("QHD"), "QHD")
@@ -99,6 +101,6 @@ final class FileNamingTests: XCTestCase {
             padWidth: 3,
             ext: "mov"
         )
-        XCTAssertEqual(name, "Clip QHD S30 001.mov")
+        XCTAssertEqual(name, "Clip QHD W30 001.mov")
     }
 }

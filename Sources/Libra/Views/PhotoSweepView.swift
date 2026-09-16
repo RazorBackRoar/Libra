@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import SwiftUI
-import AppKit
 import UniformTypeIdentifiers
 
 @MainActor
@@ -44,10 +44,12 @@ final class PhotoSweepState: ObservableObject {
             } else if self.photos.isEmpty {
                 self.recap = "No photos in that drop."
             } else {
-                self.recap = "Found \(self.photos.count) photo\(self.photos.count == 1 ? "" : "s"). Move them out of the video folders."
+                self.recap =
+                    "Found \(self.photos.count) photo\(self.photos.count == 1 ? "" : "s"). Move them out of the video folders."
             }
             self.running = false
             self.task = nil
+            self.confirmDiscover = nil
         }
     }
 
@@ -60,7 +62,9 @@ final class PhotoSweepState: ObservableObject {
         panel.prompt = "Move photos here"
         panel.message = "Choose a folder outside your video library."
         guard panel.runModal() == .OK, let dest = panel.url?.path else { return }
-        if ScanSafety.destinationIsInsideSource(dest: dest, sourceRoot: SettingsStore.shared.settings.lastFolder) {
+        if ScanSafety.destinationIsInsideSource(
+            dest: dest, sourceRoot: SettingsStore.shared.settings.lastFolder)
+        {
             recap = "Choose a folder outside the scanned video folder."
             return
         }
@@ -75,22 +79,33 @@ final class PhotoSweepState: ObservableObject {
         }
 
         running = true
-        let moved = PhotoMover.move(photos, to: dest, dryRun: dryRun)
-        results = moved
-        let ok = moved.filter { $0.status == .success }.count
-        if dryRun {
-            recap = "Preview: \(ok) photo\(ok == 1 ? "" : "s") would move to \(dest)."
-        } else {
-            recap = "Moved \(ok) photo\(ok == 1 ? "" : "s") to \(dest)."
-            photos = photos.filter { photo in
-                !moved.contains { $0.path == photo.path && $0.status == .success }
+        let dry = dryRun
+        let toMove = photos
+        Task {
+            let moved = await Task.detached {
+                PhotoMover.move(toMove, to: dest, dryRun: dry)
+            }.value
+            results = moved
+            let ok = moved.filter { $0.status == .success }.count
+            if dry {
+                recap = "Preview: \(ok) photo\(ok == 1 ? "" : "s") would move to \(dest)."
+                if let reportURL = DryRunReport.write(tool: .photoSweep, results: moved) {
+                    recap? += " Report: \(reportURL.lastPathComponent)"
+                }
+            } else {
+                recap = "Moved \(ok) photo\(ok == 1 ? "" : "s") to \(dest)."
+                photos = photos.filter { photo in
+                    !moved.contains { $0.path == photo.path && $0.status == .success }
+                }
+                undoRecords = moved.compactMap { result in
+                    guard result.status == .success, let output = result.outputPath,
+                        output != result.path
+                    else { return nil }
+                    return UndoRecord(kind: .moved, originalPath: result.path, resultPath: output)
+                }
             }
-            undoRecords = moved.compactMap { result in
-                guard result.status == .success, let output = result.outputPath, output != result.path else { return nil }
-                return UndoRecord(kind: .moved, originalPath: result.path, resultPath: output)
-            }
+            running = false
         }
-        running = false
     }
 
     func undoLastRun() {
@@ -98,13 +113,14 @@ final class PhotoSweepState: ObservableObject {
         running = true
         let records = undoRecords
         undoRecords = []
-        let outcome = UndoApply.apply(records)
-        let restored = outcome.restored
-        let failed = outcome.failed
-        running = false
-        recap = failed == 0
-            ? "Undid \(restored) photo move\(restored == 1 ? "" : "s")."
-            : "Undo finished: \(restored) restored, \(failed) failed."
+        Task {
+            let outcome = await Task.detached { UndoApply.apply(records) }.value
+            running = false
+            recap =
+                outcome.failed == 0
+                ? "Undid \(outcome.restored) photo move\(outcome.restored == 1 ? "" : "s")."
+                : "Undo finished: \(outcome.restored) restored, \(outcome.failed) failed."
+        }
     }
 }
 
@@ -145,7 +161,8 @@ struct PhotoSweepView: View {
             .disabled(state.running)
 
             if state.running {
-                ProgressView(value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
+                ProgressView(
+                    value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
             }
 
             if state.photos.isEmpty {
@@ -208,10 +225,13 @@ struct PhotoSweepView: View {
                 .tint(.yellow)
                 .disabled(state.running)
 
-                Text(state.dryRun ? "Preview only — nothing will be changed." : "Live — photos will move.")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(state.dryRun ? .yellow : .orange)
-                    .lineLimit(2)
+                Text(
+                    state.dryRun
+                        ? "Preview only — nothing will be changed." : "Live — photos will move."
+                )
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(state.dryRun ? .yellow : .orange)
+                .lineLimit(2)
 
                 Spacer()
 
@@ -251,15 +271,15 @@ struct PhotoSweepView: View {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        state.confirmDiscover = { count in
+        state.confirmDiscover = { [paths] count in
             await MainActor.run {
-                confirmFileCount(count, paths: paths)
+                Self.confirmFileCount(count, paths: paths)
             }
         }
         state.startScan(paths: paths, settings: settingsStore.settings)
     }
 
-    private func confirmFileCount(_ count: Int, paths: [String]) -> Bool {
+    private static func confirmFileCount(_ count: Int, paths: [String]) -> Bool {
         guard let warning = ScanSafety.fileCountWarning(count: count, paths: paths) else {
             return true
         }

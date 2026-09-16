@@ -47,9 +47,9 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 
 1. Download [`Libra.dmg`](https://github.com/RazorBackRoar/Libra/releases/latest/download/Libra.dmg)
 2. Open the DMG and drag **Libra.app** to `/Applications`
-3. First launch — right-click → **Open** (ad-hoc signed build)
+3. First launch — macOS 15+ removed the right-click → **Open** bypass: try to open it once, then **System Settings → Privacy & Security → Open Anyway** (ad-hoc signed build)
 
-Requires macOS 14+ on Apple Silicon. ffmpeg / ffprobe via Homebrew when transforms need them.
+Requires macOS 14+ on Apple Silicon. ffmpeg via Homebrew when transforms need it.
 
 ## Usage
 

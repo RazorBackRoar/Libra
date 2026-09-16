@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import Libra
 
 final class MediaIdentificationTests: XCTestCase {
@@ -23,14 +24,14 @@ final class MediaIdentificationTests: XCTestCase {
         let line = MediaIdentification.line(for: file)
         XCTAssertTrue(line.contains("1080p 1920×1080"))
         XCTAssertTrue(line.contains("landscape"))
-        XCTAssertTrue(line.contains("30 fps"))
+        XCTAssertTrue(line.contains("29.97 fps"))
         XCTAssertTrue(line.contains("iPhone 15 Pro"))
         XCTAssertTrue(line.contains("GPS 37.33491, -122.00904"))
         XCTAssertTrue(line.contains("1:12"))
         XCTAssertFalse(line.localizedCaseInsensitiveContains("mov"))
         XCTAssertFalse(line.localizedCaseInsensitiveContains("mp4"))
         XCTAssertEqual(file.identificationLine, line)
-        let fpsIndex = line.range(of: "30 fps")!.lowerBound
+        let fpsIndex = line.range(of: "29.97 fps")!.lowerBound
         let deviceIndex = line.range(of: "iPhone 15 Pro")!.lowerBound
         let gpsIndex = line.range(of: "GPS")!.lowerBound
         XCTAssertTrue(line.range(of: "1080p")!.lowerBound < fpsIndex)

@@ -27,11 +27,18 @@ enum FfmpegOps {
     }
 
     static func sloMoArguments(input: String, output: String, factor: Double) -> [String] {
-        [
+        // The output keeps the input's container. H.264 cannot live in WebM,
+        // so WebM outputs get VP9; every other supported container takes
+        // libx264. (h264_videotoolbox was evaluated and stays unused — it is
+        // faster but measurably lower quality per bit, and slo-mo output is
+        // archival content where quality wins over encode speed.)
+        let ext = (output as NSString).pathExtension.lowercased()
+        let videoCodec = ext == "webm" ? "libvpx-vp9" : "libx264"
+        return [
             "-i", input,
-            "-vf", "PTS*\(1.0 / factor)",
+            "-vf", "setpts=PTS*\(1.0 / factor)",
             "-an",
-            "-c:v", "libx264",
+            "-c:v", videoCodec,
             "-y", output,
         ]
     }

@@ -5,8 +5,13 @@ enum ScanSafety {
     static let legacyTestFolderMarker = "MetaBurn & L!bra Test"
     static let largeScanThreshold = 500
 
+    /// Personal test-folder bypass. Debug builds only — release builds always warn.
     private static func isTestFolder(_ path: String) -> Bool {
-        path.contains(testFolderMarker) || path.contains(legacyTestFolderMarker)
+        #if DEBUG
+            return path.contains(testFolderMarker) || path.contains(legacyTestFolderMarker)
+        #else
+            return false
+        #endif
     }
 
     /// Warning before walking a huge or accidental root. Nil means proceed.

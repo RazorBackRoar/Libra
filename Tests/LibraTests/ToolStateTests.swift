@@ -73,12 +73,12 @@ final class ToolStateTests: XCTestCase {
         XCTAssertTrue(state.undoRecords.isEmpty)
     }
 
-    func testMovePhotosOutRefusesDestinationInsideSource() {
+    func testMovePhotosOutRefusesDestinationInsideSource() async {
         let state = ToolState(tool: .provid)
         state.photos = [stubVideo(path: "/Trip/stills/IMG_0001.heic", ext: "heic")]
         SettingsStore.shared.update { $0.lastFolder = "/Trip" }
 
-        let refused = state.movePhotosOut(to: "/Trip/Photos")
+        let refused = await state.movePhotosOut(to: "/Trip/Photos")
 
         XCTAssertEqual(refused, "Choose a folder outside the scanned video folder.")
         XCTAssertTrue(state.photos.count == 1)

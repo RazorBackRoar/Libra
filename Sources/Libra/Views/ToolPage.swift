@@ -433,13 +433,15 @@ struct ToolPage: View {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        if let refused = state.movePhotosOut(to: dest) {
-            let alert = NSAlert()
-            alert.messageText = "Choose another folder"
-            alert.informativeText = refused
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
+        Task {
+            if let refused = await state.movePhotosOut(to: dest) {
+                let alert = NSAlert()
+                alert.messageText = "Choose another folder"
+                alert.informativeText = refused
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
         }
     }
 
@@ -473,9 +475,9 @@ struct ToolPage: View {
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        state.confirmDiscover = { count in
+        state.confirmDiscover = { [paths] count in
             await MainActor.run {
-                confirmFileCount(count, paths: paths)
+                Self.confirmFileCount(count, paths: paths)
             }
         }
         state.startScan(
@@ -484,7 +486,7 @@ struct ToolPage: View {
         )
     }
 
-    private func confirmFileCount(_ count: Int, paths: [String]) -> Bool {
+    private static func confirmFileCount(_ count: Int, paths: [String]) -> Bool {
         guard let warning = ScanSafety.fileCountWarning(count: count, paths: paths) else {
             return true
         }

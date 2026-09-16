@@ -61,9 +61,6 @@ struct VideoInfo: Identifiable, Equatable {
     /// Canonical resolution bucket labels (contract order).
     static let resolutionClasses = FileNaming.resolutionClasses
 
-    var resolutionFolder: String { resolutionClass }
-    var orientationFolder: String { orientation.capitalized }
-
     static func == (lhs: VideoInfo, rhs: VideoInfo) -> Bool {
         lhs.path == rhs.path
     }

@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var extensions: String = ""
     @State private var imageExtensions: String = ""
     @State private var defaultPrefix: String = ""
+    @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
         Form {
@@ -73,18 +74,27 @@ struct SettingsView: View {
         }
     }
 
+    /// Debounced ~500ms so a keystroke burst costs one disk write, not one per key.
     private func update() {
-        store.update { settings in
-            settings.ffmpegPath = ffmpegPath.isEmpty ? nil : ffmpegPath
-            settings.videoExtensions = extensions.split(separator: ",").map {
+        saveTask?.cancel()
+        saveTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            let vids = extensions.split(separator: ",").map {
                 $0.trimmingCharacters(in: .whitespaces).lowercased()
             }
-            settings.imageExtensions = imageExtensions.split(separator: ",").map {
+            let imgs = imageExtensions.split(separator: ",").map {
                 $0.trimmingCharacters(in: .whitespaces).lowercased()
             }
-            settings.defaultPrefix = defaultPrefix
+            store.update { settings in
+                settings.ffmpegPath = ffmpegPath.isEmpty ? nil : ffmpegPath
+                // Never empty a list mid-edit — an empty set would scan nothing.
+                if !vids.isEmpty { settings.videoExtensions = vids }
+                if !imgs.isEmpty { settings.imageExtensions = imgs }
+                settings.defaultPrefix = defaultPrefix
+            }
+            AppState.shared.settings = store.settings
+            AppState.shared.resolveDependencies()
         }
-        AppState.shared.settings = store.settings
-        AppState.shared.resolveDependencies()
     }
 }
