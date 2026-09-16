@@ -10,9 +10,11 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Media tools (ffmpeg)") {
-                Text("Needed only for Slo-Mo and 1-Min-Adjuster. Organize tools scan with built-in macOS media APIs.")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                Text(
+                    "Needed only for Slo-Mo and 1-Min-Adjuster. Organize tools scan with built-in macOS media APIs."
+                )
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
                 TextField("ffmpeg path", text: $ffmpegPath)
                 Button("Find Homebrew installs") {
                     detect()
@@ -31,9 +33,11 @@ struct SettingsView: View {
                 Toggle("Also sort by date", isOn: $store.settings.sortByDate)
                 Toggle("Also sort by camera", isOn: $store.settings.sortByCamera)
                 Toggle("Put extras in Duplicates", isOn: $store.settings.sortDuplicatesIntoFolder)
-                Text("Duplicates match size, duration, and video format — not a byte-for-byte hash.")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                Text(
+                    "Duplicates match size, duration, and video format — not a byte-for-byte hash."
+                )
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -59,11 +63,12 @@ struct SettingsView: View {
     private func detect() {
         let candidates = [
             "/opt/homebrew/bin/ffmpeg",
-            "/usr/local/bin/ffmpeg"
+            "/usr/local/bin/ffmpeg",
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
                 ffmpegPath = path
+                break
             }
         }
     }
@@ -71,8 +76,12 @@ struct SettingsView: View {
     private func update() {
         store.update { settings in
             settings.ffmpegPath = ffmpegPath.isEmpty ? nil : ffmpegPath
-            settings.videoExtensions = extensions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
-            settings.imageExtensions = imageExtensions.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            settings.videoExtensions = extensions.split(separator: ",").map {
+                $0.trimmingCharacters(in: .whitespaces).lowercased()
+            }
+            settings.imageExtensions = imageExtensions.split(separator: ",").map {
+                $0.trimmingCharacters(in: .whitespaces).lowercased()
+            }
             settings.defaultPrefix = defaultPrefix
         }
         AppState.shared.settings = store.settings

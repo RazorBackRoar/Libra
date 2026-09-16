@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import SwiftUI
-import AppKit
 
 @MainActor
 final class AppState: ObservableObject {
@@ -22,7 +22,8 @@ final class AppState: ObservableObject {
         ffprobePath = resolve(command: "ffprobe", override: settings.ffprobePath)
         missingFfmpeg = ffmpegPath == nil
         missingFfprobe = ffprobePath == nil
-        depMessage = missingFfmpeg
+        depMessage =
+            missingFfmpeg
             ? "Needs ffmpeg to create transformed media."
             : nil
     }
@@ -34,7 +35,7 @@ final class AppState: ObservableObject {
         let candidates = [
             "/opt/homebrew/bin/\(command)",
             "/usr/local/bin/\(command)",
-            "/usr/bin/\(command)"
+            "/usr/bin/\(command)",
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
@@ -48,20 +49,49 @@ final class AppState: ObservableObject {
         let alert = NSAlert()
         alert.messageText = "Install ffmpeg?"
         alert.informativeText = """
-        Libra will run Homebrew:
+            Libra will run Homebrew:
 
-        brew install ffmpeg
+            brew install ffmpeg
 
-        ffmpeg is only needed for Slo-Mo and 1-Min-Adjuster. Organize tools do not require it.
-        """
+            ffmpeg is only needed for Slo-Mo and 1-Min-Adjuster. Organize tools do not require it.
+            """
         alert.addButton(withTitle: "Install ffmpeg…")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
+        guard let brewPath = resolve(command: "brew", override: nil) else {
+            let alert = NSAlert()
+            alert.messageText = "Homebrew not found"
+            alert.informativeText = "Install Homebrew from brew.sh first, then try again."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        depMessage = "Installing ffmpeg with Homebrew…"
+
         Task {
-            let brewPath = resolve(command: "brew", override: nil) ?? "/opt/homebrew/bin/brew"
-            _ = try? await ProcessRunner.run(executablePath: brewPath, arguments: ["install", "ffmpeg"], timeout: 600)
-            resolveDependencies()
+            do {
+                let output = try await ProcessRunner.run(
+                    executablePath: brewPath,
+                    arguments: ["install", "ffmpeg"],
+                    timeout: 600
+                )
+                resolveDependencies()
+                if output.exitCode != 0 {
+                    let detail =
+                        output.stderr
+                        .split(whereSeparator: \.isNewline)
+                        .last
+                        .map(String.init) ?? ""
+                    depMessage =
+                        "brew install ffmpeg failed (exit \(output.exitCode))"
+                        + (detail.isEmpty ? "." : ": \(detail)")
+                }
+            } catch {
+                depMessage = "brew install ffmpeg failed: \(error.localizedDescription)"
+            }
         }
     }
 

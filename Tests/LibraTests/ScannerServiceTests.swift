@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import Libra
 
 final class ScannerServiceTests: XCTestCase {
@@ -101,6 +102,38 @@ final class ScannerServiceTests: XCTestCase {
             XCTAssertFalse(info.path.isEmpty)
         }
         XCTAssertFalse(outcome.supported.contains { $0.error?.contains(root.path) == true })
+    }
+
+    func testScanStopsEnqueueingAfterCancellationError() async throws {
+        let root = try makeFixtureFolder(fileCount: 20)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        final class ProbeBox: @unchecked Sendable {
+            var probed: [String] = []
+        }
+        let box = ProbeBox()
+
+        let outcome = await ScannerService.scan(
+            paths: [root.path],
+            extensions: ["mp4"],
+            probe: { filePath in
+                // clip_000 throws immediately; every other probe takes 50ms,
+                // so the cancellation result is always the first dequeued.
+                let name = URL(fileURLWithPath: filePath)
+                    .deletingPathExtension().lastPathComponent
+                if name == "clip_000" {
+                    throw CancellationError()
+                }
+                box.probed.append(filePath)
+                try await Task.sleep(nanoseconds: 50_000_000)
+                return Self.stubInfo(path: filePath)
+            }
+        )
+
+        XCTAssertEqual(outcome.terminal, .cancelled)
+        // Only the initial worker batch (4 tasks) may have started — the old
+        // `break` fell through to `enqueue(submitted)` and ran the remaining 16.
+        XCTAssertLessThanOrEqual(box.probed.count, 4)
     }
 
     func testScanSkipsSymlinkAndHonorsConfirmDiscover() async throws {

@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 import UniformTypeIdentifiers
 
 private enum ToolWorkspace: String, CaseIterable {
@@ -79,7 +79,9 @@ struct ToolPage: View {
                 let extras = DuplicateDetector.extraPaths(in: state.filteredFiles)
                 CategoryBrowserView(
                     title: filter.title,
-                    files: state.filteredFiles.filter { filter.matches($0, duplicateExtras: extras) },
+                    files: state.filteredFiles.filter {
+                        filter.matches($0, duplicateExtras: extras)
+                    },
                     onBack: { browserFilter = nil }
                 )
                 .background(Color.black)
@@ -167,12 +169,15 @@ struct ToolPage: View {
             sortRenameControls
         }
 
-        if state.showsExtraFolderToggles || tool == .iphoneSorter {
+        if state.showsExtraFolderToggles {
             HStack(spacing: 16) {
                 Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
                 Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
-                Toggle("Put extras in Duplicates", isOn: $settingsStore.settings.sortDuplicatesIntoFolder)
-                    .help("Same size, duration, and video format — not a byte-for-byte match")
+                Toggle(
+                    "Put extras in Duplicates",
+                    isOn: $settingsStore.settings.sortDuplicatesIntoFolder
+                )
+                .help("Same size, duration, and video format — not a byte-for-byte match")
             }
             .toggleStyle(.checkbox)
             .disabled(state.running)
@@ -220,7 +225,8 @@ struct ToolPage: View {
         }
 
         if state.running {
-            ProgressView(value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
+            ProgressView(
+                value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
             Text(progressCaption)
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
@@ -278,14 +284,18 @@ struct ToolPage: View {
     @ViewBuilder
     private var photosWorkspace: some View {
         if state.photos.isEmpty {
-            Text("No photos in this drop. Libra is video-only — if stills are mixed in, they show up here so you can move them out.")
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            Text(
+                "No photos in this drop. Libra is video-only — if stills are mixed in, they show up here so you can move them out."
+            )
+            .font(.system(size: 13))
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
-            Text("\(state.photos.count) photo\(state.photos.count == 1 ? "" : "s") found in this folder. Move them out of the video library.")
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
+            Text(
+                "\(state.photos.count) photo\(state.photos.count == 1 ? "" : "s") found in this folder. Move them out of the video library."
+            )
+            .font(.system(size: 13))
+            .foregroundColor(.secondary)
 
             List {
                 ForEach(Array(state.photos.enumerated()), id: \.element.id) { index, file in
@@ -415,7 +425,8 @@ struct ToolPage: View {
         guard panel.runModal() == .OK, let dest = panel.url?.path else { return }
         if settingsStore.settings.requireConfirmToWrite, !state.dryRun {
             let alert = NSAlert()
-            alert.messageText = "Move \(state.photos.count) photo\(state.photos.count == 1 ? "" : "s")?"
+            alert.messageText =
+                "Move \(state.photos.count) photo\(state.photos.count == 1 ? "" : "s")?"
             alert.informativeText = "From the scanned folder to:\n\(dest)"
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Move Photos")
@@ -438,9 +449,9 @@ struct ToolPage: View {
             let alert = NSAlert()
             alert.messageText = state.writeButtonTitle + "?"
             alert.informativeText = """
-            Source: \(settingsStore.settings.lastFolder ?? "dropped items")
-            \(state.previewLiveCaption)
-            """
+                Source: \(settingsStore.settings.lastFolder ?? "dropped items")
+                \(state.previewLiveCaption)
+                """
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Write")
             alert.addButton(withTitle: "Cancel")

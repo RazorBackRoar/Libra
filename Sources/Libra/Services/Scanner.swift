@@ -6,7 +6,7 @@ enum ScannerService {
 
     /// macOS bundle-like directories that are apps/frameworks, not media folders.
     private static let bundleExtensions: Set<String> = [
-        "app", "bundle", "framework", "xpc", "plugin", "kext", "driver", "appex", "qlgenerator"
+        "app", "bundle", "framework", "xpc", "plugin", "kext", "driver", "appex", "qlgenerator",
     ]
 
     static func scan(
@@ -16,9 +16,10 @@ enum ScannerService {
         progress: ProgressHandler? = nil,
         confirmDiscover: (@Sendable (Int) async -> Bool)? = nil
     ) async -> ScanOutcome {
-        let probeHandler = probe ?? { filePath in
-            try await MediaProbe.probe(filePath: filePath)
-        }
+        let probeHandler =
+            probe ?? { filePath in
+                try await MediaProbe.probe(filePath: filePath)
+            }
 
         var files: [String] = []
         var unsupported: [OperationResult] = []
@@ -35,22 +36,24 @@ enum ScannerService {
             }
 
             if FileOps.isSymlinkOrAlias(path) {
-                unsupported.append(OperationResult(
-                    path: path,
-                    status: .skipped,
-                    reason: "Skipped symlink or alias"
-                ))
+                unsupported.append(
+                    OperationResult(
+                        path: path,
+                        status: .skipped,
+                        reason: "Skipped symlink or alias"
+                    ))
                 continue
             }
 
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
                 if isBundleDirectory(path) {
-                    unsupported.append(OperationResult(
-                        path: path,
-                        status: .skipped,
-                        reason: "Skipped app/bundle directory"
-                    ))
+                    unsupported.append(
+                        OperationResult(
+                            path: path,
+                            status: .skipped,
+                            reason: "Skipped app/bundle directory"
+                        ))
                     continue
                 }
                 do {
@@ -66,11 +69,12 @@ enum ScannerService {
                         completedCount: 0
                     )
                 } catch {
-                    unsupported.append(OperationResult(
-                        path: path,
-                        status: .skipped,
-                        reason: "Could not read folder: \(error.localizedDescription)"
-                    ))
+                    unsupported.append(
+                        OperationResult(
+                            path: path,
+                            status: .skipped,
+                            reason: "Could not read folder: \(error.localizedDescription)"
+                        ))
                     continue
                 }
             } else {
@@ -78,11 +82,12 @@ enum ScannerService {
                 if allowed.contains(ext) {
                     files.append(path)
                 } else {
-                    unsupported.append(OperationResult(
-                        path: path,
-                        status: .skipped,
-                        reason: "Unsupported file type (.\(ext.isEmpty ? "?" : ext))"
-                    ))
+                    unsupported.append(
+                        OperationResult(
+                            path: path,
+                            status: .skipped,
+                            reason: "Unsupported file type (.\(ext.isEmpty ? "?" : ext))"
+                        ))
                 }
             }
         }
@@ -123,7 +128,7 @@ enum ScannerService {
                 }
 
                 var completed = 0
-                while let (index, result) = await group.next() {
+                outer: while let (index, result) = await group.next() {
                     if Task.isCancelled {
                         group.cancelAll()
                         break
@@ -134,11 +139,11 @@ enum ScannerService {
                     case .failure(let error):
                         if error is CancellationError {
                             group.cancelAll()
-                            break
+                            break outer
                         }
                         if let runner = error as? ProcessRunnerError, case .cancelled = runner {
                             group.cancelAll()
-                            break
+                            break outer
                         }
                         slotResults[index] = failedProbeInfo(filePath: deduped[index])
                     }
@@ -227,28 +232,32 @@ enum ScannerService {
 
             let full = (path as NSString).appendingPathComponent(item)
             var isDir: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: full, isDirectory: &isDir) else { continue }
+            guard FileManager.default.fileExists(atPath: full, isDirectory: &isDir) else {
+                continue
+            }
 
             if FileOps.isSymlinkOrAlias(full) {
                 if isDir.boolValue {
                     enumerator?.skipDescendants()
                 }
-                unsupported.append(OperationResult(
-                    path: full,
-                    status: .skipped,
-                    reason: "Skipped symlink or alias"
-                ))
+                unsupported.append(
+                    OperationResult(
+                        path: full,
+                        status: .skipped,
+                        reason: "Skipped symlink or alias"
+                    ))
                 continue
             }
 
             if isDir.boolValue {
                 if isBundleDirectory(full) {
                     enumerator?.skipDescendants()
-                    unsupported.append(OperationResult(
-                        path: full,
-                        status: .skipped,
-                        reason: "Skipped app/bundle directory"
-                    ))
+                    unsupported.append(
+                        OperationResult(
+                            path: full,
+                            status: .skipped,
+                            reason: "Skipped app/bundle directory"
+                        ))
                 }
                 continue
             }

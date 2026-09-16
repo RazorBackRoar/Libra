@@ -29,12 +29,14 @@ final class ToolState: ObservableObject {
     private var rerunTask: Task<Void, Never>?
     private var pendingUndo: [UndoRecord] = []
     private var previewPass = true
+    private var unresolvedLocationCount = 0
     var confirmDiscover: (@Sendable (Int) async -> Bool)?
 
     var canUndo: Bool { !undoRecords.isEmpty && !running }
 
     var canWrite: Bool {
-        !running && !files.isEmpty && !dryRun && (!tool.needsFfmpeg || AppState.shared.ffmpegPath != nil)
+        !running && !files.isEmpty && !dryRun
+            && (!tool.needsFfmpeg || AppState.shared.ffmpegPath != nil)
     }
 
     var writeButtonTitle: String {
@@ -43,7 +45,7 @@ final class ToolState: ObservableObject {
     }
 
     var showsExtraFolderToggles: Bool {
-        if tool == .gps { return true }
+        if tool == .gps || tool == .iphoneSorter { return true }
         return tool.isSortRenameFamily && folderDepth != .none
     }
 
@@ -160,7 +162,9 @@ final class ToolState: ObservableObject {
 
     func movePhotosOut(to destDir: String) -> String? {
         guard !photos.isEmpty, !running else { return nil }
-        if ScanSafety.destinationIsInsideSource(dest: destDir, sourceRoot: SettingsStore.shared.settings.lastFolder) {
+        if ScanSafety.destinationIsInsideSource(
+            dest: destDir, sourceRoot: SettingsStore.shared.settings.lastFolder)
+        {
             let reason = "Choose a folder outside the scanned video folder."
             recap = reason
             message = reason
@@ -176,7 +180,9 @@ final class ToolState: ObservableObject {
             let movedPaths = Set(moved.filter { $0.status == .success }.map(\.path))
             photos.removeAll { movedPaths.contains($0.path) }
             let records = moved.compactMap { result -> UndoRecord? in
-                guard result.status == .success, let output = result.outputPath, output != result.path else { return nil }
+                guard result.status == .success, let output = result.outputPath,
+                    output != result.path
+                else { return nil }
                 return UndoRecord(kind: .moved, originalPath: result.path, resultPath: output)
             }
             if !records.isEmpty {
@@ -197,7 +203,8 @@ final class ToolState: ObservableObject {
         let restored = outcome.restored
         let failed = outcome.failed
         running = false
-        recap = failed == 0
+        recap =
+            failed == 0
             ? "Undid \(restored) change\(restored == 1 ? "" : "s")."
             : "Undo finished: \(restored) restored, \(failed) failed."
         message = recap
@@ -206,7 +213,8 @@ final class ToolState: ObservableObject {
 
     private func continueAfterScan() async {
         if files.isEmpty {
-            recap = photos.isEmpty
+            recap =
+                photos.isEmpty
                 ? "No videos found."
                 : "No videos. \(photos.count) photo\(photos.count == 1 ? "" : "s") are in the Photos tab — move them out."
             message = recap
@@ -287,7 +295,9 @@ final class ToolState: ObservableObject {
                 parts.append("\(unsupportedCount) unsupported skipped")
             }
             if dupes > 0 {
-                parts.append("\(dupes) likely duplicate\(dupes == 1 ? "" : "s") (same size, duration, format)")
+                parts.append(
+                    "\(dupes) likely duplicate\(dupes == 1 ? "" : "s") (same size, duration, format)"
+                )
             }
             recap = parts.joined(separator: " · ") + "."
         }
@@ -318,7 +328,8 @@ final class ToolState: ObservableObject {
         case .iphoneSorter:
             await iphoneSort(target: target)
         case .oneMin:
-            await oneMinAdjust(target: target, start: oneMinStart, mode: oneMinMode, ffmpegPath: ffmpegPath)
+            await oneMinAdjust(
+                target: target, start: oneMinStart, mode: oneMinMode, ffmpegPath: ffmpegPath)
         case .slomo:
             await sloMo(target: target, factor: slomoFactor, ffmpegPath: ffmpegPath)
         case .photoSweep:
@@ -349,6 +360,10 @@ final class ToolState: ObservableObject {
         if previewPass, tool == .gps {
             summary += " City names fill in on Write."
         }
+        if !previewPass, tool == .gps, unresolvedLocationCount > 0 {
+            summary +=
+                " \(unresolvedLocationCount) location\(unresolvedLocationCount == 1 ? "" : "s") could not be named — filed under GPS."
+        }
         if previewPass, let reportURL = DryRunReport.write(tool: tool, results: runResults) {
             summary += " Report: \(reportURL.lastPathComponent)"
         }
@@ -376,7 +391,9 @@ final class ToolState: ObservableObject {
     }
 
     private func noteUndo(kind: UndoRecord.Kind, from: String, result: OperationResult) {
-        guard !previewPass, result.status == .success, let output = result.outputPath, output != from else { return }
+        guard !previewPass, result.status == .success, let output = result.outputPath,
+            output != from
+        else { return }
         pendingUndo.append(UndoRecord(kind: kind, originalPath: from, resultPath: output))
     }
 
@@ -394,9 +411,11 @@ final class ToolState: ObservableObject {
         progressName = (from as NSString).lastPathComponent
         let dry = previewPass
         let reservedSnapshot = reserved
-        let root = SettingsStore.shared.settings.lastFolder ?? (from as NSString).deletingLastPathComponent
+        let root =
+            SettingsStore.shared.settings.lastFolder ?? (from as NSString).deletingLastPathComponent
         let result = await Task.detached {
-            FileOps.moveFile(from: from, to: planned, dryRun: dry, reserved: reservedSnapshot, withinRoot: root)
+            FileOps.moveFile(
+                from: from, to: planned, dryRun: dry, reserved: reservedSnapshot, withinRoot: root)
         }.value
         if let output = result.outputPath { reserved.insert(output) }
         noteUndo(kind: kind, from: from, result: result)
@@ -412,13 +431,16 @@ final class ToolState: ObservableObject {
         for file in target {
             if shouldStop() { return }
             if let error = file.error {
-                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                results.append(
+                    OperationResult(
+                        path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
                 advanceProgress()
                 continue
             }
             index += 1
             let folder = destinationFolder(for: file, duplicateExtra: extras.contains(file.path))
-            let filename = filenameStyle == .keepOriginal
+            let filename =
+                filenameStyle == .keepOriginal
                 ? keepNameFileName(for: file)
                 : FileNaming.standardFileName(
                     for: file,
@@ -441,12 +463,15 @@ final class ToolState: ObservableObject {
         for file in target {
             if shouldStop() { return }
             if let error = file.error {
-                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                results.append(
+                    OperationResult(
+                        path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
                 advanceProgress()
                 continue
             }
             index += 1
-            let filename = filenameStyle == .keepOriginal
+            let filename =
+                filenameStyle == .keepOriginal
                 ? keepNameFileName(for: file)
                 : FileNaming.standardFileName(
                     for: file,
@@ -462,6 +487,7 @@ final class ToolState: ObservableObject {
     }
 
     private func gpsSort(target: [VideoInfo]) async {
+        unresolvedLocationCount = 0
         let extras = DuplicateDetector.extraPaths(in: target)
         var cityByPath: [String: String] = [:]
         if !previewPass {
@@ -476,6 +502,10 @@ final class ToolState: ObservableObject {
                 try? await Task.sleep(nanoseconds: 250_000_000)
             }
             clusters = GPSMapClustering.mergeByPlaceName(clusters)
+            unresolvedLocationCount =
+                clusters
+                .filter { $0.placeName == nil }
+                .reduce(0) { $0 + $1.files.count }
             for cluster in clusters {
                 let folder = GPSGeocoder.folderName(for: cluster.placeName)
                 for file in cluster.files {
@@ -491,7 +521,9 @@ final class ToolState: ObservableObject {
         for file in target {
             if shouldStop() { return }
             if let error = file.error {
-                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                results.append(
+                    OperationResult(
+                        path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
                 advanceProgress()
                 continue
             }
@@ -504,7 +536,8 @@ final class ToolState: ObservableObject {
             } else {
                 city = "No-GPS"
             }
-            let folder = destinationFolder(for: file, duplicateExtra: extras.contains(file.path), gpsCity: city)
+            let folder = destinationFolder(
+                for: file, duplicateExtra: extras.contains(file.path), gpsCity: city)
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let planned = (folder as NSString).appendingPathComponent(filename)
             let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
@@ -524,11 +557,12 @@ final class ToolState: ObservableObject {
         for file in ordered {
             if shouldStop() { return }
             if let error = file.error {
-                results.append(OperationResult(
-                    path: file.path,
-                    status: .failed,
-                    reason: "Metadata read failed: \(error)"
-                ))
+                results.append(
+                    OperationResult(
+                        path: file.path,
+                        status: .failed,
+                        reason: "Metadata read failed: \(error)"
+                    ))
                 advanceProgress()
                 continue
             }
@@ -564,21 +598,26 @@ final class ToolState: ObservableObject {
                 parts.append("Duplicates")
             }
             parts.append(classification.folder.rawValue)
-            parts.append(contentsOf: extraFolderParts(for: file))
+            if showsExtraFolderToggles {
+                parts.append(contentsOf: extraFolderParts(for: file))
+            }
             let folder = parts.reduce(file.dir) { ($0 as NSString).appendingPathComponent($1) }
             let planned = (folder as NSString).appendingPathComponent(filename)
             let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
-            results.append(OperationResult(
-                path: file.path,
-                status: result.status,
-                reason: result.reason ?? classification.note,
-                outputPath: result.outputPath
-            ))
+            results.append(
+                OperationResult(
+                    path: file.path,
+                    status: result.status,
+                    reason: result.reason ?? classification.note,
+                    outputPath: result.outputPath
+                ))
             advanceProgress()
         }
     }
 
-    private func oneMinAdjust(target: [VideoInfo], start: Date, mode: String, ffmpegPath: String) async {
+    private func oneMinAdjust(target: [VideoInfo], start: Date, mode: String, ffmpegPath: String)
+        async
+    {
         let eligible = target.filter { $0.error == nil }
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var reserved = Set<String>()
@@ -587,7 +626,9 @@ final class ToolState: ObservableObject {
         for file in target {
             if shouldStop() { return }
             if let error = file.error {
-                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                results.append(
+                    OperationResult(
+                        path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
                 advanceProgress()
                 continue
             }
@@ -621,14 +662,16 @@ final class ToolState: ObservableObject {
                     withinRoot: SettingsStore.shared.settings.lastFolder ?? file.dir
                 )
                 if mode != "copies",
-                   written.status == .success,
-                   output != file.path {
+                    written.status == .success,
+                    output != file.path
+                {
                     let removed = FileOps.trashFile(file.path, dryRun: false)
                     if removed.status != .success {
                         written = OperationResult(
                             path: file.path,
                             status: .failed,
-                            reason: "Wrote \(output) but could not move original to Trash: \(removed.reason ?? "unknown error")",
+                            reason:
+                                "Wrote \(output) but could not move original to Trash: \(removed.reason ?? "unknown error")",
                             outputPath: output
                         )
                     }
@@ -636,7 +679,8 @@ final class ToolState: ObservableObject {
                 result = written
             }
             if let out = result.outputPath { reserved.insert(out) }
-            noteUndo(kind: mode == "copies" ? .createdCopy : .moved, from: file.path, result: result)
+            noteUndo(
+                kind: mode == "copies" ? .createdCopy : .moved, from: file.path, result: result)
             results.append(result)
             advanceProgress()
             if result.status == .cancelled { return }
@@ -652,7 +696,9 @@ final class ToolState: ObservableObject {
         for file in target {
             if shouldStop() { return }
             if let error = file.error {
-                results.append(OperationResult(path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
+                results.append(
+                    OperationResult(
+                        path: file.path, status: .failed, reason: "Metadata read failed: \(error)"))
                 advanceProgress()
                 continue
             }
@@ -712,7 +758,9 @@ final class ToolState: ObservableObject {
         return parts
     }
 
-    private func destinationFolder(for file: VideoInfo, duplicateExtra: Bool, gpsCity: String? = nil) -> String {
+    private func destinationFolder(
+        for file: VideoInfo, duplicateExtra: Bool, gpsCity: String? = nil
+    ) -> String {
         var parts: [String] = []
         if SettingsStore.shared.settings.sortDuplicatesIntoFolder, duplicateExtra {
             parts.append("Duplicates")
@@ -720,12 +768,13 @@ final class ToolState: ObservableObject {
         if let gpsCity {
             parts.append(gpsCity)
         } else if tool.isSortRenameFamily {
-            parts.append(contentsOf: OrganizeLayout.folderComponents(
-                depth: folderDepth,
-                resolutionClass: file.resolutionClass,
-                orientation: file.orientation,
-                fpsBucket: FileNaming.fpsBucket(file.fps)
-            ))
+            parts.append(
+                contentsOf: OrganizeLayout.folderComponents(
+                    depth: folderDepth,
+                    resolutionClass: file.resolutionClass,
+                    orientation: file.orientation,
+                    fpsBucket: FileNaming.fpsBucket(file.fps)
+                ))
         }
         if showsExtraFolderToggles {
             parts.append(contentsOf: extraFolderParts(for: file))
