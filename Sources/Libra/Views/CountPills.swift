@@ -131,15 +131,18 @@ struct CountPill: View {
             HStack(spacing: 4) {
                 Text("\(value)")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.yellow)
+                    .foregroundColor(LibraTheme.yellow)
                 Text(label)
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Color(.systemGray).opacity(0.2))
-            .cornerRadius(8)
+            .background(LibraTheme.panel)
+            .overlay(
+                Capsule().stroke(LibraTheme.hairline, lineWidth: 1)
+            )
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(value == 0 || action == nil)

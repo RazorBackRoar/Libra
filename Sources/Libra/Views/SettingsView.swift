@@ -47,8 +47,11 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .padding()
         .frame(width: 460, height: 560)
+        .background(LibraTheme.bg.ignoresSafeArea())
+        .tint(LibraTheme.yellow)
         .onAppear {
             ffmpegPath = store.settings.ffmpegPath ?? ""
             extensions = store.settings.videoExtensions.joined(separator: ", ")

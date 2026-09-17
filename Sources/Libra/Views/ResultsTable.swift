@@ -21,7 +21,7 @@ struct ResultsTable: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Image(systemName: "film.stack")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.yellow.opacity(0.7))
+                        .foregroundColor(LibraTheme.yellow.opacity(0.7))
                     Text("No videos yet")
                         .font(.system(size: 14, weight: .semibold))
                     Text("Drop a folder or videos above.")
@@ -97,8 +97,7 @@ struct ResultsTable: View {
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
                 .scrollContentBackground(.hidden)
-                .background(Color(.systemGray).opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .libraPanel()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -140,7 +139,7 @@ struct ResultsTable: View {
         HStack(alignment: .top, spacing: 8) {
             Text("\(index).")
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundColor(.yellow)
+                .foregroundColor(LibraTheme.gold)
                 .frame(width: numberColumnWidth, alignment: .trailing)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

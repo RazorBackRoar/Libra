@@ -10,7 +10,7 @@ struct HomeView: View {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "film.stack")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.yellow)
+                    .foregroundColor(LibraTheme.yellow)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Libra")
                         .font(.system(size: 18, weight: .bold))
@@ -25,11 +25,11 @@ struct HomeView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.black.ignoresSafeArea())
+        .background(LibraTheme.bg.ignoresSafeArea())
     }
 
     private var videoGrid: some View {
-        Grid(horizontalSpacing: 12, verticalSpacing: 12) {
+        Grid(horizontalSpacing: 14, verticalSpacing: 14) {
             ForEach(0..<2, id: \.self) { row in
                 GridRow {
                     ForEach(0..<3, id: \.self) { col in
@@ -59,33 +59,32 @@ struct ToolCard: View {
                 HStack(alignment: .top) {
                     Image(systemName: tool.systemImage)
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.yellow)
+                        .foregroundColor(.black)
                     Spacer()
                     Text(tool.category)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundColor(.black.opacity(0.55))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color.black.opacity(0.12))
+                        .clipShape(Capsule())
                 }
                 Text(tool.title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.black)
                     .lineLimit(2)
                     .minimumScaleFactor(0.9)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(tool.description)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.black.opacity(0.72))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.white.opacity(hovering ? 0.11 : 0.06))
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(hovering ? Color.yellow.opacity(0.45) : Color.white.opacity(0.08), lineWidth: 1)
-            )
+            .background(LibraCardFace(hovering: hovering))
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }

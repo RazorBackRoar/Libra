@@ -3,7 +3,17 @@ import CoreLocation
 
 @MainActor
 enum GPSGeocoder {
+    /// Test seam — real reverse geocoding needs Apple's servers. Tests swap
+    /// this for a stub and must restore it (see `useRealGeocoder`).
+    static var resolver: (Double, Double) async -> String? = { lat, lon in
+        await realReverseGeocode(latitude: lat, longitude: lon)
+    }
+
     static func reverseGeocode(latitude: Double, longitude: Double) async -> String? {
+        await resolver(latitude, longitude)
+    }
+
+    private static func realReverseGeocode(latitude: Double, longitude: Double) async -> String? {
         let location = CLLocation(latitude: latitude, longitude: longitude)
         do {
             let placemarks = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[CLPlacemark], Error>) in

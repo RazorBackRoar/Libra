@@ -73,7 +73,7 @@ struct ToolPage: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.black.ignoresSafeArea())
+            .background(LibraTheme.bg.ignoresSafeArea())
 
             if let filter = browserFilter {
                 let extras = DuplicateDetector.extraPaths(in: state.filteredFiles)
@@ -84,7 +84,7 @@ struct ToolPage: View {
                     },
                     onBack: { browserFilter = nil }
                 )
-                .background(Color.black)
+                .background(LibraTheme.bg)
             }
         }
         .onChange(of: state.photos.count) { _, count in
@@ -109,9 +109,9 @@ struct ToolPage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(tool.title)
                     .font(.system(size: 20, weight: .bold))
-                Text(tool.description)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                Text(tool.ruleSummary)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(LibraTheme.gold)
                     .lineLimit(2)
             }
             Spacer(minLength: 8)
@@ -143,9 +143,9 @@ struct ToolPage: View {
             VStack(spacing: 5) {
                 Text(label)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(workspace == item ? .yellow : .secondary)
+                    .foregroundColor(workspace == item ? LibraTheme.yellow : .secondary)
                 Rectangle()
-                    .fill(workspace == item ? Color.yellow : Color.clear)
+                    .fill(workspace == item ? LibraTheme.yellow : Color.clear)
                     .frame(height: 2)
             }
             .padding(.trailing, 16)
@@ -163,6 +163,24 @@ struct ToolPage: View {
 
         if state.filteredFiles.contains(where: \.hasCoordinates) {
             GPSMapPanel(files: state.filteredFiles, startsExpanded: tool == .gps)
+        }
+
+        if tool == .gps, state.filteredFiles.contains(where: \.hasCoordinates) {
+            HStack(spacing: 12) {
+                Button(state.gpsCitiesResolved ? "City names resolved" : "Resolve city names…") {
+                    state.resolveGPSCityNames()
+                }
+                .buttonStyle(LibraSecondaryButtonStyle())
+                .disabled(state.running || state.gpsCitiesResolved)
+                .accessibilityLabel("Resolve city names")
+                Text(
+                    state.gpsCitiesResolved
+                        ? "Preview shows the exact destination folders."
+                        : "Preview shows GPS/ — resolve once for exact folders; Write uses the same names."
+                )
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+            }
         }
 
         if tool.isSortRenameFamily {
@@ -309,7 +327,7 @@ struct ToolPage: View {
                     HStack(spacing: 8) {
                         Text("\(index + 1).")
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.yellow)
+                            .foregroundColor(LibraTheme.gold)
                             .frame(width: 36, alignment: .trailing)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(file.name).\(file.ext)")
@@ -331,8 +349,7 @@ struct ToolPage: View {
             }
             .listStyle(.inset(alternatesRowBackgrounds: true))
             .scrollContentBackground(.hidden)
-            .background(Color(.systemGray).opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .libraPanel()
 
             HStack {
                 Spacer()
@@ -357,10 +374,10 @@ struct ToolPage: View {
                 Toggle(isOn: $state.dryRun) {
                     Text("Preview only")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.yellow)
+                        .foregroundColor(LibraTheme.yellow)
                 }
                 .toggleStyle(.switch)
-                .tint(.yellow)
+                .tint(LibraTheme.yellow)
                 .disabled(state.running)
                 .accessibilityLabel("Preview only")
                 .onChange(of: state.dryRun) { _, _ in
@@ -369,7 +386,7 @@ struct ToolPage: View {
 
                 Text(state.previewLiveCaption)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(state.dryRun ? .yellow : .orange)
+                    .foregroundColor(state.dryRun ? LibraTheme.yellow : .orange)
                     .lineLimit(2)
 
                 Spacer()

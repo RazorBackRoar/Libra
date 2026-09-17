@@ -18,7 +18,7 @@ struct GPSMapPanel: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "map")
-                        .foregroundColor(.yellow)
+                        .foregroundColor(LibraTheme.yellow)
                     Text("City / GPS Map")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white)
@@ -52,7 +52,7 @@ struct GPSMapPanel: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                        .stroke(LibraTheme.hairline, lineWidth: 1)
                 )
 
                 if let selected = model.selectedCluster {
@@ -67,8 +67,7 @@ struct GPSMapPanel: View {
             }
         }
         .padding(expanded ? 12 : 10)
-        .background(Color(.systemGray).opacity(0.12))
-        .cornerRadius(12)
+        .libraPanel()
         .onAppear {
             expanded = startsExpanded
             model.update(files: files, geocode: expanded)
@@ -97,7 +96,7 @@ struct GPSMapPanel: View {
             HStack {
                 Image(systemName: "mappin.circle.fill")
                     .font(.system(size: 14))
-                    .foregroundColor(.yellow)
+                    .foregroundColor(LibraTheme.yellow)
                 Text(cluster.placeName ?? "Resolving city…")
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
@@ -121,7 +120,7 @@ struct GPSMapPanel: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(file.name + "." + file.ext)
                                     .font(.system(size: 11))
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(LibraTheme.gold)
                                     .lineLimit(1)
                                 Text(file.identificationLine)
                                     .font(.system(size: 10))
@@ -144,7 +143,11 @@ struct GPSMapPanel: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(0.35))
+        .background(Color.black.opacity(0.45))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(LibraTheme.hairline, lineWidth: 1)
+        )
         .cornerRadius(8)
     }
 }
@@ -156,15 +159,21 @@ private struct GPSMapPin: View {
     var body: some View {
         VStack(spacing: 0) {
             Circle()
-                .fill(Color.yellow)
+                .fill(
+                    LinearGradient(
+                        colors: [LibraTheme.yellow, LibraTheme.gold],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .frame(width: selected ? 12 : 10, height: selected ? 12 : 10)
                 .overlay(
                     Circle()
                         .stroke(Color.black.opacity(0.45), lineWidth: 0.8)
                 )
-                .shadow(color: .black.opacity(0.35), radius: selected ? 2 : 1, y: 1)
+                .shadow(color: LibraTheme.yellow.opacity(0.5), radius: selected ? 4 : 2, y: 1)
             Capsule()
-                .fill(Color.yellow)
+                .fill(LibraTheme.gold)
                 .frame(width: 2, height: 5)
                 .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
         }

@@ -1,17 +1,12 @@
 # Libra
 
 [![Download](https://img.shields.io/github/v/release/RazorBackRoar/Libra?style=for-the-badge&label=Download%20DMG&color=d32f2f)](https://github.com/RazorBackRoar/Libra/releases/latest)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue?style=for-the-badge)](https://github.com/RazorBackRoar/Libra/releases/tag/v1.3.0)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue?style=for-the-badge)](https://github.com/RazorBackRoar/Libra/releases/tag/v1.4.0)
 [![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet?style=for-the-badge)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
 [![macOS](https://img.shields.io/badge/mac%20os-Apple%20Silicon-d32f2f?style=for-the-badge&logo=apple&logoColor=white)](https://support.apple.com/en-us/HT211814)
 [![MapKit](https://img.shields.io/badge/MapKit-City%20%2F%20GPS-c9a227?style=for-the-badge&logo=apple&logoColor=white)](https://developer.apple.com/documentation/mapkit)
-
-<!-- Workspace Health Layer -->
-![Status](https://img.shields.io/badge/status-active-2ea44f?style=for-the-badge)
-![Tests](https://img.shields.io/badge/tests-present-2ea44f?style=for-the-badge)
-![Build](https://img.shields.io/badge/build-swift-F05138?style=for-the-badge)
 
 <!-- Workspace Health Layer -->
 ![Status](https://img.shields.io/badge/status-active-2ea44f?style=for-the-badge)
@@ -38,12 +33,13 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 - **Home grid** — Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, and Photos Only
 - **Libra Sorter** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
 - **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; expanded on the GPS tool, collapsed on the others (coordinates stay on each row); click a filename to open the video
-- **GPS** — city folders from coordinates on Write, `No-GPS` when location is missing; Preview uses `GPS` / `No-GPS` folders
+- **GPS** — **Resolve city names** fills Preview with the exact `City, ST/` folders Write will use (cached, never re-geocoded); `No-GPS` when location is missing, `GPS/` when a place can't be named
 - **Optional date / camera folders** — extra sort keys on the sort tools
 - **Duplicates** — likely extras (same size, duration, resolution, fps, codec) go in a Duplicates folder
 - **Identification** — each row shows resolution, fps, iPhone/Apple, and GPS coordinates (not the container; the filename already has that)
 - **iPhone Model Sort** — iPhone / Other Apple / Not Apple (videos)
-- **Transform** — Slo-Mo copies and 1-Min-Adjuster sequential timestamps (these need ffmpeg)
+- **Transform** — Slo-Mo copies (½× or ¼×, audio kept-and-slowed or removed by your choice) and 1-Min-Adjuster sequential timestamps (these need ffmpeg)
+- **1-Min-Adjuster undo** — "Change originals" puts each untouched original in Trash; Undo restores the original bytes and removes the adjusted copy
 - **Resilient import** — cancelable scans; per-file probe failures don’t stall the batch
 - **Local-first organize** — sort, rename, and file moves stay on your Mac. City names on the GPS map use Apple reverse-geocode when you open the map, or when you Write on GPS. Check for Updates talks to GitHub when you ask.
 - **Native SwiftUI** — Apple Silicon macOS app, ad-hoc signed DMG
@@ -82,7 +78,7 @@ Package a macOS `.app` + DMG (ad-hoc signed):
 ```
 
 | Surface | Value |
-|---------|-------|
+| --------- | ------- |
 | Display name (UI, Dock, `.app`, DMG) | **Libra** |
 | GitHub | [RazorBackRoar/Libra](https://github.com/RazorBackRoar/Libra) |
 | appId | `com.razorbackroar.libra` |

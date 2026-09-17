@@ -186,9 +186,9 @@ struct PhotoSweepView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(Tool.photoSweep.title)
                         .font(.system(size: 20, weight: .bold))
-                    Text("Move stills out of mixed video folders.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                    Text(Tool.photoSweep.ruleSummary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(LibraTheme.gold)
                         .lineLimit(2)
                 }
                 Spacer(minLength: 8)
@@ -218,7 +218,7 @@ struct PhotoSweepView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Image(systemName: "photo.on.rectangle")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.yellow.opacity(0.7))
+                        .foregroundColor(LibraTheme.yellow.opacity(0.7))
                     Text(state.recap ?? "No photos yet")
                         .font(.system(size: 14, weight: .semibold))
                     if state.recap == nil {
@@ -236,7 +236,7 @@ struct PhotoSweepView: View {
                             HStack(spacing: 8) {
                                 Text("\(index + 1).")
                                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(LibraTheme.gold)
                                     .frame(width: 36, alignment: .trailing)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("\(file.name).\(file.ext)")
@@ -260,18 +260,17 @@ struct PhotoSweepView: View {
                 }
                 .listStyle(.inset(alternatesRowBackgrounds: true))
                 .scrollContentBackground(.hidden)
-                .background(Color(.systemGray).opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .libraPanel()
             }
 
             HStack {
                 Toggle(isOn: $state.dryRun) {
                     Text("Preview only")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.yellow)
+                        .foregroundColor(LibraTheme.yellow)
                 }
                 .toggleStyle(.switch)
-                .tint(.yellow)
+                .tint(LibraTheme.yellow)
                 .disabled(state.running)
 
                 Text(
@@ -279,7 +278,7 @@ struct PhotoSweepView: View {
                         ? "Preview only — nothing will be changed." : "Live — photos will move."
                 )
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(state.dryRun ? .yellow : .orange)
+                .foregroundColor(state.dryRun ? LibraTheme.yellow : .orange)
                 .lineLimit(2)
 
                 Spacer()
@@ -315,7 +314,7 @@ struct PhotoSweepView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.black.ignoresSafeArea())
+        .background(LibraTheme.bg.ignoresSafeArea())
         .onExitCommand {
             if state.running {
                 state.cancelActiveWork()

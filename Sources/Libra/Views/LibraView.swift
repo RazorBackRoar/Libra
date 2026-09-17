@@ -16,7 +16,7 @@ struct LibraView: View {
                 HomeView(selectedTool: $selectedTool)
             }
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(LibraTheme.bg.ignoresSafeArea())
         .onReceive(NotificationCenter.default.publisher(for: LibraCommands.openSettings)) { _ in
             openSettings()
         }

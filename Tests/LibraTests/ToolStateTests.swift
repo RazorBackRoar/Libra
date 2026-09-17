@@ -84,7 +84,48 @@ final class ToolStateTests: XCTestCase {
         XCTAssertTrue(state.photos.count == 1)
     }
 
-    private func stubVideo(path: String = "/tmp/sample.mov", ext: String = "mov") -> VideoInfo {
+    func testGPSResolveCacheDrivesCityFolders() async {
+        let state = ToolState(tool: .gps)
+        let files = [
+            stubVideo(path: "/vids/a.mov", lat: 43.6150, lon: -116.2023),
+            stubVideo(path: "/vids/b.mov", lat: 43.6160, lon: -116.2030),
+            stubVideo(path: "/vids/nogps.mov"),
+        ]
+        var calls = 0
+        let real = GPSGeocoder.resolver
+        GPSGeocoder.resolver = { _, _ in
+            calls += 1
+            return "Boise, Idaho"
+        }
+        defer { GPSGeocoder.resolver = real }
+
+        let outcome = await state.geocodeGPSClusters(files: files)
+
+        // Both Boise files share one cluster → one geocode call, both named.
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(outcome.byPath["/vids/a.mov"], "Boise, Idaho")
+        XCTAssertEqual(outcome.byPath["/vids/b.mov"], "Boise, Idaho")
+        XCTAssertEqual(outcome.unresolved, 0)
+        XCTAssertNil(outcome.byPath["/vids/nogps.mov"])
+    }
+
+    func testGPSUnresolvedFallsBackToGPSFolder() async {
+        let state = ToolState(tool: .gps)
+        let files = [stubVideo(path: "/vids/lonely.mov", lat: 10.0, lon: 10.0)]
+        let real = GPSGeocoder.resolver
+        GPSGeocoder.resolver = { _, _ in nil }
+        defer { GPSGeocoder.resolver = real }
+
+        let outcome = await state.geocodeGPSClusters(files: files)
+
+        XCTAssertEqual(outcome.byPath["/vids/lonely.mov"], "GPS")
+        XCTAssertEqual(outcome.unresolved, 1)
+    }
+
+    private func stubVideo(
+        path: String = "/tmp/sample.mov", ext: String = "mov",
+        lat: Double? = nil, lon: Double? = nil
+    ) -> VideoInfo {
         VideoInfo(
             path: path,
             name: "sample",
@@ -103,9 +144,9 @@ final class ToolStateTests: XCTestCase {
             model: "",
             hasAppleMake: false,
             hasiPhoneModel: false,
-            hasGPS: false,
-            latitude: nil,
-            longitude: nil,
+            hasGPS: lat != nil && lon != nil,
+            latitude: lat,
+            longitude: lon,
             creationTime: nil,
             error: nil,
             warning: nil

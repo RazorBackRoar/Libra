@@ -29,6 +29,7 @@ struct CategoryBrowserView: View {
                             dismiss()
                         }
                     }
+                    .buttonStyle(LibraSecondaryButtonStyle(compact: true))
                     Spacer()
                     if !files.isEmpty {
                         Text("\(index + 1) / \(files.count)")
@@ -56,8 +57,7 @@ struct CategoryBrowserView: View {
                         if let file = current {
                             mediaPane(for: file)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .background(Color(.systemGray).opacity(0.15))
-                                .cornerRadius(10)
+                                .libraPanel()
 
                             Text("\(file.name).\(file.ext)")
                                 .font(.system(size: 14, weight: .semibold))
@@ -83,7 +83,7 @@ struct CategoryBrowserView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
+        .background(LibraTheme.bg.ignoresSafeArea())
         .focusable()
         .focused($focused)
         .onAppear {
@@ -135,7 +135,7 @@ struct CategoryBrowserView: View {
                     HStack(alignment: .top, spacing: 6) {
                         Text("\(offset + 1).")
                             .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.yellow)
+                            .foregroundColor(LibraTheme.gold)
                             .frame(width: 36, alignment: .trailing)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(file.name).\(file.ext)")
@@ -161,6 +161,8 @@ struct CategoryBrowserView: View {
             }
         }
         .listStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .libraPanel()
     }
 
     @ViewBuilder

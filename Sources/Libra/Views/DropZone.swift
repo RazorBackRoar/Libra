@@ -21,11 +21,15 @@ struct DropZone: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .background(isDragging ? Color.yellow.opacity(0.12) : Color.white.opacity(0.05))
+        .background(
+            isDragging ? LibraTheme.yellow.opacity(0.14) : LibraTheme.panel.opacity(0.9))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isDragging ? Color.yellow : Color.white.opacity(0.12), lineWidth: 1)
+                .stroke(
+                    isDragging ? LibraTheme.yellow : LibraTheme.hairline,
+                    style: StrokeStyle(lineWidth: isDragging ? 2 : 1, dash: isDragging ? [] : [6, 4])
+                )
         )
         .onDrop(of: [.fileURL], isTargeted: $isDragging) { providers in
             handleProviders(providers)
@@ -36,7 +40,7 @@ struct DropZone: View {
         VStack(spacing: 10) {
             Image(systemName: "arrow.down.doc")
                 .font(.system(size: 22, weight: .semibold))
-                .foregroundColor(.yellow)
+                .foregroundColor(LibraTheme.yellow)
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
                 .multilineTextAlignment(.center)
@@ -54,7 +58,7 @@ struct DropZone: View {
         HStack(spacing: 12) {
             Image(systemName: "arrow.down.doc")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.yellow)
+                .foregroundColor(LibraTheme.yellow)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
@@ -106,33 +110,5 @@ struct DropZone: View {
             onDrop(urls.map(\.path))
         }
         return true
-    }
-}
-
-struct LibraPrimaryButtonStyle: ButtonStyle {
-    var compact: Bool = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: compact ? 12 : 13, weight: .semibold))
-            .padding(.horizontal, compact ? 10 : 14)
-            .padding(.vertical, compact ? 5 : 8)
-            .background(configuration.isPressed ? Color.orange : Color.yellow)
-            .foregroundColor(.black)
-            .cornerRadius(8)
-    }
-}
-
-struct LibraSecondaryButtonStyle: ButtonStyle {
-    var compact: Bool = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: compact ? 12 : 13, weight: .semibold))
-            .padding(.horizontal, compact ? 10 : 14)
-            .padding(.vertical, compact ? 5 : 8)
-            .background(Color(.systemGray))
-            .foregroundColor(.white)
-            .cornerRadius(8)
     }
 }

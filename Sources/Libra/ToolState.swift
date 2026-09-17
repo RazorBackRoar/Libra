@@ -30,6 +30,13 @@ final class ToolState: ObservableObject {
     private var previewPass = true
     private var reportThisPass = true
     private var unresolvedLocationCount = 0
+    /// file.path → resolved city folder, filled by `resolveGPSCityNames` and
+    /// reused by Write so Preview and Write can't disagree.
+    private var gpsCityByPath: [String: String] = [:]
+    /// cluster id → place name, persisted across scans — same spot never
+    /// geocodes twice in one session.
+    private var gpsPlaceCache: [String: String] = [:]
+    @Published private(set) var gpsCitiesResolved = false
 
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -96,6 +103,9 @@ final class ToolState: ObservableObject {
         results = []
         recap = nil
         undoRecords = []
+        gpsCityByPath = [:]
+        gpsCitiesResolved = false
+        unresolvedLocationCount = 0
         message = "Finding supported videos…"
         AppState.shared.rememberLastFolder(from: paths)
 
@@ -381,7 +391,12 @@ final class ToolState: ObservableObject {
             total: progress.total
         )
         if previewPass, tool == .gps {
-            summary += " City names fill in on Write."
+            if gpsCitiesResolved, unresolvedLocationCount > 0 {
+                summary +=
+                    " \(unresolvedLocationCount) location\(unresolvedLocationCount == 1 ? "" : "s") could not be named — filed under GPS."
+            } else if !gpsCitiesResolved {
+                summary += " Preview shows GPS/ — “Resolve city names” shows exact folders."
+            }
         }
         if !previewPass, tool == .gps, unresolvedLocationCount > 0 {
             summary +=
@@ -521,32 +536,79 @@ final class ToolState: ObservableObject {
         }
     }
 
+    /// One geocode pass over the coordinate clusters in `files`. Returns a
+    /// file.path → city-folder map plus how many files' locations could not
+    /// be named. Internal (not private) so tests can drive it with a stubbed
+    /// `GPSGeocoder.resolver`.
+    @discardableResult
+    func geocodeGPSClusters(files: [VideoInfo]) async
+        -> (byPath: [String: String], unresolved: Int)
+    {
+        var clusters = GPSMapClustering.cluster(files: files)
+        for index in clusters.indices {
+            if Task.isCancelled || cancelling { return ([:], 0) }
+            if let cached = gpsPlaceCache[clusters[index].id] {
+                clusters[index].placeName = cached
+                continue
+            }
+            clusters[index].placeName = await GPSGeocoder.reverseGeocode(
+                latitude: clusters[index].latitude,
+                longitude: clusters[index].longitude
+            )
+            if let name = clusters[index].placeName {
+                gpsPlaceCache[clusters[index].id] = name
+            }
+            // Be gentle with Apple's geocoder.
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        guard !Task.isCancelled, !cancelling else { return ([:], 0) }
+        clusters = GPSMapClustering.mergeByPlaceName(clusters)
+        var byPath: [String: String] = [:]
+        var unresolved = 0
+        for cluster in clusters {
+            if cluster.placeName == nil { unresolved += cluster.files.count }
+            let folder = GPSGeocoder.folderName(for: cluster.placeName)
+            for file in cluster.files {
+                byPath[file.path] = folder
+            }
+        }
+        return (byPath, unresolved)
+    }
+
+    /// Explicit user action: geocode now so Preview shows the exact city
+    /// folders Write will use. Cached — Write never re-geocodes.
+    func resolveGPSCityNames() {
+        guard tool == .gps, !running, !files.isEmpty, !gpsCitiesResolved else { return }
+        running = true
+        cancelling = false
+        message = "Resolving city names…"
+        activeTask = Task { [weak self] in
+            guard let self else { return }
+            let outcome = await self.geocodeGPSClusters(files: self.files)
+            guard !Task.isCancelled, !self.cancelling else {
+                self.finishIdle()
+                return
+            }
+            self.gpsCityByPath = outcome.byPath
+            self.unresolvedLocationCount = outcome.unresolved
+            self.gpsCitiesResolved = true
+            // Re-run the preview so rows show the resolved folders.
+            self.previewPass = true
+            self.reportThisPass = false
+            await self.performRun(ffmpegPath: "")
+        }
+    }
+
     private func gpsSort(target: [VideoInfo]) async {
-        unresolvedLocationCount = 0
         let extras = DuplicateDetector.extraPaths(in: target)
-        var cityByPath: [String: String] = [:]
-        if !previewPass {
-            var clusters = GPSMapClustering.cluster(files: target)
-            for index in clusters.indices {
-                if shouldStop() { return }
-                let name = await GPSGeocoder.reverseGeocode(
-                    latitude: clusters[index].latitude,
-                    longitude: clusters[index].longitude
-                )
-                clusters[index].placeName = name
-                try? await Task.sleep(nanoseconds: 250_000_000)
-            }
-            clusters = GPSMapClustering.mergeByPlaceName(clusters)
-            unresolvedLocationCount =
-                clusters
-                .filter { $0.placeName == nil }
-                .reduce(0) { $0 + $1.files.count }
-            for cluster in clusters {
-                let folder = GPSGeocoder.folderName(for: cluster.placeName)
-                for file in cluster.files {
-                    cityByPath[file.path] = folder
-                }
-            }
+        var cityByPath = gpsCityByPath
+        if !previewPass, cityByPath.isEmpty {
+            // "Resolve city names" was skipped — geocode inline so Write
+            // still lands in real city folders.
+            let outcome = await geocodeGPSClusters(files: target)
+            if Task.isCancelled || cancelling { return }
+            cityByPath = outcome.byPath
+            unresolvedLocationCount = outcome.unresolved
         }
 
         let eligible = target.filter { $0.error == nil }
