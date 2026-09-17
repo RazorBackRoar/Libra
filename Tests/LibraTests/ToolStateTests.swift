@@ -122,6 +122,76 @@ final class ToolStateTests: XCTestCase {
         XCTAssertEqual(outcome.unresolved, 1)
     }
 
+    func testGPSWriteBlockedUntilCitiesResolved() async {
+        let state = ToolState(tool: .gps)
+        state.dryRun = false
+        state.files = [stubVideo(path: "/vids/a.mov", lat: 43.6, lon: -116.2)]
+        var calls = 0
+        let real = GPSGeocoder.resolver
+        GPSGeocoder.resolver = { _, _ in
+            calls += 1
+            return "Boise, Idaho"
+        }
+        defer { GPSGeocoder.resolver = real }
+
+        XCTAssertFalse(state.canWrite)
+        XCTAssertNotNil(state.gpsWriteBlockReason)
+
+        state.startWrite(settings: .default, ffmpegPath: nil)
+
+        XCTAssertFalse(state.running)
+        XCTAssertEqual(calls, 0)  // Write never geocodes inline.
+        XCTAssertEqual(state.message, state.gpsWriteBlockReason)
+    }
+
+    func testGPSWriteAllowedWhenNoCoordinates() {
+        let state = ToolState(tool: .gps)
+        state.dryRun = false
+        state.files = [stubVideo(path: "/vids/nogps.mov")]
+
+        XCTAssertNil(state.gpsWriteBlockReason)
+        XCTAssertTrue(state.canWrite)
+    }
+
+    func testGPSResolveEnablesWriteAndPublishesMapNames() async {
+        let state = ToolState(tool: .gps)
+        state.dryRun = false
+        state.files = [
+            stubVideo(path: "/vids/a.mov", lat: 43.6150, lon: -116.2023),
+            stubVideo(path: "/vids/b.mov", lat: 43.6160, lon: -116.2030),
+            stubVideo(path: "/vids/nogps.mov"),
+        ]
+        var calls = 0
+        let real = GPSGeocoder.resolver
+        GPSGeocoder.resolver = { _, _ in
+            calls += 1
+            return "Boise, Idaho"
+        }
+        defer { GPSGeocoder.resolver = real }
+
+        state.resolveGPSCityNames()
+        for _ in 0..<1000 where state.running {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        XCTAssertTrue(state.gpsCitiesResolved)
+        XCTAssertTrue(state.canWrite)
+        XCTAssertNil(state.gpsWriteBlockReason)
+        XCTAssertEqual(calls, 1)  // one cluster → one lookup
+        XCTAssertEqual(state.gpsPlaceByPath["/vids/a.mov"], "Boise, Idaho")
+        XCTAssertEqual(state.gpsPlaceByPath["/vids/b.mov"], "Boise, Idaho")
+        XCTAssertNil(state.gpsPlaceByPath["/vids/nogps.mov"])
+
+        // The resolve pass re-ran Preview: rows already show the exact city
+        // and No-GPS folders Write will use — same cache, no drift.
+        let outputs = state.results.compactMap(\.outputPath)
+        XCTAssertEqual(outputs.count, 3)
+        XCTAssertTrue(
+            outputs.filter { $0.contains("Boise, Idaho/") }.count == 2,
+            "expected resolved city folders in preview, got \(outputs)")
+        XCTAssertTrue(outputs.contains { $0.contains("No-GPS/") })
+    }
+
     private func stubVideo(
         path: String = "/tmp/sample.mov", ext: String = "mov",
         lat: Double? = nil, lon: Double? = nil

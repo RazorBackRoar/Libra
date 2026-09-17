@@ -44,14 +44,27 @@ struct GPSLocationCluster: Identifiable, Hashable {
     }
 }
 
+/// Pure map view-model: owns pins, camera, and selection only. It never
+/// reverse-geocodes — place names arrive from ToolState's explicit
+/// "Resolve city names" action, so opening or filtering the map can never
+/// contact Apple. Base 5-mile clustering runs once per scanned file set off
+/// the main actor; filter changes reuse it in O(clustered files).
 @MainActor
 final class GPSMapModel: ObservableObject {
     @Published private(set) var clusters: [GPSLocationCluster] = []
     @Published var selectedClusterID: String?
     @Published var cameraPosition: MapCameraPosition = .automatic
+    @Published private(set) var isClustering = false
 
-    private var geocodeTask: Task<Void, Never>?
-    private var placeNameCache: [String: String] = [:]
+    private var baseClusters: [GPSLocationCluster] = []
+    /// Sorted paths of coordinate-bearing files the base build covers.
+    private var baseSignature: [String] = []
+    /// Rejects stale async builds after a newer scan.
+    private var buildGeneration = 0
+    /// file.path → place name, from ToolState's explicit resolve.
+    private var resolvedNames: [String: String] = [:]
+    private var filter: MediaBrowserFilter = .all
+    private var duplicateExtras: Set<String> = []
 
     var selectedCluster: GPSLocationCluster? {
         guard let selectedClusterID else { return nil }
@@ -62,22 +75,75 @@ final class GPSMapModel: ObservableObject {
         clusters.reduce(0) { $0 + $1.files.count }
     }
 
-    func update(files: [VideoInfo], geocode: Bool = false) {
-        let built = GPSMapClustering.cluster(files: files)
-        clusters = built.map { cluster in
+    /// Total coordinate-bearing files across every pin, ignoring the filter —
+    /// used by the panel's summary line.
+    var totalClusteredFiles: Int {
+        baseClusters.reduce(0) { $0 + $1.files.count }
+    }
+
+    func update(
+        files: [VideoInfo],
+        resolvedNames: [String: String] = [:],
+        filter: MediaBrowserFilter = .all
+    ) {
+        self.resolvedNames = resolvedNames
+        self.filter = filter
+        duplicateExtras = DuplicateDetector.extraPaths(in: files)
+
+        let signature = files.filter(\.hasCoordinates).map(\.path).sorted()
+        guard signature != baseSignature else {
+            applyVisibleClusters()
+            return
+        }
+
+        baseSignature = signature
+        buildGeneration += 1
+        let generation = buildGeneration
+        isClustering = true
+        let snapshot = files
+        Task.detached(priority: .userInitiated) {
+            let built = GPSMapClustering.cluster(files: snapshot)
+            await MainActor.run {
+                guard self.buildGeneration == generation else { return }
+                self.baseClusters = built
+                self.isClustering = false
+                self.applyVisibleClusters()
+            }
+        }
+    }
+
+    private func applyVisibleClusters() {
+        let extras = duplicateExtras
+        let active = filter
+        var visible = baseClusters.compactMap { cluster -> GPSLocationCluster? in
+            let kept = cluster.files.filter { active.matches($0, duplicateExtras: extras) }
+            guard !kept.isEmpty else { return nil }
             var copy = cluster
-            copy.placeName = placeNameCache[cluster.id]
+            copy.files = kept
+            copy.placeName = sharedPlaceName(for: kept)
             return copy
         }
-        // Re-apply any city merges already known from prior geocodes.
-        clusters = GPSMapClustering.mergeByPlaceName(clusters)
-        cameraPosition = GPSMapClustering.fittingPosition(for: clusters)
-        if let selectedClusterID, !clusters.contains(where: { $0.id == selectedClusterID }) {
+        visible = GPSMapClustering.mergeByPlaceName(visible)
+        clusters = visible
+        cameraPosition = GPSMapClustering.fittingPosition(for: visible)
+        if let selectedClusterID, !visible.contains(where: { $0.id == selectedClusterID }) {
             self.selectedClusterID = nil
         }
-        if geocode {
-            startGeocodingIfNeeded()
+    }
+
+    /// A cluster displays a place name only when every visible file resolved
+    /// to the same name; mixed or unresolved clusters show counts/coords.
+    private func sharedPlaceName(for files: [VideoInfo]) -> String? {
+        var name: String?
+        for file in files {
+            guard let resolved = resolvedNames[file.path] else { return nil }
+            if name == nil {
+                name = resolved
+            } else if name != resolved {
+                return nil
+            }
         }
+        return name
     }
 }
 
@@ -285,41 +351,5 @@ enum GPSMapClustering {
             longitudeDelta: max((maxLon - minLon) * 1.6, 0.05)
         )
         return .region(MKCoordinateRegion(center: center, span: span))
-    }
-}
-
-extension GPSMapModel {
-    private func startGeocodingIfNeeded() {
-        geocodeTask?.cancel()
-        let pending = clusters.filter { placeNameCache[$0.id] == nil }
-        guard !pending.isEmpty else { return }
-
-        geocodeTask = Task { [weak self] in
-            for cluster in pending {
-                if Task.isCancelled { return }
-                let name = await GPSGeocoder.reverseGeocode(
-                    latitude: cluster.latitude, longitude: cluster.longitude)
-                guard let self, !Task.isCancelled else { return }
-                if let name {
-                    self.placeNameCache[cluster.id] = name
-                    if let index = self.clusters.firstIndex(where: { $0.id == cluster.id }) {
-                        self.clusters[index].placeName = name
-                    }
-                    // Same city name → one pin with a combined count.
-                    self.clusters = GPSMapClustering.mergeByPlaceName(self.clusters)
-                    for merged in self.clusters where merged.placeName != nil {
-                        self.placeNameCache[merged.id] = merged.placeName
-                    }
-                    if let selectedClusterID = self.selectedClusterID,
-                        !self.clusters.contains(where: { $0.id == selectedClusterID })
-                    {
-                        self.selectedClusterID = nil
-                    }
-                    self.cameraPosition = GPSMapClustering.fittingPosition(for: self.clusters)
-                }
-                // Be gentle with Apple's geocoder.
-                try? await Task.sleep(nanoseconds: 250_000_000)
-            }
-        }
     }
 }

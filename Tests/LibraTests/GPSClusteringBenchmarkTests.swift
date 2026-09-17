@@ -64,6 +64,28 @@ final class GPSClusteringBenchmarkTests: XCTestCase {
         XCTAssertLessThan(elapsed, 2.0, "clustering 5,000 files took \(elapsed)s")
     }
 
+    /// Count-pill filters must reuse the base build — no re-clustering on
+    /// every click. Same file set → synchronous in-memory filter only.
+    @MainActor
+    func testMapFilterSwitchIsFast() async throws {
+        let files = makeFiles()
+        let model = GPSMapModel()
+        model.update(files: files)
+        let deadline = Date().addingTimeInterval(10)
+        while model.isClustering, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertEqual(model.clusters.count, 500)
+
+        let start = CFAbsoluteTimeGetCurrent()
+        model.update(files: files, filter: .resolution("1080p"))
+        let elapsed = CFAbsoluteTimeGetCurrent() - start
+
+        XCTAssertFalse(model.isClustering)  // filter change never re-clusters
+        XCTAssertEqual(model.clusters.reduce(0) { $0 + $1.files.count }, 5000)
+        XCTAssertLessThan(elapsed, 0.1, "filtering 5,000 files took \(elapsed)s")
+    }
+
     func testMergeByPlaceNameHandles500Clusters() {
         let files = makeFiles()
         var clusters = GPSMapClustering.cluster(files: files)

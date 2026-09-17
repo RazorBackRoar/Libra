@@ -71,6 +71,9 @@ enum MediaBrowserFilter: Hashable, Identifiable {
 struct CountPills: View {
     let files: [VideoInfo]
     var tool: Tool? = nil
+    /// Non-nil on GPS: pills show which map filter is active instead of
+    /// opening the category browser.
+    var selection: MediaBrowserFilter? = nil
     var onSelect: ((MediaBrowserFilter) -> Void)? = nil
 
     var body: some View {
@@ -111,7 +114,13 @@ struct CountPills: View {
 
     @ViewBuilder
     private func pill(filter: MediaBrowserFilter, label: String, value: Int, help: String? = nil) -> some View {
-        CountPill(label: label, value: value, helpText: help) {
+        let defaultHelp =
+            value == 0
+            ? "No \(label.lowercased())"
+            : selection != nil
+                ? (filter == .all ? "Show all pins" : "Show only \(label.lowercased()) on the map")
+                : "Browse \(label.lowercased())"
+        CountPill(label: label, value: value, helpText: help ?? defaultHelp, isSelected: selection == filter) {
             guard value > 0 else { return }
             onSelect?(filter)
         }
@@ -122,7 +131,9 @@ struct CountPill: View {
     let label: String
     let value: Int
     var helpText: String? = nil
+    var isSelected: Bool = false
     var action: (() -> Void)? = nil
+    @State private var hovering = false
 
     var body: some View {
         Button {
@@ -131,23 +142,58 @@ struct CountPill: View {
             HStack(spacing: 4) {
                 Text("\(value)")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(LibraTheme.yellow)
+                    .foregroundColor(isSelected ? .black : LibraTheme.yellow)
                 Text(label)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(isSelected ? .black.opacity(0.8) : .secondary)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(LibraTheme.panel)
-            .overlay(
-                Capsule().stroke(LibraTheme.hairline, lineWidth: 1)
+            .background(
+                ZStack {
+                    if isSelected {
+                        Capsule().fill(
+                            LinearGradient(
+                                colors: [LibraTheme.yellow, LibraTheme.gold],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        Capsule().fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.45), .clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                    } else {
+                        Capsule().fill(LibraTheme.panel)
+                        Capsule().fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(hovering ? 0.16 : 0.08), .clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                    }
+                }
             )
-            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(
+                    isSelected
+                        ? LibraTheme.amber.opacity(0.7)
+                        : hovering ? LibraTheme.yellow.opacity(0.45) : LibraTheme.hairline,
+                    lineWidth: 1
+                )
+            )
         }
         .buttonStyle(.plain)
         .disabled(value == 0 || action == nil)
         .opacity(value == 0 ? 0.55 : 1)
-        .help(helpText ?? (value == 0 ? "No \(label.lowercased())" : "Browse \(label.lowercased())"))
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .help(helpText ?? (value == 0 ? "No \(label.lowercased())" : label))
         .accessibilityLabel("\(value) \(label)")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }

@@ -36,6 +36,9 @@ final class ToolState: ObservableObject {
     /// cluster id → place name, persisted across scans — same spot never
     /// geocodes twice in one session.
     private var gpsPlaceCache: [String: String] = [:]
+    /// file.path → place name for map labels, filled by the explicit
+    /// "Resolve city names" action. Read-only to views; empty until resolved.
+    @Published private(set) var gpsPlaceByPath: [String: String] = [:]
     @Published private(set) var gpsCitiesResolved = false
 
     private static let dayFormatter: DateFormatter = {
@@ -52,6 +55,16 @@ final class ToolState: ObservableObject {
     var canWrite: Bool {
         !running && !files.isEmpty && !dryRun
             && (!tool.needsFfmpeg || AppState.shared.ffmpegPath != nil)
+            && gpsWriteBlockReason == nil
+    }
+
+    /// When set, GPS Write stays disabled — coordinate-bearing files must be
+    /// resolved to city folders by the explicit action first. Batches with no
+    /// coordinates at all write straight to No-GPS/ and never need Resolve.
+    var gpsWriteBlockReason: String? {
+        guard tool == .gps, files.contains(where: \.hasCoordinates), !gpsCitiesResolved
+        else { return nil }
+        return "Resolve city names first — Write stays off until locations are named."
     }
 
     var writeButtonTitle: String {
@@ -104,6 +117,7 @@ final class ToolState: ObservableObject {
         recap = nil
         undoRecords = []
         gpsCityByPath = [:]
+        gpsPlaceByPath = [:]
         gpsCitiesResolved = false
         unresolvedLocationCount = 0
         message = "Finding supported videos…"
@@ -143,6 +157,10 @@ final class ToolState: ObservableObject {
         }
         if tool.needsFfmpeg, (ffmpegPath ?? AppState.shared.ffmpegPath) == nil {
             message = "Needs ffmpeg to create transformed media."
+            return
+        }
+        if let blocked = gpsWriteBlockReason {
+            message = blocked
             return
         }
 
@@ -537,16 +555,17 @@ final class ToolState: ObservableObject {
     }
 
     /// One geocode pass over the coordinate clusters in `files`. Returns a
-    /// file.path → city-folder map plus how many files' locations could not
-    /// be named. Internal (not private) so tests can drive it with a stubbed
+    /// file.path → city-folder map for Preview/Write, a file.path → place-name
+    /// map for map labels, and how many files' locations could not be named.
+    /// Internal (not private) so tests can drive it with a stubbed
     /// `GPSGeocoder.resolver`.
     @discardableResult
     func geocodeGPSClusters(files: [VideoInfo]) async
-        -> (byPath: [String: String], unresolved: Int)
+        -> (byPath: [String: String], names: [String: String], unresolved: Int)
     {
         var clusters = GPSMapClustering.cluster(files: files)
         for index in clusters.indices {
-            if Task.isCancelled || cancelling { return ([:], 0) }
+            if Task.isCancelled || cancelling { return ([:], [:], 0) }
             if let cached = gpsPlaceCache[clusters[index].id] {
                 clusters[index].placeName = cached
                 continue
@@ -561,18 +580,22 @@ final class ToolState: ObservableObject {
             // Be gentle with Apple's geocoder.
             try? await Task.sleep(nanoseconds: 250_000_000)
         }
-        guard !Task.isCancelled, !cancelling else { return ([:], 0) }
+        guard !Task.isCancelled, !cancelling else { return ([:], [:], 0) }
         clusters = GPSMapClustering.mergeByPlaceName(clusters)
         var byPath: [String: String] = [:]
+        var names: [String: String] = [:]
         var unresolved = 0
         for cluster in clusters {
             if cluster.placeName == nil { unresolved += cluster.files.count }
             let folder = GPSGeocoder.folderName(for: cluster.placeName)
             for file in cluster.files {
                 byPath[file.path] = folder
+                if let place = cluster.placeName {
+                    names[file.path] = place
+                }
             }
         }
-        return (byPath, unresolved)
+        return (byPath, names, unresolved)
     }
 
     /// Explicit user action: geocode now so Preview shows the exact city
@@ -590,6 +613,7 @@ final class ToolState: ObservableObject {
                 return
             }
             self.gpsCityByPath = outcome.byPath
+            self.gpsPlaceByPath = outcome.names
             self.unresolvedLocationCount = outcome.unresolved
             self.gpsCitiesResolved = true
             // Re-run the preview so rows show the resolved folders.
@@ -601,15 +625,9 @@ final class ToolState: ObservableObject {
 
     private func gpsSort(target: [VideoInfo]) async {
         let extras = DuplicateDetector.extraPaths(in: target)
-        var cityByPath = gpsCityByPath
-        if !previewPass, cityByPath.isEmpty {
-            // "Resolve city names" was skipped — geocode inline so Write
-            // still lands in real city folders.
-            let outcome = await geocodeGPSClusters(files: target)
-            if Task.isCancelled || cancelling { return }
-            cityByPath = outcome.byPath
-            unresolvedLocationCount = outcome.unresolved
-        }
+        // Only the explicit "Resolve city names" cache feeds destinations —
+        // Write never geocodes inline (gpsWriteBlockReason gates it).
+        let cityByPath = gpsCityByPath
 
         let eligible = target.filter { $0.error == nil }
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)

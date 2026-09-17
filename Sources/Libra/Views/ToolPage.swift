@@ -14,6 +14,8 @@ struct ToolPage: View {
     @ObservedObject private var appState = AppState.shared
     @ObservedObject private var settingsStore = SettingsStore.shared
     @State private var browserFilter: MediaBrowserFilter?
+    /// GPS map-only pin filter — never affects Preview/Write scope.
+    @State private var gpsMapFilter: MediaBrowserFilter = .all
     @State private var workspace: ToolWorkspace = .video
 
     init(tool: Tool, onBack: @escaping () -> Void) {
@@ -92,6 +94,9 @@ struct ToolPage: View {
                 workspace = .video
             }
         }
+        .onChange(of: state.files.map(\.path)) { _, _ in
+            gpsMapFilter = .all
+        }
     }
 
     private var hasMedia: Bool {
@@ -155,17 +160,36 @@ struct ToolPage: View {
 
     @ViewBuilder
     private var videoWorkspace: some View {
+        if tool == .gps {
+            gpsWorkspace
+        } else {
+            standardVideoWorkspace
+        }
+    }
+
+    /// GPS is map-first: pills filter pins, the map fills the workspace, and
+    /// no results table or media browser lives here. Preview/Write scope is
+    /// untouched — filters are visual only.
+    @ViewBuilder
+    private var gpsWorkspace: some View {
         if !state.filteredFiles.isEmpty {
-            CountPills(files: state.filteredFiles, tool: tool) { filter in
-                browserFilter = filter
+            CountPills(
+                files: state.filteredFiles, tool: tool, selection: gpsMapFilter
+            ) { filter in
+                gpsMapFilter = gpsMapFilter == filter ? .all : filter
             }
         }
 
-        if state.filteredFiles.contains(where: \.hasCoordinates) {
-            GPSMapPanel(files: state.filteredFiles, startsExpanded: tool == .gps)
-        }
+        GPSMapPanel(
+            files: state.filteredFiles,
+            resolvedNames: state.gpsPlaceByPath,
+            filter: gpsMapFilter,
+            presentation: .primary
+        )
+        .frame(maxHeight: .infinity)
+        .layoutPriority(1)
 
-        if tool == .gps, state.filteredFiles.contains(where: \.hasCoordinates) {
+        if state.filteredFiles.contains(where: \.hasCoordinates) {
             HStack(spacing: 12) {
                 Button(state.gpsCitiesResolved ? "City names resolved" : "Resolve city names…") {
                     state.resolveGPSCityNames()
@@ -176,11 +200,37 @@ struct ToolPage: View {
                 Text(
                     state.gpsCitiesResolved
                         ? "Preview shows the exact destination folders."
-                        : "Preview shows GPS/ — resolve once for exact folders; Write uses the same names."
+                        : "Required before Write — preview shows GPS/ until cities resolve."
                 )
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
             }
+        }
+
+        if state.showsExtraFolderToggles {
+            extraFolderToggles
+        }
+
+        if state.running {
+            ProgressView(
+                value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
+            Text(progressCaption)
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+                .accessibilityLabel(progressCaption)
+        }
+    }
+
+    @ViewBuilder
+    private var standardVideoWorkspace: some View {
+        if !state.filteredFiles.isEmpty {
+            CountPills(files: state.filteredFiles, tool: tool) { filter in
+                browserFilter = filter
+            }
+        }
+
+        if state.filteredFiles.contains(where: \.hasCoordinates) {
+            GPSMapPanel(files: state.filteredFiles)
         }
 
         if tool.isSortRenameFamily {
@@ -188,29 +238,7 @@ struct ToolPage: View {
         }
 
         if state.showsExtraFolderToggles {
-            HStack(spacing: 16) {
-                Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
-                Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
-                Toggle(
-                    "Put extras in Duplicates",
-                    isOn: $settingsStore.settings.sortDuplicatesIntoFolder
-                )
-                .help("Same size, duration, and video format — not a byte-for-byte match")
-            }
-            .toggleStyle(.checkbox)
-            .disabled(state.running)
-            .onChange(of: settingsStore.settings.sortByDate) { _, _ in
-                settingsStore.save()
-                state.scheduleRerunAfterOptionsChange()
-            }
-            .onChange(of: settingsStore.settings.sortByCamera) { _, _ in
-                settingsStore.save()
-                state.scheduleRerunAfterOptionsChange()
-            }
-            .onChange(of: settingsStore.settings.sortDuplicatesIntoFolder) { _, _ in
-                settingsStore.save()
-                state.scheduleRerunAfterOptionsChange()
-            }
+            extraFolderToggles
         }
 
         if tool == .slomo {
@@ -260,6 +288,32 @@ struct ToolPage: View {
 
         ResultsTable(files: state.filteredFiles, results: state.results)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var extraFolderToggles: some View {
+        HStack(spacing: 16) {
+            Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
+            Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
+            Toggle(
+                "Put extras in Duplicates",
+                isOn: $settingsStore.settings.sortDuplicatesIntoFolder
+            )
+            .help("Same size, duration, and video format — not a byte-for-byte match")
+        }
+        .toggleStyle(.checkbox)
+        .disabled(state.running)
+        .onChange(of: settingsStore.settings.sortByDate) { _, _ in
+            settingsStore.save()
+            state.scheduleRerunAfterOptionsChange()
+        }
+        .onChange(of: settingsStore.settings.sortByCamera) { _, _ in
+            settingsStore.save()
+            state.scheduleRerunAfterOptionsChange()
+        }
+        .onChange(of: settingsStore.settings.sortDuplicatesIntoFolder) { _, _ in
+            settingsStore.save()
+            state.scheduleRerunAfterOptionsChange()
+        }
     }
 
     @ViewBuilder
@@ -363,6 +417,11 @@ struct ToolPage: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let reason = state.gpsWriteBlockReason, !state.dryRun {
+                Text(reason)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(LibraTheme.gold)
+            }
             if let recap = state.recap ?? state.message {
                 Text(recap)
                     .font(.system(size: 13, weight: .medium))
@@ -395,6 +454,7 @@ struct ToolPage: View {
                     Button("Undo last run") {
                         state.undoLastRun()
                     }
+                    .buttonStyle(LibraSecondaryButtonStyle(compact: true))
                     .accessibilityLabel("Undo last run")
                 }
 
@@ -402,6 +462,7 @@ struct ToolPage: View {
                     Button(state.cancelling ? "Cancelling…" : "Cancel") {
                         state.cancelActiveWork()
                     }
+                    .buttonStyle(LibraSecondaryButtonStyle(compact: true))
                     .disabled(state.cancelling)
                     .accessibilityLabel("Cancel")
                 } else {
@@ -410,6 +471,7 @@ struct ToolPage: View {
                     }
                     .buttonStyle(LibraPrimaryButtonStyle())
                     .disabled(!state.canWrite)
+                    .help(state.gpsWriteBlockReason ?? "")
                     .accessibilityLabel(state.writeButtonTitle)
                 }
             }

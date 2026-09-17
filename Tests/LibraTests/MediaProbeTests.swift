@@ -187,6 +187,19 @@ final class MediaProbeTests: XCTestCase {
             ).folder, .otherApple)
     }
 
+    /// Image with no embedded date falls back to the filesystem stamp and
+    /// must surface the nonfatal warning that feeds the row + scan recap.
+    func testImageWithoutEmbeddedTimestampWarns() async throws {
+        let url = try makeJPEG(make: "Canon", model: nil)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let info = try await MediaProbe.probe(filePath: url.path)
+        XCTAssertNil(info.error)
+        XCTAssertFalse(info.creationTimeEmbedded)
+        XCTAssertNotNil(info.creationTime)
+        XCTAssertEqual(info.warning, "No embedded timestamp — using file date")
+    }
+
     func testFailedProbeStillReportsFilesystemDates() async throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("libra-probe-\(UUID().uuidString).mov")

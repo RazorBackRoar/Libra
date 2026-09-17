@@ -1,53 +1,170 @@
 import SwiftUI
 import MapKit
 
-/// Lightweight Apple Maps mini-map — native MapKit only.
-/// Caller should only present this when `files` contain coordinates.
+/// Apple Maps surface — native MapKit only, no thumbnails or media playback.
+/// `.primary` (the GPS tool): always expanded, fills the workspace, pin
+/// selection shows a bottom overlay of glossy filename buttons.
+/// `.compact` (other tools): a collapsible 168-pt mini-map.
 struct GPSMapPanel: View {
+    enum Presentation {
+        case compact
+        case primary
+    }
+
     let files: [VideoInfo]
+    /// file.path → place name from ToolState's explicit Resolve — the map
+    /// never geocodes itself.
+    var resolvedNames: [String: String] = [:]
+    /// Map-only visual filter — never changes Preview/Write scope.
+    var filter: MediaBrowserFilter = .all
+    var presentation: Presentation = .compact
     var startsExpanded: Bool = false
+
     @StateObject private var model = GPSMapModel()
     @State private var expanded = false
+
+    private var isPrimary: Bool { presentation == .primary }
 
     var body: some View {
         let coordinateFiles = files.filter(\.hasCoordinates)
         let totals = GPSMediaCounts.totals(in: coordinateFiles)
         VStack(spacing: 10) {
-            Button {
-                expanded.toggle()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "map")
-                        .foregroundColor(LibraTheme.yellow)
-                    Text("City / GPS Map")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-                    Spacer(minLength: 8)
-                    Text(summaryText(photos: totals.photos, videos: totals.videos))
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
-                }
+            if isPrimary {
+                headerRow(photos: totals.photos, videos: totals.videos)
+            } else {
+                collapseHeader(photos: totals.photos, videos: totals.videos)
             }
-            .buttonStyle(.plain)
 
-            if expanded {
-                Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
-                    ForEach(model.clusters) { cluster in
-                        Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
-                            GPSMapPin(selected: model.selectedClusterID == cluster.id)
-                        }
-                        .tag(cluster.id)
-                    }
+            if isPrimary {
+                primaryMap
+            } else if expanded {
+                compactMap
+            }
+        }
+        .padding(isPrimary || expanded ? 12 : 10)
+        .libraPanel()
+        .onAppear {
+            expanded = startsExpanded
+            model.update(files: files, resolvedNames: resolvedNames, filter: filter)
+        }
+        .onChange(of: files.map(\.path)) { _, _ in
+            if startsExpanded, files.contains(where: \.hasCoordinates) {
+                expanded = true
+            }
+            model.update(files: files, resolvedNames: resolvedNames, filter: filter)
+        }
+        .onChange(of: resolvedNames) { _, names in
+            model.update(files: files, resolvedNames: names, filter: filter)
+        }
+        .onChange(of: filter) { _, active in
+            model.update(files: files, resolvedNames: resolvedNames, filter: active)
+        }
+        .onChange(of: expanded) { _, isExpanded in
+            if isExpanded {
+                model.update(files: files, resolvedNames: resolvedNames, filter: filter)
+            }
+        }
+    }
+
+    private func headerRow(photos: Int, videos: Int) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "map")
+                .foregroundColor(LibraTheme.yellow)
+            Text("City / GPS Map")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+            Spacer(minLength: 8)
+            Text(summaryText(photos: photos, videos: videos))
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func collapseHeader(photos: Int, videos: Int) -> some View {
+        Button {
+            expanded.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "map")
+                    .foregroundColor(LibraTheme.yellow)
+                Text("City / GPS Map")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                Spacer(minLength: 8)
+                Text(summaryText(photos: photos, videos: videos))
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var mapSurface: some View {
+        Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
+            ForEach(model.clusters) { cluster in
+                Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
+                    GPSMapPin(selected: model.selectedClusterID == cluster.id)
                 }
-                .mapStyle(.standard)
-                .mapControls {
-                    MapCompass()
-                    MapScaleView()
+                .tag(cluster.id)
+            }
+        }
+        .mapStyle(.standard)
+        .mapControls {
+            MapCompass()
+            MapScaleView()
+        }
+    }
+
+    /// Primary mode: the map owns the space. Status messages float centered;
+    /// the selected location docks as a names-only card at the bottom, clear
+    /// of MapKit's scale/attribution edge.
+    private var primaryMap: some View {
+        ZStack {
+            mapSurface
+
+            if let status = mapStatusMessage {
+                Text(status)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(LibraTheme.hairline, lineWidth: 1)
+                    )
+                    .padding()
+                    .allowsHitTesting(false)
+            }
+
+            if let selected = model.selectedCluster {
+                VStack {
+                    Spacer()
+                    selectedLocationOverlay(selected)
                 }
+                .padding(10)
+                .padding(.bottom, 22)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 300, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(LibraTheme.hairline, lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+    }
+
+    private var compactMap: some View {
+        VStack(spacing: 8) {
+            mapSurface
                 .frame(height: 168)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(
@@ -55,34 +172,26 @@ struct GPSMapPanel: View {
                         .stroke(LibraTheme.hairline, lineWidth: 1)
                 )
 
-                if let selected = model.selectedCluster {
-                    selectedClusterCard(selected)
-                } else {
-                    Text("Click a yellow pin to see every video at that city (5 mi + same city).")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                }
+            if let selected = model.selectedCluster {
+                selectedLocationOverlay(selected)
+            } else {
+                Text("Click a yellow pin to see every video at that city.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding(expanded ? 12 : 10)
-        .libraPanel()
-        .onAppear {
-            expanded = startsExpanded
-            model.update(files: files, geocode: expanded)
+    }
+
+    private var mapStatusMessage: String? {
+        if model.isClustering { return "Placing videos on the map…" }
+        if files.isEmpty { return "Drop videos to place them on the map." }
+        if !files.contains(where: \.hasCoordinates) {
+            return "No GPS coordinates found — these videos will use No-GPS/."
         }
-        .onChange(of: files.map(\.path)) { _, _ in
-            if startsExpanded, files.contains(where: \.hasCoordinates) {
-                expanded = true
-            }
-            model.update(files: files, geocode: expanded)
-        }
-        .onChange(of: expanded) { _, isExpanded in
-            if isExpanded {
-                model.update(files: files, geocode: true)
-            }
-        }
+        if model.clusters.isEmpty { return "No mapped videos match this filter." }
+        return nil
     }
 
     private func summaryText(photos: Int, videos: Int) -> String {
@@ -90,65 +199,58 @@ struct GPSMapPanel: View {
         return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi / city"
     }
 
-    @ViewBuilder
-    private func selectedClusterCard(_ cluster: GPSLocationCluster) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+    /// Names only — no thumbnails, metadata rows, or playback. Buttons open
+    /// the file externally; the context menu can reveal it in Finder.
+    private func selectedLocationOverlay(_ cluster: GPSLocationCluster) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
                 Image(systemName: "mappin.circle.fill")
                     .font(.system(size: 14))
                     .foregroundColor(LibraTheme.yellow)
-                Text(cluster.placeName ?? "Resolving city…")
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
+                Text(
+                    cluster.placeName
+                        ?? String(format: "%.4f, %.4f", cluster.latitude, cluster.longitude)
+                )
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                Spacer(minLength: 8)
                 Text(cluster.mediaCountLabel)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(LibraTheme.gold)
             }
-            Text("All media within 5 miles, merged by city when names match")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-            Text(String(format: "%.5f, %.5f", cluster.latitude, cluster.longitude))
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundColor(.secondary)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 3) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 8) {
                     ForEach(cluster.files) { file in
                         Button {
                             MediaOpen.open(file.path)
                         } label: {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(file.name + "." + file.ext)
-                                    .font(.system(size: 11))
-                                    .foregroundColor(LibraTheme.gold)
-                                    .lineLimit(1)
-                                Text(file.identificationLine)
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                    .help(file.identificationLine)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Text("\(file.name).\(file.ext)")
+                                .lineLimit(1)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(LibraFileButtonStyle())
                         .help("Open \(file.name).\(file.ext)")
+                        .accessibilityLabel("Open \(file.name).\(file.ext)")
                         .contextMenu {
                             Button("Open") { MediaOpen.open(file.path) }
                             Button("Reveal in Finder") { MediaOpen.reveal(file.path) }
                         }
                     }
                 }
+                .padding(.vertical, 2)
             }
-            .frame(maxHeight: 140)
+            .frame(height: 30)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(0.45))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(LibraTheme.hairline, lineWidth: 1)
         )
-        .cornerRadius(8)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Selected location")
     }
 }
 

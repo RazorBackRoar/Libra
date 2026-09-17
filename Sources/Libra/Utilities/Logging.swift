@@ -8,7 +8,8 @@ final class Log {
 
     private static let timestampFormatter = ISO8601DateFormatter()
     /// Rotate `libra.log` to `libra.1.log` past this size (one generation kept).
-    private static let maxLogBytes: UInt64 = 5 * 1024 * 1024
+    /// nonisolated — read by the serial file queue off the main actor.
+    private nonisolated static let maxLogBytes: UInt64 = 5 * 1024 * 1024
 
     private let fileURL: URL
     private let osLog = Logger(subsystem: Brand.appId, category: "app")

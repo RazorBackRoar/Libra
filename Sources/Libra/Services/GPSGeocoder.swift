@@ -4,7 +4,7 @@ import CoreLocation
 @MainActor
 enum GPSGeocoder {
     /// Test seam — real reverse geocoding needs Apple's servers. Tests swap
-    /// this for a stub and must restore it (see `useRealGeocoder`).
+    /// this for a stub and must restore the original closure afterwards.
     static var resolver: (Double, Double) async -> String? = { lat, lon in
         await realReverseGeocode(latitude: lat, longitude: lon)
     }

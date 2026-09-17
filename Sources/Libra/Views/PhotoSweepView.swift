@@ -372,7 +372,11 @@ struct PhotoSweepView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         if files {
-            panel.allowedContentTypes = [.image, .data]
+            // Image-only picker — broad `.data` let arbitrary files through.
+            let types = SettingsStore.shared.settings.imageExtensions.compactMap {
+                UTType(filenameExtension: $0)
+            }
+            panel.allowedContentTypes = types.isEmpty ? [.image] : types
         }
         if panel.runModal() == .OK {
             beginScan(panel.urls.map(\.path))

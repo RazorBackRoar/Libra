@@ -1,7 +1,7 @@
 # Libra
 
 [![Download](https://img.shields.io/github/v/release/RazorBackRoar/Libra?style=for-the-badge&label=Download%20DMG&color=d32f2f)](https://github.com/RazorBackRoar/Libra/releases/latest)
-[![Version](https://img.shields.io/badge/version-1.4.0-blue?style=for-the-badge)](https://github.com/RazorBackRoar/Libra/releases/tag/v1.4.0)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue?style=for-the-badge)](Sources/Libra/Resources/version.json)
 [![CI](https://img.shields.io/github/actions/workflow/status/RazorBackRoar/Libra/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/RazorBackRoar/Libra/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blueviolet?style=for-the-badge)](LICENSE)
 [![Swift](https://img.shields.io/badge/Swift-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://swift.org/)
@@ -32,8 +32,8 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 - **Dry Run first** — bright yellow **Preview only** toggle; Desktop reports named `Libra Sorter Dry Run 1.txt` (tool name swaps per mode)
 - **Home grid** — Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuster, and Photos Only
 - **Libra Sorter** — ProVid, VidRes, ProMax, MaxVid; optional prefix replaces the original name (`katie 720p W30 002.mp4`); KeepName keeps original filenames
-- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city; expanded on the GPS tool, collapsed on the others (coordinates stay on each row); click a filename to open the video
-- **GPS** — **Resolve city names** fills Preview with the exact `City, ST/` folders Write will use (cached, never re-geocoded); `No-GPS` when location is missing, `GPS/` when a place can't be named
+- **City / GPS Map** — MapKit pins clustered within **5 miles**, merged by city once names resolve; a large always-on map on the GPS tool, a collapsible mini-map on the others; click a pin for a bottom strip of filename buttons that open the video externally
+- **GPS** — count pills filter map pins (All, resolution, Has location, Apple device, duplicates — visual only, never changes what Write touches); **Resolve city names** is the only action that looks up locations, fills Preview with the exact `City, ST/` folders Write will use (cached, never re-geocoded), and is required before Write when coordinates exist; `No-GPS` when location is missing, `GPS/` when a place can't be named
 - **Optional date / camera folders** — extra sort keys on the sort tools
 - **Duplicates** — likely extras (same size, duration, resolution, fps, codec) go in a Duplicates folder
 - **Identification** — each row shows resolution, fps, iPhone/Apple, and GPS coordinates (not the container; the filename already has that)
@@ -41,7 +41,7 @@ Drag folders onto a tool, preview with Dry Run, and tidy libraries on your machi
 - **Transform** — Slo-Mo copies (½× or ¼×, audio kept-and-slowed or removed by your choice) and 1-Min-Adjuster sequential timestamps (these need ffmpeg)
 - **1-Min-Adjuster undo** — "Change originals" puts each untouched original in Trash; Undo restores the original bytes and removes the adjusted copy
 - **Resilient import** — cancelable scans; per-file probe failures don’t stall the batch
-- **Local-first organize** — sort, rename, and file moves stay on your Mac. City names on the GPS map use Apple reverse-geocode when you open the map, or when you Write on GPS. Check for Updates talks to GitHub when you ask.
+- **Local-first organize** — sort, rename, and file moves stay on your Mac. Opening or filtering the GPS map never contacts Apple — only the **Resolve city names** button reverse-geocodes. Check for Updates talks to GitHub when you ask.
 - **Native SwiftUI** — Apple Silicon macOS app, ad-hoc signed DMG
 
 ## Install
@@ -58,8 +58,8 @@ Requires macOS 14+ on Apple Silicon. ffmpeg via Homebrew when transforms need it
 2. Drop a folder or videos, or use Open Folder / Select Videos
 3. Leave **Preview only** on to plan the run; turn it off and press **Write** to change files (confirm first)
 4. Use **Undo last run** if a live pass wasn’t what you wanted
-5. Use the City / GPS Map pins to inspect locations; click a filename to open the video
-6. Click a row to open the file; right-click to Reveal in Finder
+5. On **GPS**, use the count pills to filter pins, click a pin to see its filenames in the bottom strip, and press **Resolve city names** before Write
+6. Click a filename or row to open the file; right-click to Reveal in Finder
 
 ## Development
 

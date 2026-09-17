@@ -143,23 +143,96 @@ struct LibraPrimaryButtonStyle: ButtonStyle {
     }
 }
 
-/// Dark glass pill — hairline yellow edge, white text, for secondary actions.
+/// Dark glass pill — top gloss, hairline yellow edge that brightens on
+/// hover, white text. For secondary actions (Back, Resolve, Undo, Cancel).
 struct LibraSecondaryButtonStyle: ButtonStyle {
     var compact: Bool = false
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: compact ? 12 : 13, weight: .semibold))
-            .foregroundColor(.white)
-            .padding(.horizontal, compact ? 12 : 16)
-            .padding(.vertical, compact ? 5 : 8)
-            .background(
-                Capsule()
-                    .fill(LibraTheme.panel)
-                    .overlay(
-                        Capsule().stroke(LibraTheme.hairline, lineWidth: 1)
+        SecondaryPill(label: configuration.label, isPressed: configuration.isPressed, compact: compact)
+    }
+
+    private struct SecondaryPill: View {
+        let label: Configuration.Label
+        let isPressed: Bool
+        let compact: Bool
+        @State private var hovering = false
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            label
+                .font(.system(size: compact ? 12 : 13, weight: .semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, compact ? 12 : 16)
+                .padding(.vertical, compact ? 5 : 8)
+                .background(
+                    ZStack {
+                        Capsule().fill(LibraTheme.panel)
+                        Capsule().fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(hovering ? 0.18 : 0.10), .clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                    }
+                )
+                .overlay(
+                    Capsule().stroke(
+                        hovering ? LibraTheme.yellow.opacity(0.5) : LibraTheme.hairline,
+                        lineWidth: 1
                     )
-            )
-            .opacity(configuration.isPressed ? 0.6 : 1)
+                )
+                .opacity(isEnabled ? (isPressed ? 0.7 : 1) : 0.5)
+                .scaleEffect(isPressed ? 0.97 : 1)
+                .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
+        }
+    }
+}
+
+/// Glossy dark pill for filename buttons — compact, gold on hover, used in
+/// the GPS map overlay where names are the only affordance.
+struct LibraFileButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        FilePill(label: configuration.label, isPressed: configuration.isPressed)
+    }
+
+    private struct FilePill: View {
+        let label: Configuration.Label
+        let isPressed: Bool
+        @State private var hovering = false
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            label
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(hovering ? LibraTheme.yellow : .white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    ZStack {
+                        Capsule().fill(LibraTheme.panel)
+                        Capsule().fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(hovering ? 0.2 : 0.12), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    }
+                )
+                .overlay(
+                    Capsule().stroke(
+                        hovering ? LibraTheme.yellow.opacity(0.6) : LibraTheme.hairline,
+                        lineWidth: 1
+                    )
+                )
+                .shadow(color: LibraTheme.yellow.opacity(hovering ? 0.25 : 0), radius: 6, y: 2)
+                .opacity(isEnabled ? (isPressed ? 0.65 : 1) : 0.5)
+                .scaleEffect(isPressed ? 0.96 : 1)
+                .onHover { hovering = $0 }
+                .animation(.easeOut(duration: 0.12), value: hovering)
+        }
     }
 }

@@ -52,6 +52,22 @@ final class MediaKindsTests: XCTestCase {
         XCTAssertFalse(defaults.contains("webm"))
     }
 
+    /// Representative fixture per default extension must survive the real
+    /// probe path — the list isn't just a hard-coded set. Fixtures are
+    /// ffmpeg-generated h264+aac files committed under Tests/Fixtures.
+    func testDefaultExtensionsProbeBundledFixtures() async throws {
+        for ext in AppSettings.default.videoExtensions {
+            guard let url = Bundle.module.url(forResource: "fmt-probe", withExtension: ext)
+            else {
+                XCTFail("missing bundled fixture fmt-probe.\(ext)")
+                continue
+            }
+            let info = try await MediaProbe.probe(filePath: url.path)
+            XCTAssertNil(info.error, "\(ext) failed to probe: \(info.error ?? "?")")
+            XCTAssertEqual(info.container, ext)
+        }
+    }
+
     func testVideoInfoIsImageUsesLiveSettings() {
         var settings = SettingsStore.shared.settings
         settings.imageExtensions = ["avif"]
