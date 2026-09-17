@@ -27,47 +27,30 @@ enum LibraTheme {
     }
 }
 
-/// Glossy yellow card face: vertical gradient + top gloss highlight +
-/// inner bottom shadow + soft yellow ambient shadow + hover lift/sweep.
-/// Black text/icons sit on top — never yellow text on yellow.
+/// Card face — a very light gold-and-black gradient: pale gold wash bleeding
+/// down over near-black, thin gold border, soft ambient glow, hover
+/// lift + shine sweep.
 struct LibraCardFace: View {
     var hovering: Bool = false
 
     var body: some View {
         RoundedRectangle(cornerRadius: 14)
-            .fill(LibraTheme.cardFace)
-            .overlay(alignment: .top) {
-                // Gloss band — white highlight bleeding down from the top edge.
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(hovering ? 0.5 : 0.35),
-                                Color.white.opacity(0.06),
-                                .clear,
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: 28)
-            }
-            .overlay(alignment: .bottom) {
-                // Inner bottom shadow keeps the face from reading flat.
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, Color.black.opacity(0.18)],
-                            startPoint: .center,
-                            endPoint: .bottom
-                        )
-                    )
-            }
+            .fill(
+                LinearGradient(
+                    colors: [
+                        LibraTheme.gold.opacity(hovering ? 0.22 : 0.16),
+                        Color(red: 0.09, green: 0.085, blue: 0.075),
+                        Color(red: 0.045, green: 0.045, blue: 0.05),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
             .overlay {
                 // Sweeping shine on hover — a diagonal shaft sliding across.
                 GeometryReader { geo in
                     LinearGradient(
-                        colors: [.clear, Color.white.opacity(0.28), .clear],
+                        colors: [.clear, Color.white.opacity(0.14), .clear],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -80,7 +63,17 @@ struct LibraCardFace: View {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(LibraTheme.amber.opacity(0.6), lineWidth: 1)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                LibraTheme.gold.opacity(hovering ? 0.8 : 0.55),
+                                LibraTheme.amber.opacity(0.25),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
             )
             .shadow(color: LibraTheme.ambient(hovering: hovering), radius: hovering ? 14 : 8, y: 3)
             .scaleEffect(hovering ? 1.02 : 1)

@@ -9,7 +9,7 @@ struct LibraApp: App {
         Window("Libra", id: "main") {
             LibraView()
         }
-        .defaultSize(width: 900, height: 860)
+        .defaultSize(width: 900, height: 445)
         .windowResizability(.contentMinSize)
 
         Settings {
@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.backgroundColor = .black
-            window.minSize = NSSize(width: 780, height: 740)
+            window.minSize = NSSize(width: 780, height: 430)
         }
     }
 

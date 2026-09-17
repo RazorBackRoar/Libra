@@ -54,6 +54,8 @@ Source/build version is **1.4.0** — not yet published.
 - [x] Non-GPS tools: location details hide behind a full-width gold "Location details" button pinned at the section's bottom; clicking expands the mini-map upward above it (spring animation), chevron flips direction with state
 - [x] Preview/Live control: custom `PreviewModeToggleStyle` — gold circle knob docked left on a gold-edged track while Preview only; flipping slides a white knob right onto an amber track and the label reads "Live"
 - [x] Action button names the operation — "Rename N Videos" (sort family + iPhone: "Sort N Videos"), "Organize N Videos" (GPS), "Make N Slo-Mo", "Adjust N Timestamps", "Move N Photos"; confirm alert button uses the matching verb
+- [x] Home cards restyled — near-black faces with a subtle pale-gold wash over black, thin gold gradient border, gold icon/chip accents, compact fixed 148pt height; gold liner border tracing the whole window edge on every page (`LibraView`)
+- [x] Window hugs content — `LibraView.resizeWindow` animates the window to 900×445 on home and 900×860 on tool pages (top edge anchored, clamped to the visible frame); home min size 780×430, `defaultSize` 900×445
 - [ ] Manual UAT (owner): ⌘, Settings; drop→Preview vs Write; Cancel mid-scan; GPS pills→pins, resolve→Preview→Write gate, pin overlay filenames; iPhone sort; Photos Only; Slo-Mo audio on/off (MOV+WEBM); 1-Min copy + in-place + Undo; ~5k folder smoothness
 - [ ] Release gate (explicit ask only): `razorbuild Libra`, SHA-256, `gh release create v1.4.0`, delete v1.3.0 release+tag
 
