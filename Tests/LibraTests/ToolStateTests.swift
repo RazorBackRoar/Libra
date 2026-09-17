@@ -69,7 +69,7 @@ final class ToolStateTests: XCTestCase {
         state.startWrite(settings: .default, ffmpegPath: nil)
 
         XCTAssertFalse(state.running)
-        XCTAssertEqual(state.message, "Turn off Preview only, then Write.")
+        XCTAssertEqual(state.message, "Turn off Preview only to enable the action.")
         XCTAssertTrue(state.undoRecords.isEmpty)
     }
 
@@ -190,6 +190,24 @@ final class ToolStateTests: XCTestCase {
             outputs.filter { $0.contains("Boise, Idaho/") }.count == 2,
             "expected resolved city folders in preview, got \(outputs)")
         XCTAssertTrue(outputs.contains { $0.contains("No-GPS/") })
+    }
+
+    func testActionTitleNamesTheOperation() {
+        for (tool, verb) in [
+            (Tool.provid, "Rename"),
+            (.iphoneSorter, "Sort"),
+            (.gps, "Organize"),
+            (.slomo, "Make"),
+            (.oneMin, "Adjust"),
+        ] {
+            let state = ToolState(tool: tool)
+            state.files = [stubVideo(path: "/vids/a.mov"), stubVideo(path: "/vids/b.mov")]
+            XCTAssertEqual(state.writeActionVerb, verb, "\(tool) verb")
+            XCTAssertTrue(
+                state.writeButtonTitle.hasPrefix(verb),
+                "\(tool) title \(state.writeButtonTitle) should start with \(verb)")
+            XCTAssertFalse(state.writeButtonTitle.contains("Write"))
+        }
     }
 
     private func stubVideo(

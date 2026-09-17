@@ -119,7 +119,7 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         case .provid, .vidres, .keepName, .promax, .maxvid:
             return "Rename videos, or nest folders by resolution, orientation, and FPS."
         case .oneMin: return "Stamp sequential 60-second creation times. Needs ffmpeg."
-        case .slomo: return "Write slowed copies into a SloMo folder. Needs ffmpeg."
+        case .slomo: return "Make slowed copies into a SloMo folder. Needs ffmpeg."
         case .gps:
             return "Sort into city folders from location, or No-GPS when location is missing."
         case .photoSweep: return "Move stills out of mixed video folders."

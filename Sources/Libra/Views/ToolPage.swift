@@ -200,7 +200,7 @@ struct ToolPage: View {
                 Text(
                     state.gpsCitiesResolved
                         ? "Preview shows the exact destination folders."
-                        : "Required before Write — preview shows GPS/ until cities resolve."
+                        : "Required before organizing — preview shows GPS/ until cities resolve."
                 )
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
@@ -431,14 +431,17 @@ struct ToolPage: View {
 
             HStack {
                 Toggle(isOn: $state.dryRun) {
-                    Text("Preview only")
+                    Text(state.dryRun ? "Preview only" : "Live")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(LibraTheme.yellow)
+                        .foregroundColor(state.dryRun ? LibraTheme.yellow : .orange)
                 }
-                .toggleStyle(.switch)
-                .tint(LibraTheme.yellow)
+                .toggleStyle(PreviewModeToggleStyle())
                 .disabled(state.running)
                 .accessibilityLabel("Preview only")
+                .accessibilityHint(
+                    state.dryRun
+                        ? "Preview is on — nothing will be changed. Turn off to enable the action."
+                        : "Live — the action button applies changes.")
                 .onChange(of: state.dryRun) { _, _ in
                     state.scheduleRerunAfterOptionsChange()
                 }
@@ -541,7 +544,7 @@ struct ToolPage: View {
                 \(state.previewLiveCaption)
                 """
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "Write")
+            alert.addButton(withTitle: state.writeActionVerb)
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }

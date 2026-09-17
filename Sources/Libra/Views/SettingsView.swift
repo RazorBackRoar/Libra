@@ -34,7 +34,7 @@ struct SettingsView: View {
             }
             Section("Defaults") {
                 Toggle("Preview only by default", isOn: $store.settings.dryRunDefault)
-                Toggle("Confirm before Write", isOn: $store.settings.requireConfirmToWrite)
+                Toggle("Confirm before applying", isOn: $store.settings.requireConfirmToWrite)
                 TextField("Default prefix", text: $defaultPrefix)
                 Toggle("Also sort by date", isOn: $store.settings.sortByDate)
                 Toggle("Also sort by camera", isOn: $store.settings.sortByCamera)

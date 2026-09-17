@@ -58,18 +58,39 @@ final class ToolState: ObservableObject {
             && gpsWriteBlockReason == nil
     }
 
-    /// When set, GPS Write stays disabled — coordinate-bearing files must be
-    /// resolved to city folders by the explicit action first. Batches with no
-    /// coordinates at all write straight to No-GPS/ and never need Resolve.
+    /// When set, the action button stays disabled — coordinate-bearing files
+    /// must be resolved to city folders by the explicit action first. Batches
+    /// with no coordinates at all write straight to No-GPS/ and never need it.
     var gpsWriteBlockReason: String? {
         guard tool == .gps, files.contains(where: \.hasCoordinates), !gpsCitiesResolved
         else { return nil }
-        return "Resolve city names first — Write stays off until locations are named."
+        return "Resolve city names first — organizing stays off until locations are named."
+    }
+
+    /// The verb the action button performs for this tool — "Write" means
+    /// nothing; the button names the operation itself.
+    var writeActionVerb: String {
+        switch tool {
+        case .slomo: return "Make"
+        case .oneMin: return "Adjust"
+        case .gps: return "Organize"
+        case .iphoneSorter: return "Sort"
+        case .photoSweep: return "Move"
+        default: return "Rename"
+        }
     }
 
     var writeButtonTitle: String {
         let count = files.filter { $0.error == nil }.count
-        return "Write \(count) video\(count == 1 ? "" : "s")"
+        let plural = count == 1 ? "" : "s"
+        switch tool {
+        case .slomo: return "Make \(count) Slo-Mo"
+        case .oneMin: return "Adjust \(count) Timestamp\(plural)"
+        case .gps: return "Organize \(count) Video\(plural)"
+        case .iphoneSorter: return "Sort \(count) Video\(plural)"
+        case .photoSweep: return "Move \(count) Photo\(plural)"
+        default: return "Rename \(count) Video\(plural)"
+        }
     }
 
     var showsExtraFolderToggles: Bool {
@@ -81,13 +102,13 @@ final class ToolState: ObservableObject {
         if dryRun { return "Preview only — nothing will be changed." }
         switch tool {
         case .slomo:
-            return "Live — Write will create new slowed copies."
+            return "Live — Make Slo-Mo will create slowed copies."
         case .oneMin:
             return oneMinMode == "copies"
-                ? "Live — Write will create new timestamped copies."
-                : "Live — Write will change originals."
+                ? "Live — Adjust will create timestamped copies."
+                : "Live — Adjust will change originals."
         default:
-            return "Live — Write will rename, move, or copy."
+            return "Live — the action button renames, moves, or copies files."
         }
     }
 
@@ -152,7 +173,7 @@ final class ToolState: ObservableObject {
     func startWrite(settings: AppSettings, ffmpegPath: String?) {
         guard !running, !files.isEmpty else { return }
         if dryRun {
-            message = "Turn off Preview only, then Write."
+            message = "Turn off Preview only to enable the action."
             return
         }
         if tool.needsFfmpeg, (ffmpegPath ?? AppState.shared.ffmpegPath) == nil {

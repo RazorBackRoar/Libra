@@ -31,18 +31,20 @@ struct GPSMapPanel: View {
         VStack(spacing: 10) {
             if isPrimary {
                 headerRow(photos: totals.photos, videos: totals.videos)
-            } else {
-                collapseHeader(photos: totals.photos, videos: totals.videos)
-            }
-
-            if isPrimary {
                 primaryMap
-            } else if expanded {
-                compactMap
+            } else {
+                // Gold button pinned at the bottom; the map expands upward
+                // above it when opened.
+                if expanded {
+                    compactMap
+                        .transition(
+                            .move(edge: .bottom).combined(with: .opacity))
+                }
+                goldCollapseButton(photos: totals.photos, videos: totals.videos)
             }
         }
-        .padding(isPrimary || expanded ? 12 : 10)
-        .libraPanel()
+        .padding(isPrimary || expanded ? 12 : 0)
+        .modifier(CollapsedPanel(isPanelled: isPrimary || expanded))
         .onAppear {
             expanded = startsExpanded
             model.update(files: files, resolvedNames: resolvedNames, filter: filter)
@@ -82,27 +84,58 @@ struct GPSMapPanel: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func collapseHeader(photos: Int, videos: Int) -> some View {
+    /// Collapsed state for non-GPS tools: a gold button that expands the
+    /// location details upward when clicked. The map is hidden until asked
+    /// for — nothing is displayed openly.
+    private func goldCollapseButton(photos: Int, videos: Int) -> some View {
         Button {
-            expanded.toggle()
+            withAnimation(.spring(duration: 0.3)) {
+                expanded.toggle()
+            }
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "map")
-                    .foregroundColor(LibraTheme.yellow)
-                Text("City / GPS Map")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white)
+                Image(systemName: "map.fill")
+                    .foregroundColor(.black)
+                Text("Location details")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.black)
                 Spacer(minLength: 8)
                 Text(summaryText(photos: photos, videos: videos))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.black.opacity(0.65))
                     .lineLimit(1)
-                Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
+                Image(systemName: expanded ? "chevron.down" : "chevron.up")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.black)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [LibraTheme.yellow, LibraTheme.gold],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.4), .clear],
+                                startPoint: .top,
+                                endPoint: .center
+                            )
+                        )
+                }
+            )
+            .shadow(color: LibraTheme.yellow.opacity(0.25), radius: 8, y: 3)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(
+            expanded ? "Hide location details" : "Show location details")
     }
 
     private var mapSurface: some View {
@@ -166,14 +199,14 @@ struct GPSMapPanel: View {
             }
 
             if let selected = model.selectedCluster {
-                VStack {
-                    Spacer()
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
                     selectedLocationOverlay(selected)
                 }
-                .padding(10)
-                .padding(.bottom, 22)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .animation(.spring(duration: 0.25), value: model.selectedClusterID)
         .frame(maxWidth: .infinity, minHeight: 300, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
@@ -220,8 +253,9 @@ struct GPSMapPanel: View {
         return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi / city"
     }
 
-    /// Names only — no thumbnails, metadata rows, or playback. Buttons open
-    /// the file externally; the context menu can reveal it in Finder.
+    /// Names only — no thumbnails, metadata rows, or playback. Docks flush
+    /// against the map's bottom edge, fully opaque; buttons open the file
+    /// externally and the context menu reveals it in Finder.
     private func selectedLocationOverlay(_ cluster: GPSLocationCluster) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
@@ -263,15 +297,31 @@ struct GPSMapPanel: View {
             }
             .frame(height: 30)
         }
-        .padding(10)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(LibraTheme.hairline, lineWidth: 1)
-        )
+        .background(LibraTheme.panel)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(LibraTheme.gold.opacity(0.45))
+                .frame(height: 1)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Selected location")
+    }
+}
+
+/// Applies the dark glass panel only when the section is expanded (or
+/// primary) — a collapsed compact section is just the gold button itself.
+private struct CollapsedPanel: ViewModifier {
+    let isPanelled: Bool
+
+    func body(content: Content) -> some View {
+        if isPanelled {
+            content.libraPanel()
+        } else {
+            content
+        }
     }
 }
 

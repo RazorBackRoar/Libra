@@ -49,15 +49,20 @@ Source/build version is **1.4.0** — not yet published.
 - [x] `version.json` → 1.4.0; README badge points at version.json (v1.4.0 not published yet — GitHub latest is v1.3.0)
 - [x] README — deduped badge block; GPS map-first flow, explicit Resolve, map-filter pills, filename overlay documented
 - [x] `docs/ARCHITECTURE.md` — LibraTheme, sole-owner geocode flow, MediaKinds lock, in-place undo, format-honesty note, primary/compact map modes
-- [ ] `docs/screenshots/app.png` refresh to show the GPS map-first layout (needs a real app run)
+- [x] `docs/screenshots/app.png` refreshed — real run of the GPS map-first layout (selected pin, resolved city, filename overlay)
+- [x] Selected-location card docks flush at the map's bottom edge, fully opaque (solid panel fill + gold top hairline), slides up on pin tap
+- [x] Non-GPS tools: location details hide behind a full-width gold "Location details" button pinned at the section's bottom; clicking expands the mini-map upward above it (spring animation), chevron flips direction with state
+- [x] Preview/Live control: custom `PreviewModeToggleStyle` — gold circle knob docked left on a gold-edged track while Preview only; flipping slides a white knob right onto an amber track and the label reads "Live"
+- [x] Action button names the operation — "Rename N Videos" (sort family + iPhone: "Sort N Videos"), "Organize N Videos" (GPS), "Make N Slo-Mo", "Adjust N Timestamps", "Move N Photos"; confirm alert button uses the matching verb
 - [ ] Manual UAT (owner): ⌘, Settings; drop→Preview vs Write; Cancel mid-scan; GPS pills→pins, resolve→Preview→Write gate, pin overlay filenames; iPhone sort; Photos Only; Slo-Mo audio on/off (MOV+WEBM); 1-Min copy + in-place + Undo; ~5k folder smoothness
 - [ ] Release gate (explicit ask only): `razorbuild Libra`, SHA-256, `gh release create v1.4.0`, delete v1.3.0 release+tag
 
 ## Verification notes
 
-- `swift build` + `swift build -c release` clean, zero warnings · `swift test` **112/112 green**
+- `swift build` + `swift build -c release` clean, zero warnings · `swift test` **113/113 green**
 - Test isolation: `SettingsStore.fileURLOverride` + `DryRunReport.reportDirectoryOverride` — no real Desktop reports or settings writes from tests
 - 1-Min in-place undo test restores original bytes via real Trash round-trip
 - GPS geocode test seam: `GPSGeocoder.resolver` (tests stub it, restore in defer)
 - GPS tests prove: map never geocodes, filters reuse base clusters, same-city merge, selection cleared on filter-out, Write blocked until Resolve, resolve publishes map names, preview shows exact folders
 - Format gate: each default extension has a committed `fmt-probe.*` fixture that probes cleanly
+- Live GPS verification (real app run): scan → pin click → bottom overlay with glossy filename pills + horizontal scroll; pill filters narrow pins without touching Preview/Write scope; Resolve rewrites pin/overlay to "Cupertino, CA" and Preview to exact folders; Write gated until Resolve, enabled after; write produced `Cupertino, CA/IMG_### 4K W60 🍎📱🌍 00N.mov`; Undo restored originals. Custom-annotation taps don't select via `Map(selection:)` on macOS — pins select via a `MapReader` onTap within ~24pt instead.

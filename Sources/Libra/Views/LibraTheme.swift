@@ -110,6 +110,7 @@ extension View {
 /// Yellow gloss pill — black text, for the one primary action.
 struct LibraPrimaryButtonStyle: ButtonStyle {
     var compact: Bool = false
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -137,7 +138,7 @@ struct LibraPrimaryButtonStyle: ButtonStyle {
                         )
                 }
             )
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.45)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
@@ -234,5 +235,57 @@ struct LibraFileButtonStyle: ButtonStyle {
                 .onHover { hovering = $0 }
                 .animation(.easeOut(duration: 0.12), value: hovering)
         }
+    }
+}
+
+/// Preview/Live mode switch — gold circle-knob docked left next to a gold
+/// edge while Preview only is on; flipping slides the knob right and the
+/// track warms amber to signal the action button is armed.
+struct PreviewModeToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 9) {
+            ZStack(alignment: configuration.isOn ? .leading : .trailing) {
+                Capsule()
+                    .fill(
+                        configuration.isOn
+                            ? LibraTheme.panel
+                            : LibraTheme.amber.opacity(0.55)
+                    )
+                    .overlay(
+                        Capsule().stroke(
+                            configuration.isOn
+                                ? LibraTheme.gold.opacity(0.8)
+                                : LibraTheme.amber,
+                            lineWidth: 1
+                        )
+                    )
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: configuration.isOn
+                                ? [LibraTheme.yellow, LibraTheme.gold]
+                                : [Color.white, Color(white: 0.82)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .overlay(
+                        Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.4), radius: 1.5, y: 1)
+                    .frame(width: 16, height: 16)
+                    .padding(3)
+            }
+            .frame(width: 40, height: 22)
+
+            configuration.label
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.spring(duration: 0.22)) {
+                configuration.isOn.toggle()
+            }
+        }
+        .accessibilityAddTraits(.isButton)
     }
 }
