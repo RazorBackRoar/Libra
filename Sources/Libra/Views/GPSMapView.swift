@@ -106,19 +106,40 @@ struct GPSMapPanel: View {
     }
 
     private var mapSurface: some View {
-        Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
-            ForEach(model.clusters) { cluster in
-                Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
-                    GPSMapPin(selected: model.selectedClusterID == cluster.id)
+        // Map(selection:) does not reliably deliver taps to custom Annotation
+        // content on macOS, so selection is resolved manually: a tap within
+        // ~24pt of a pin selects it, anywhere else clears the selection.
+        MapReader { proxy in
+            Map(position: $model.cameraPosition, selection: $model.selectedClusterID) {
+                ForEach(model.clusters) { cluster in
+                    Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
+                        GPSMapPin(selected: model.selectedClusterID == cluster.id)
+                    }
+                    .tag(cluster.id)
                 }
-                .tag(cluster.id)
+            }
+            .mapStyle(.standard)
+            .mapControls {
+                MapCompass()
+                MapScaleView()
+            }
+            .onTapGesture { point in
+                selectCluster(nearScreenPoint: point, proxy: proxy)
             }
         }
-        .mapStyle(.standard)
-        .mapControls {
-            MapCompass()
-            MapScaleView()
+    }
+
+    private func selectCluster(nearScreenPoint point: CGPoint, proxy: MapProxy) {
+        var best: (id: String, distance: CGFloat)?
+        for cluster in model.clusters {
+            guard let pinPoint = proxy.convert(cluster.coordinate, to: .local) else { continue }
+            // Pins anchor at their tail tip; the visible dot sits ~10pt above.
+            let distance = hypot(pinPoint.x - point.x, pinPoint.y - point.y)
+            if distance < 24, best == nil || distance < best!.distance {
+                best = (cluster.id, distance)
+            }
         }
+        model.selectedClusterID = best?.id
     }
 
     /// Primary mode: the map owns the space. Status messages float centered;
