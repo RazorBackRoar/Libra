@@ -23,6 +23,11 @@ struct SettingsView: View {
             }
             Section("Video extensions") {
                 TextField("mp4, mov, m4v, …", text: $extensions)
+                Text(
+                    "Scanning uses macOS media APIs — containers they can't read (mkv, avi, webm) report “metadata unreadable” and are skipped."
+                )
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
             }
             Section("Photo extensions") {
                 TextField("jpg, heic, png, …", text: $imageExtensions)

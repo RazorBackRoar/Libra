@@ -8,6 +8,7 @@ final class PhotoSweepState: ObservableObject {
     @Published var photos: [VideoInfo] = []
     @Published var results: [OperationResult] = []
     @Published var running = false
+    @Published var cancelling = false
     @Published var recap: String?
     @Published var dryRun = true
     @Published var progress: (done: Int, total: Int) = (0, 0)
@@ -17,10 +18,24 @@ final class PhotoSweepState: ObservableObject {
 
     var confirmDiscover: (@Sendable (Int) async -> Bool)?
     private var task: Task<Void, Never>?
+    // Detached file-I/O tasks don't inherit the parent task's cancellation —
+    // these handles carry the cancel signal into PhotoMover/UndoApply loops.
+    private var detachedMove: Task<[OperationResult], Never>?
+    private var detachedUndo: Task<(restored: Int, failed: Int), Never>?
+
+    func cancelActiveWork() {
+        guard running, !cancelling else { return }
+        cancelling = true
+        recap = "Cancelling…"
+        task?.cancel()
+        detachedMove?.cancel()
+        detachedUndo?.cancel()
+    }
 
     func startScan(paths: [String], settings: AppSettings) {
         guard !running else { return }
         running = true
+        cancelling = false
         recap = "Finding photos…"
         photos = []
         results = []
@@ -48,6 +63,7 @@ final class PhotoSweepState: ObservableObject {
                     "Found \(self.photos.count) photo\(self.photos.count == 1 ? "" : "s"). Move them out of the video folders."
             }
             self.running = false
+            self.cancelling = false
             self.task = nil
             self.confirmDiscover = nil
         }
@@ -79,19 +95,37 @@ final class PhotoSweepState: ObservableObject {
         }
 
         running = true
+        cancelling = false
         let dry = dryRun
         let toMove = photos
-        Task {
-            let moved = await Task.detached {
-                PhotoMover.move(toMove, to: dest, dryRun: dry)
-            }.value
+        task = Task { [weak self] in
+            guard let self else { return }
+            let move = Task.detached {
+                PhotoMover.move(toMove, to: dest, dryRun: dry, shouldStop: { Task.isCancelled })
+            }
+            self.detachedMove = move
+            let moved = await move.value
+            self.detachedMove = nil
+            let wasCancelled = self.cancelling || Task.isCancelled
             results = moved
             for result in moved where result.status == .failed {
                 let name = (result.path as NSString).lastPathComponent
                 Log.shared.warn("\(name): \(result.reason ?? "unknown error")", scope: "run")
             }
             let ok = moved.filter { $0.status == .success }.count
-            if dry {
+            if wasCancelled {
+                recap =
+                    "Cancelled — \(ok) of \(toMove.count) photo\(toMove.count == 1 ? "" : "s") moved."
+                photos = photos.filter { photo in
+                    !moved.contains { $0.path == photo.path && $0.status == .success }
+                }
+                undoRecords = moved.compactMap { result in
+                    guard result.status == .success, let output = result.outputPath,
+                        output != result.path
+                    else { return nil }
+                    return UndoRecord(kind: .moved, originalPath: result.path, resultPath: output)
+                }
+            } else if dry {
                 recap = "Preview: \(ok) photo\(ok == 1 ? "" : "s") would move to \(dest)."
                 if let reportURL = DryRunReport.write(tool: .photoSweep, results: moved) {
                     recap? += " Report: \(reportURL.lastPathComponent)"
@@ -109,17 +143,28 @@ final class PhotoSweepState: ObservableObject {
                 }
             }
             running = false
+            cancelling = false
+            task = nil
         }
     }
 
     func undoLastRun() {
         guard canUndo else { return }
         running = true
+        cancelling = false
         let records = undoRecords
         undoRecords = []
-        Task {
-            let outcome = await Task.detached { UndoApply.apply(records) }.value
+        task = Task { [weak self] in
+            guard let self else { return }
+            let undo = Task.detached {
+                UndoApply.apply(records, shouldStop: { Task.isCancelled })
+            }
+            self.detachedUndo = undo
+            let outcome = await undo.value
+            self.detachedUndo = nil
             running = false
+            cancelling = false
+            task = nil
             recap =
                 outcome.failed == 0
                 ? "Undid \(outcome.restored) photo move\(outcome.restored == 1 ? "" : "s")."
@@ -245,6 +290,14 @@ struct PhotoSweepView: View {
                     }
                 }
 
+                if state.running {
+                    Button(state.cancelling ? "Cancelling…" : "Cancel") {
+                        state.cancelActiveWork()
+                    }
+                    .disabled(state.cancelling)
+                    .accessibilityLabel("Cancel")
+                }
+
                 Button("Move photos out…") {
                     state.moveOut()
                 }
@@ -263,6 +316,23 @@ struct PhotoSweepView: View {
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.black.ignoresSafeArea())
+        .onExitCommand {
+            if state.running {
+                state.cancelActiveWork()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.openFolder)) { _ in
+            browse(files: false)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.selectFiles)) { _ in
+            browse(files: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.undoLastRun)) { _ in
+            state.undoLastRun()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.cancelWork)) { _ in
+            state.cancelActiveWork()
+        }
     }
 
     private func beginScan(_ paths: [String]) {
@@ -297,6 +367,7 @@ struct PhotoSweepView: View {
     }
 
     private func browse(files: Bool) {
+        guard !state.running else { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = files
         panel.canChooseDirectories = true

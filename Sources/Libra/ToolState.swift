@@ -709,13 +709,21 @@ final class ToolState: ObservableObject {
                                 "Wrote \(output) but could not move original to Trash: \(removed.reason ?? "unknown error")",
                             outputPath: output
                         )
+                    } else if let trashPath = removed.outputPath {
+                        // In-place runs record two halves: restore the original
+                        // from its Trash location, and remove the adjusted copy.
+                        pendingUndo.append(
+                            UndoRecord(
+                                kind: .trashedOriginal,
+                                originalPath: file.path,
+                                resultPath: trashPath))
                     }
                 }
                 result = written
             }
             if let out = result.outputPath { reserved.insert(out) }
-            noteUndo(
-                kind: mode == "copies" ? .createdCopy : .moved, from: file.path, result: result)
+            // Both modes produce a new output file — undo removes it via Trash.
+            noteUndo(kind: .createdCopy, from: file.path, result: result)
             logFailure(result)
             results.append(result)
             advanceProgress()
@@ -725,6 +733,7 @@ final class ToolState: ObservableObject {
     }
 
     private func sloMo(target: [VideoInfo], factor: Double, ffmpegPath: String) async {
+        let keepAudio = SettingsStore.shared.settings.sloMoKeepAudio
         let eligible = target.filter { $0.error == nil }
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var reserved = Set<String>()
@@ -762,7 +771,9 @@ final class ToolState: ObservableObject {
                     factor: factor,
                     ffmpegPath: ffmpegPath,
                     durationSec: file.durationSec,
-                    withinRoot: SettingsStore.shared.settings.lastFolder ?? file.dir
+                    withinRoot: SettingsStore.shared.settings.lastFolder ?? file.dir,
+                    keepAudio: keepAudio,
+                    hasAudio: file.audioCodec != nil
                 )
             }
             if let out = result.outputPath { reserved.insert(out) }

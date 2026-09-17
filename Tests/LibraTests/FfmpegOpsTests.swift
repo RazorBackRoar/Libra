@@ -68,6 +68,42 @@ final class FfmpegOpsTests: XCTestCase {
         }
     }
 
+    func testSloMoArgumentsKeepAudio() {
+        let args = FfmpegOps.sloMoArguments(
+            input: "/vids/in.mov", output: "/vids/out.libra-tmp.mp4",
+            factor: 0.5, keepAudio: true, hasAudio: true)
+        XCTAssertFalse(args.contains("-an"))
+        XCTAssertTrue(args.contains("atempo=0.5"))
+        XCTAssertEqual(args[args.firstIndex(of: "-c:a")! + 1], "aac")
+        XCTAssertEqual(args[args.firstIndex(of: "-c:v")! + 1], "libx264")
+    }
+
+    func testSloMoArgumentsKeepAudioChainsAtempoBelowHalf() {
+        // atempo's range floor is 0.5 — 0.25x needs two chained stages.
+        let args = FfmpegOps.sloMoArguments(
+            input: "/vids/in.mov", output: "/vids/out.libra-tmp.mp4",
+            factor: 0.25, keepAudio: true, hasAudio: true)
+        XCTAssertTrue(args.contains("atempo=0.5,atempo=0.5"))
+    }
+
+    func testSloMoArgumentsKeepAudioWebmUsesOpus() {
+        // WebM can't hold AAC — audio codec follows the container.
+        let args = FfmpegOps.sloMoArguments(
+            input: "/vids/in.webm", output: "/vids/out.libra-tmp.webm",
+            factor: 0.5, keepAudio: true, hasAudio: true)
+        XCTAssertEqual(args[args.firstIndex(of: "-c:a")! + 1], "libopus")
+        XCTAssertEqual(args[args.firstIndex(of: "-c:v")! + 1], "libvpx-vp9")
+        XCTAssertFalse(args.contains("-an"))
+    }
+
+    func testSloMoArgumentsKeepAudioWithoutAudioTrackStillStrips() {
+        let args = FfmpegOps.sloMoArguments(
+            input: "/vids/in.mov", output: "/vids/out.libra-tmp.mp4",
+            factor: 0.5, keepAudio: true, hasAudio: false)
+        XCTAssertTrue(args.contains("-an"))
+        XCTAssertFalse(args.contains("-af"))
+    }
+
     func testAdjustTimestampArgumentsEndAtExtensionPreservingTempPath() {
         let date = Date(timeIntervalSince1970: 1_704_192_000)
         for ext in ["mov", "mp4", "webm"] {

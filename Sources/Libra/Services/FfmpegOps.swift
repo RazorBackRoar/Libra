@@ -12,7 +12,9 @@ enum FfmpegOps {
         factor: Double,
         ffmpegPath: String,
         durationSec: Double = 0,
-        withinRoot: String? = nil
+        withinRoot: String? = nil,
+        keepAudio: Bool = false,
+        hasAudio: Bool = false
     ) async -> OperationResult {
         return await runToUniqueOutput(
             filePath: filePath,
@@ -21,12 +23,17 @@ enum FfmpegOps {
             timeout: timeout(durationSec: durationSec, factor: factor),
             withinRoot: withinRoot,
             arguments: { tmp in
-                sloMoArguments(input: filePath, output: tmp, factor: factor)
+                sloMoArguments(
+                    input: filePath, output: tmp, factor: factor,
+                    keepAudio: keepAudio, hasAudio: hasAudio)
             }
         )
     }
 
-    static func sloMoArguments(input: String, output: String, factor: Double) -> [String] {
+    static func sloMoArguments(
+        input: String, output: String, factor: Double,
+        keepAudio: Bool = false, hasAudio: Bool = false
+    ) -> [String] {
         // The output keeps the input's container. H.264 cannot live in WebM,
         // so WebM outputs get VP9; every other supported container takes
         // libx264. (h264_videotoolbox was evaluated and stays unused — it is
@@ -34,13 +41,32 @@ enum FfmpegOps {
         // archival content where quality wins over encode speed.)
         let ext = (output as NSString).pathExtension.lowercased()
         let videoCodec = ext == "webm" ? "libvpx-vp9" : "libx264"
-        return [
+        var args = [
             "-i", input,
             "-vf", "setpts=PTS*\(1.0 / factor)",
-            "-an",
-            "-c:v", videoCodec,
-            "-y", output,
         ]
+        if keepAudio && hasAudio {
+            // Audio is tempo-matched to the slowed video. WebM can't hold AAC.
+            args += ["-af", atempoFilter(factor: factor)]
+            args += ["-c:a", ext == "webm" ? "libopus" : "aac"]
+        } else {
+            args.append("-an")
+        }
+        args += ["-c:v", videoCodec, "-y", output]
+        return args
+    }
+
+    /// atempo accepts 0.5…100 per stage — chain 0.5 steps for slower factors
+    /// (0.25 → "atempo=0.5,atempo=0.5").
+    private static func atempoFilter(factor: Double) -> String {
+        var tempo = max(factor, 0.01)
+        var parts: [String] = []
+        while tempo < 0.5 {
+            parts.append("atempo=0.5")
+            tempo /= 0.5
+        }
+        parts.append("atempo=\(tempo)")
+        return parts.joined(separator: ",")
     }
 
     static func adjustTimestamp(

@@ -40,6 +40,18 @@ final class MediaKindsTests: XCTestCase {
         XCTAssertFalse(MediaKinds.isImage(ext: "mp4"))
     }
 
+    func testDefaultVideoExtensionsAreAllAVFoundationReadable() {
+        // Empirically verified on macOS (arm64): AVURLAsset.loadTracks succeeds
+        // for these containers. mkv/avi/webm fail with "Cannot Open" — they
+        // must never ship as defaults since probing is AVFoundation-only.
+        let defaults = Set(AppSettings.default.videoExtensions)
+        let avFoundationReadable: Set<String> = ["mp4", "mov", "m4v", "mts", "m2ts", "3gp"]
+        XCTAssertEqual(defaults, avFoundationReadable)
+        XCTAssertFalse(defaults.contains("mkv"))
+        XCTAssertFalse(defaults.contains("avi"))
+        XCTAssertFalse(defaults.contains("webm"))
+    }
+
     func testVideoInfoIsImageUsesLiveSettings() {
         var settings = SettingsStore.shared.settings
         settings.imageExtensions = ["avif"]

@@ -205,6 +205,13 @@ struct ToolPage: View {
             .onChange(of: state.slomoFactor) { _, _ in
                 state.scheduleRerunAfterOptionsChange()
             }
+            Toggle("Keep audio — slowed to match the video", isOn: $settingsStore.settings.sloMoKeepAudio)
+                .toggleStyle(.checkbox)
+                .disabled(state.running)
+                .onChange(of: settingsStore.settings.sloMoKeepAudio) { _, _ in
+                    settingsStore.save()
+                    state.scheduleRerunAfterOptionsChange()
+                }
         }
 
         if tool == .oneMin {

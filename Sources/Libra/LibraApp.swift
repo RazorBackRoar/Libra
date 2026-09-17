@@ -159,9 +159,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showSettings() {
-        // SwiftUI Settings scenes answer to showSettingsWindow: — the
-        // pre-macOS-13 name (showPreferencesWindow:) no longer exists.
-        NSApp?.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        // Routed through SwiftUI's public `openSettings` environment action —
+        // received by LibraView, which owns a live view hierarchy.
+        NotificationCenter.default.post(name: LibraCommands.openSettings, object: nil)
     }
 
     @objc func openFolder() {

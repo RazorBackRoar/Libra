@@ -168,6 +168,8 @@ struct UndoRecord: Equatable {
     enum Kind: Equatable {
         case moved
         case createdCopy
+        /// Original was moved to Trash; `resultPath` is its location inside ~/.Trash.
+        case trashedOriginal
     }
 
     var kind: Kind
@@ -207,10 +209,11 @@ struct AppSettings: Codable {
     var sortByDate: Bool
     var sortByCamera: Bool
     var sortDuplicatesIntoFolder: Bool
+    var sloMoKeepAudio: Bool
 
     static let `default` = AppSettings(
         ffmpegPath: nil,
-        videoExtensions: ["mp4", "mov", "m4v", "mkv", "avi", "mts", "m2ts", "3gp", "webm"],
+        videoExtensions: ["mp4", "mov", "m4v", "mts", "m2ts", "3gp"],
         imageExtensions: ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "webp"],
         dryRunDefault: true,
         lastFolder: nil,
@@ -218,7 +221,8 @@ struct AppSettings: Codable {
         defaultPrefix: "",
         sortByDate: false,
         sortByCamera: false,
-        sortDuplicatesIntoFolder: false
+        sortDuplicatesIntoFolder: false,
+        sloMoKeepAudio: true
     )
 
     init(
@@ -231,7 +235,8 @@ struct AppSettings: Codable {
         defaultPrefix: String,
         sortByDate: Bool,
         sortByCamera: Bool,
-        sortDuplicatesIntoFolder: Bool
+        sortDuplicatesIntoFolder: Bool,
+        sloMoKeepAudio: Bool
     ) {
         self.ffmpegPath = ffmpegPath
         self.videoExtensions = videoExtensions
@@ -243,6 +248,7 @@ struct AppSettings: Codable {
         self.sortByDate = sortByDate
         self.sortByCamera = sortByCamera
         self.sortDuplicatesIntoFolder = sortDuplicatesIntoFolder
+        self.sloMoKeepAudio = sloMoKeepAudio
     }
 
     init(from decoder: Decoder) throws {
@@ -263,21 +269,43 @@ struct AppSettings: Codable {
         sortByCamera = try container.decodeIfPresent(Bool.self, forKey: .sortByCamera) ?? false
         sortDuplicatesIntoFolder =
             try container.decodeIfPresent(Bool.self, forKey: .sortDuplicatesIntoFolder) ?? false
+        sloMoKeepAudio = try container.decodeIfPresent(Bool.self, forKey: .sloMoKeepAudio) ?? true
     }
 }
 
 enum MediaKinds {
     /// Mirror of the user's photo extensions, refreshed by SettingsStore on every
     /// settings mutation so nonisolated probe/model code can classify without
-    /// hopping to the main actor.
-    private(set) static var imageExtensions: Set<String> =
-        Set(AppSettings.default.imageExtensions)
+    /// hopping to the main actor. Lock-guarded: writes happen on MainActor while
+    /// detached probe tasks read concurrently.
+    private static let imageExtensions = ExtensionSetBox(
+        initial: Set(AppSettings.default.imageExtensions))
 
     static func sync(with settings: AppSettings) {
-        imageExtensions = Set(settings.imageExtensions.map { $0.lowercased() })
+        imageExtensions.set(Set(settings.imageExtensions.map { $0.lowercased() }))
     }
 
     static func isImage(ext: String) -> Bool {
         imageExtensions.contains(ext.lowercased())
+    }
+
+    private final class ExtensionSetBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var extensions: Set<String>
+
+        init(initial: Set<String>) { self.extensions = initial }
+
+        func set(_ new: Set<String>) {
+            lock.lock()
+            extensions = new
+            lock.unlock()
+        }
+
+        func contains(_ ext: String) -> Bool {
+            lock.lock()
+            let hit = extensions.contains(ext)
+            lock.unlock()
+            return hit
+        }
     }
 }

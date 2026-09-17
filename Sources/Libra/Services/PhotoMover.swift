@@ -1,10 +1,20 @@
 import Foundation
 
 enum PhotoMover {
-    static func move(_ files: [VideoInfo], to destDir: String, dryRun: Bool) -> [OperationResult] {
+    static func move(
+        _ files: [VideoInfo],
+        to destDir: String,
+        dryRun: Bool,
+        shouldStop: () -> Bool = { false }
+    ) -> [OperationResult] {
         var reserved = Set<String>()
         var results: [OperationResult] = []
         for file in files {
+            if shouldStop() {
+                results.append(
+                    OperationResult(path: file.path, status: .cancelled, reason: "Cancelled"))
+                continue
+            }
             let filename = "\(FileOps.sanitizeFileName(file.name)).\(file.ext.lowercased())"
             let planned = (destDir as NSString).appendingPathComponent(filename)
             let result = FileOps.moveFile(

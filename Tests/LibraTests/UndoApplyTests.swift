@@ -67,6 +67,36 @@ final class UndoApplyTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: dest1))
     }
 
+    func testUndoInPlaceRestoresOriginalFromTrash() throws {
+        // 1-Min "Change originals": the adjusted copy is written under a new
+        // name and the original is moved to Trash. Undo must restore the
+        // ORIGINAL bytes at the original path and remove the adjusted copy.
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("libra-inplace-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let source = dir.appendingPathComponent("clip.mov").path
+        let adjusted = dir.appendingPathComponent("clip 1080p W30 001.mov").path
+        FileManager.default.createFile(atPath: source, contents: Data("original".utf8))
+        FileManager.default.createFile(atPath: adjusted, contents: Data("adjusted".utf8))
+
+        let trashed = FileOps.trashFile(source, dryRun: false)
+        XCTAssertEqual(trashed.status, .success)
+        let trashPath = try XCTUnwrap(trashed.outputPath, "Trash URL must be recorded")
+
+        let outcome = UndoApply.apply([
+            UndoRecord(kind: .trashedOriginal, originalPath: source, resultPath: trashPath),
+            UndoRecord(kind: .createdCopy, originalPath: source, resultPath: adjusted),
+        ])
+
+        XCTAssertEqual(outcome.restored, 2)
+        XCTAssertEqual(outcome.failed, 0)
+        // The ORIGINAL bytes came back at the ORIGINAL path — not the adjusted copy.
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: source)), Data("original".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: adjusted))
+    }
+
     func testUndoCreatedCopyDeletesOutput() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("libra-copy-undo-\(UUID().uuidString)", isDirectory: true)

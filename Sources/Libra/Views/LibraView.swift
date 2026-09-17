@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LibraView: View {
     @State private var selectedTool: Tool?
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         Group {
@@ -16,5 +17,8 @@ struct LibraView: View {
             }
         }
         .background(Color.black.ignoresSafeArea())
+        .onReceive(NotificationCenter.default.publisher(for: LibraCommands.openSettings)) { _ in
+            openSettings()
+        }
     }
 }

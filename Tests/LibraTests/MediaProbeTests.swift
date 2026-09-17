@@ -68,6 +68,16 @@ final class MediaProbeTests: XCTestCase {
         XCTAssertEqual(result.first, "iPhone")
     }
 
+    func testHasAppleMakeMatchesWholeTokensOnly() {
+        XCTAssertTrue(DeviceMetadata.hasAppleMake(in: ["Apple"]))
+        XCTAssertTrue(DeviceMetadata.hasAppleMake(in: ["Apple Inc."]))
+        XCTAssertTrue(DeviceMetadata.hasAppleMake(in: ["APPLE iPhone"]))
+        // Substring traps must not match.
+        XCTAssertFalse(DeviceMetadata.hasAppleMake(in: ["Pineapple Corp"]))
+        XCTAssertFalse(DeviceMetadata.hasAppleMake(in: ["appleseed"]))
+        XCTAssertFalse(DeviceMetadata.hasAppleMake(in: []))
+    }
+
     // MARK: - §23.20 real-file verification
     // Fixture: ffmpeg-generated 3840×2160 @ 59.94fps .mov, h264 + aac, with
     // mvhd creation_time 2024-06-15T10:30:00Z, ISO6709 location +37.3349-122.0090,

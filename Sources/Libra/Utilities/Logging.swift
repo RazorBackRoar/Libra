@@ -12,6 +12,8 @@ final class Log {
 
     private let fileURL: URL
     private let osLog = Logger(subsystem: Brand.appId, category: "app")
+    /// Serial queue keeps per-line FileHandle I/O off the main actor.
+    private let fileQueue = DispatchQueue(label: "com.razorbackroar.libra.log")
     private var hasSetup = false
 
     private init() {
@@ -21,6 +23,7 @@ final class Log {
 
     func setup() {
         hasSetup = true
+        Paths.ensureLogsDirectory()
     }
 
     private func write(level: String, message: String, scope: String) {
@@ -29,8 +32,14 @@ final class Log {
         osLog.log(level: level, "\(line)")
 
         guard hasSetup else { return }
-        Paths.ensureLogsDirectory()
-        rotateIfNeeded()
+        let fileURL = fileURL
+        fileQueue.async {
+            Self.appendLine(line, to: fileURL)
+        }
+    }
+
+    private nonisolated static func appendLine(_ line: String, to fileURL: URL) {
+        rotateIfNeeded(fileURL: fileURL)
         if let data = (line + "\n").data(using: .utf8) {
             if FileManager.default.fileExists(atPath: fileURL.path) {
                 if let handle = try? FileHandle(forWritingTo: fileURL) {
@@ -44,7 +53,7 @@ final class Log {
         }
     }
 
-    private func rotateIfNeeded() {
+    private nonisolated static func rotateIfNeeded(fileURL: URL) {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
             let size = attrs[.size] as? UInt64, size > Self.maxLogBytes
         else { return }

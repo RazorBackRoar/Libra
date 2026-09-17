@@ -81,13 +81,18 @@ enum FileOps {
     }
 
     /// Moves `path` to the Trash. Use when replacing a user's original file.
+    /// `outputPath` carries the item's location inside ~/.Trash so callers can
+    /// restore it later (Undo).
     static func trashFile(_ path: String, dryRun: Bool) -> OperationResult {
         if dryRun {
             return OperationResult(path: path, status: .success, reason: "Dry-run move to Trash")
         }
         do {
-            try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
-            return OperationResult(path: path, status: .success)
+            var resulting: NSURL?
+            try FileManager.default.trashItem(
+                at: URL(fileURLWithPath: path), resultingItemURL: &resulting)
+            return OperationResult(
+                path: path, status: .success, outputPath: (resulting as URL?)?.path)
         } catch {
             return OperationResult(path: path, status: .failed, reason: error.localizedDescription)
         }

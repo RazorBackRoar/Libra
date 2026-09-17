@@ -5,10 +5,13 @@ import ImageIO
 import UniformTypeIdentifiers
 
 enum DeviceMetadata {
+    /// "apple" must be a whole token — "Apple", "Apple Inc.", "Apple iPhone" match;
+    /// substring traps like "Pineapple" do not.
     static func hasAppleMake(in values: [String]) -> Bool {
         values.contains { value in
-            let lower = value.lowercased()
-            return lower == "apple" || lower.contains("apple")
+            value.lowercased()
+                .split { !($0.isLetter || $0.isNumber) }
+                .contains("apple")
         }
     }
 
@@ -256,6 +259,9 @@ enum MediaProbe {
             if creation == nil {
                 creation = fileDates.creation
             }
+            let timestampWarning =
+                !creationTimeEmbedded && creation != nil
+                ? "No embedded timestamp — using file date" : nil
 
             let make = preferredValue(makeValues)
             let model = preferredValue(modelValues)
@@ -287,7 +293,7 @@ enum MediaProbe {
                 longitude: longitude,
                 creationTime: creation,
                 error: nil,
-                warning: nil,
+                warning: timestampWarning,
                 creationTimeEmbedded: creationTimeEmbedded,
                 fileCreationTime: fileDates.creation,
                 fileModificationTime: fileDates.modification,
@@ -534,6 +540,9 @@ enum MediaProbe {
         let hasiPhoneModel = DeviceMetadata.hasiPhoneModel(in: modelValues + makeValues)
         let embeddedCreation = embeddedImageCreationDate(properties: properties)
         let fileDates = fileSystemDates(filePath)
+        let timestampWarning =
+            embeddedCreation == nil && fileDates.creation != nil
+            ? "No embedded timestamp — using file date" : nil
 
         return VideoInfo(
             path: filePath,
@@ -559,7 +568,7 @@ enum MediaProbe {
             longitude: longitude,
             creationTime: embeddedCreation ?? fileDates.creation,
             error: nil,
-            warning: nil,
+            warning: timestampWarning,
             creationTimeEmbedded: embeddedCreation != nil,
             fileCreationTime: fileDates.creation,
             fileModificationTime: fileDates.modification,
