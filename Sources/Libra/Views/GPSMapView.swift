@@ -15,23 +15,29 @@ struct GPSMapPanel: View {
     /// file.path → place name from ToolState's explicit Resolve — the map
     /// never geocodes itself.
     var resolvedNames: [String: String] = [:]
-    /// Map-only visual filter — never changes Preview/Write scope.
-    var filter: MediaBrowserFilter = .all
+    /// Map-only visual filter — never changes Preview/Write scope. A binding
+    /// in primary mode so the floating pills can drive it.
+    var filter: Binding<MediaBrowserFilter>? = nil
     var presentation: Presentation = .compact
     var startsExpanded: Bool = false
+    /// Primary mode only: the map itself is the drop/browse surface.
+    var onDrop: (([String]) -> Void)? = nil
+    var onBrowse: (() -> Void)? = nil
+    var onSelectFiles: (() -> Void)? = nil
 
     @StateObject private var model = GPSMapModel()
     @State private var expanded = false
+    @State private var mapDropActive = false
 
     private var isPrimary: Bool { presentation == .primary }
+    private var activeFilter: MediaBrowserFilter { filter?.wrappedValue ?? .all }
 
     var body: some View {
         let coordinateFiles = files.filter(\.hasCoordinates)
         let totals = GPSMediaCounts.totals(in: coordinateFiles)
         VStack(spacing: 10) {
             if isPrimary {
-                headerRow(photos: totals.photos, videos: totals.videos)
-                primaryMap
+                primaryMap(totals: totals)
             } else {
                 // Gold button pinned at the bottom; the map expands upward
                 // above it when opened.
@@ -47,41 +53,25 @@ struct GPSMapPanel: View {
         .modifier(CollapsedPanel(isPanelled: isPrimary || expanded))
         .onAppear {
             expanded = startsExpanded
-            model.update(files: files, resolvedNames: resolvedNames, filter: filter)
+            model.update(files: files, resolvedNames: resolvedNames, filter: activeFilter)
         }
         .onChange(of: files.map(\.path)) { _, _ in
             if startsExpanded, files.contains(where: \.hasCoordinates) {
                 expanded = true
             }
-            model.update(files: files, resolvedNames: resolvedNames, filter: filter)
+            model.update(files: files, resolvedNames: resolvedNames, filter: activeFilter)
         }
         .onChange(of: resolvedNames) { _, names in
-            model.update(files: files, resolvedNames: names, filter: filter)
+            model.update(files: files, resolvedNames: names, filter: activeFilter)
         }
-        .onChange(of: filter) { _, active in
-            model.update(files: files, resolvedNames: resolvedNames, filter: active)
+        .onChange(of: filter?.wrappedValue) { _, _ in
+            model.update(files: files, resolvedNames: resolvedNames, filter: activeFilter)
         }
         .onChange(of: expanded) { _, isExpanded in
             if isExpanded {
-                model.update(files: files, resolvedNames: resolvedNames, filter: filter)
+                model.update(files: files, resolvedNames: resolvedNames, filter: activeFilter)
             }
         }
-    }
-
-    private func headerRow(photos: Int, videos: Int) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "map")
-                .foregroundColor(LibraTheme.yellow)
-            Text("City / GPS Map")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(.white)
-            Spacer(minLength: 8)
-            Text(summaryText(photos: photos, videos: videos))
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-        }
-        .accessibilityElement(children: .combine)
     }
 
     /// Collapsed state for non-GPS tools: a gold button that expands the
@@ -175,14 +165,42 @@ struct GPSMapPanel: View {
         model.selectedClusterID = best?.id
     }
 
-    /// Primary mode: the map owns the space. Status messages float centered;
-    /// the selected location docks as a names-only card at the bottom, clear
-    /// of MapKit's scale/attribution edge.
-    private var primaryMap: some View {
+    /// Primary mode: the map owns the whole workspace — it is the drop
+    /// surface, hosts floating chips (stats, filter pills, Add menu), and
+    /// shows the centered empty state. The selected location docks as a
+    /// names-only card at the bottom, clear of MapKit's scale/attribution.
+    private func primaryMap(totals: (photos: Int, videos: Int)) -> some View {
         ZStack {
             mapSurface
+                .onDrop(of: [.fileURL], isTargeted: $mapDropActive) { providers in
+                    guard let onDrop else { return false }
+                    DropZone.loadPaths(from: providers, completion: onDrop)
+                    return true
+                }
 
-            if let status = mapStatusMessage {
+            if !files.isEmpty {
+                VStack(spacing: 8) {
+                    HStack(alignment: .top, spacing: 8) {
+                        statsChip(totals: totals)
+                        if let filter {
+                            CountPills(
+                                files: files, tool: .gps,
+                                selection: filter.wrappedValue
+                            ) { picked in
+                                filter.wrappedValue = filter.wrappedValue == picked ? .all : picked
+                            }
+                        }
+                        Spacer(minLength: 8)
+                        addMenu
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(10)
+            }
+
+            if files.isEmpty {
+                emptyState
+            } else if let status = mapStatusMessage {
                 Text(status)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white)
@@ -211,9 +229,80 @@ struct GPSMapPanel: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(LibraTheme.hairline, lineWidth: 1)
+                .stroke(
+                    mapDropActive ? LibraTheme.gold : LibraTheme.hairline,
+                    lineWidth: mapDropActive ? 1.5 : 1
+                )
         )
         .accessibilityElement(children: .contain)
+        .accessibilityLabel("Drop videos here")
+    }
+
+    /// Centered empty state — the map's own drop affordance, no dashed box.
+    private var emptyState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "arrow.down.doc")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(LibraTheme.yellow)
+            Text("Drop videos to place them on the map.")
+                .font(.system(size: 15, weight: .semibold))
+                .multilineTextAlignment(.center)
+            Text("Folders or videos.")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+            HStack(spacing: 12) {
+                Button("Open Folder…") { onBrowse?() }
+                    .buttonStyle(LibraPrimaryButtonStyle(compact: true))
+                    .accessibilityLabel("Open Folder")
+                Button("Select Videos…") { onSelectFiles?() }
+                    .buttonStyle(LibraSecondaryButtonStyle(compact: true))
+                    .accessibilityLabel("Select Videos")
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 18)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(LibraTheme.hairline, lineWidth: 1)
+        )
+        .padding()
+    }
+
+    /// Floating glass capsule — counts only; the cluster radius is a
+    /// clustering constant, not user-facing information.
+    private func statsChip(totals: (photos: Int, videos: Int)) -> some View {
+        Text(
+            "\(GPSMediaCounts.label(photos: totals.photos, videos: totals.videos)) · \(model.clusters.count) place\(model.clusters.count == 1 ? "" : "s")"
+        )
+        .font(.system(size: 11, weight: .medium))
+        .foregroundColor(.white)
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(LibraTheme.hairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Top-trailing Add menu — keeps extra drops browseable after the first
+    /// scan without a persistent drop box.
+    private var addMenu: some View {
+        Menu {
+            Button("Open Folder…") { onBrowse?() }
+            Button("Select Videos…") { onSelectFiles?() }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(LibraTheme.yellow)
+                .padding(8)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(LibraTheme.hairline, lineWidth: 1))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Add videos")
     }
 
     private var compactMap: some View {
@@ -240,7 +329,6 @@ struct GPSMapPanel: View {
 
     private var mapStatusMessage: String? {
         if model.isClustering { return "Placing videos on the map…" }
-        if files.isEmpty { return "Drop videos to place them on the map." }
         if !files.contains(where: \.hasCoordinates) {
             return "No GPS coordinates found — these videos will use No-GPS/."
         }
@@ -250,7 +338,7 @@ struct GPSMapPanel: View {
 
     private func summaryText(photos: Int, videos: Int) -> String {
         let places = model.clusters.count
-        return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s") · 5 mi / city"
+        return "\(GPSMediaCounts.label(photos: photos, videos: videos)) · \(places) place\(places == 1 ? "" : "s")"
     }
 
     /// Names only — no thumbnails, metadata rows, or playback. Docks flush

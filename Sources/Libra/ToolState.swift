@@ -83,13 +83,14 @@ final class ToolState: ObservableObject {
     var writeButtonTitle: String {
         let count = files.filter { $0.error == nil }.count
         let plural = count == 1 ? "" : "s"
+        let noun = count == 0 ? "" : "\(count) "
         switch tool {
-        case .slomo: return "Make \(count) Slo-Mo"
-        case .oneMin: return "Adjust \(count) Timestamp\(plural)"
-        case .gps: return "Organize \(count) Video\(plural)"
-        case .iphoneSorter: return "Sort \(count) Video\(plural)"
-        case .photoSweep: return "Move \(count) Photo\(plural)"
-        default: return "Rename \(count) Video\(plural)"
+        case .slomo: return "Make \(noun)Slo-Mo"
+        case .oneMin: return "Adjust \(noun)Timestamp\(plural)"
+        case .gps: return "Organize \(noun)Video\(plural)"
+        case .iphoneSorter: return "Sort \(noun)Video\(plural)"
+        case .photoSweep: return "Move \(noun)Photo\(plural)"
+        default: return "Rename \(noun)Video\(plural)"
         }
     }
 
@@ -99,16 +100,16 @@ final class ToolState: ObservableObject {
     }
 
     var previewLiveCaption: String {
-        if dryRun { return "Preview only — nothing will be changed." }
+        if dryRun { return "Nothing will be changed." }
         switch tool {
         case .slomo:
-            return "Live — Make Slo-Mo will create slowed copies."
+            return "Make Slo-Mo will create slowed copies."
         case .oneMin:
             return oneMinMode == "copies"
-                ? "Live — Adjust will create timestamped copies."
-                : "Live — Adjust will change originals."
+                ? "Adjust will create timestamped copies."
+                : "Adjust will change originals."
         default:
-            return "Live — the action button renames, moves, or copies files."
+            return "The action button renames, moves, or copies files."
         }
     }
 

@@ -13,16 +13,26 @@ struct HomeView: View {
                     .foregroundColor(LibraTheme.yellow)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Libra")
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.system(size: 20, weight: .semibold))
                         .tracking(2.5)
                         .foregroundStyle(.white)
-                        .goldHairlineOutline()
                     Text("Video organization toolkit")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
                 Spacer(minLength: 12)
             }
+
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [LibraTheme.gold, LibraTheme.amber.opacity(0.3)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: 56, height: 2.5)
+                .padding(.leading, 2)
 
             videoGrid
         }
@@ -65,16 +75,10 @@ struct ToolCard: View {
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(LibraTheme.yellow)
                     Spacer()
-                    Text(tool.category)
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundColor(LibraTheme.gold)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(LibraTheme.gold.opacity(0.12))
-                        .overlay(
-                            Capsule().stroke(LibraTheme.gold.opacity(0.35), lineWidth: 1)
-                        )
-                        .clipShape(Capsule())
+                    Text(tool.category.uppercased())
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1.2)
+                        .foregroundColor(.white.opacity(0.38))
                 }
                 Text(tool.title)
                     .font(.system(size: 15, weight: .bold))
@@ -83,8 +87,8 @@ struct ToolCard: View {
                     .minimumScaleFactor(0.9)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(tool.description)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.62))
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.55))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)

@@ -42,24 +42,27 @@ struct ToolPage: View {
                     .cornerRadius(8)
                 }
 
-                DropZone(
-                    title: "Drop videos here",
-                    subtitle: hasMedia
-                        ? "Drop more, or use Open Folder / Select Videos."
-                        : "Folders or videos. Mixed photos get a Photos tab.",
-                    compact: hasMedia,
-                    selectTitle: "Select Videos…",
-                    onDrop: { paths in
-                        guard !state.running else { return }
-                        beginScan(paths)
-                    },
-                    onBrowse: { browse() },
-                    onSelectFiles: { selectFiles() }
-                )
-                .disabled(state.running)
-                .opacity(state.running ? 0.6 : 1)
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Drop videos here")
+                // GPS is map-first — the map itself is the drop surface.
+                if tool != .gps {
+                    DropZone(
+                        title: "Drop videos here",
+                        subtitle: hasMedia
+                            ? "Drop more, or use Open Folder / Select Videos."
+                            : "Folders or videos. Mixed photos get a Photos tab.",
+                        compact: hasMedia,
+                        selectTitle: "Select Videos…",
+                        onDrop: { paths in
+                            guard !state.running else { return }
+                            beginScan(paths)
+                        },
+                        onBrowse: { browse() },
+                        onSelectFiles: { selectFiles() }
+                    )
+                    .disabled(state.running)
+                    .opacity(state.running ? 0.6 : 1)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Drop videos here")
+                }
 
                 if !state.photos.isEmpty || workspace == .photos {
                     workspaceTabs
@@ -167,24 +170,23 @@ struct ToolPage: View {
         }
     }
 
-    /// GPS is map-first: pills filter pins, the map fills the workspace, and
-    /// no results table or media browser lives here. Preview/Write scope is
-    /// untouched — filters are visual only.
+    /// GPS is map-first: the map fills the workspace, is itself the drop
+    /// surface, and hosts floating chips (stats, filter pills, Add menu).
+    /// No drop zone, results table, or media browser lives here.
+    /// Preview/Write scope is untouched — filters are visual only.
     @ViewBuilder
     private var gpsWorkspace: some View {
-        if !state.filteredFiles.isEmpty {
-            CountPills(
-                files: state.filteredFiles, tool: tool, selection: gpsMapFilter
-            ) { filter in
-                gpsMapFilter = gpsMapFilter == filter ? .all : filter
-            }
-        }
-
         GPSMapPanel(
             files: state.filteredFiles,
             resolvedNames: state.gpsPlaceByPath,
-            filter: gpsMapFilter,
-            presentation: .primary
+            filter: $gpsMapFilter,
+            presentation: .primary,
+            onDrop: { paths in
+                guard !state.running else { return }
+                beginScan(paths)
+            },
+            onBrowse: { browse() },
+            onSelectFiles: { selectFiles() }
         )
         .frame(maxHeight: .infinity)
         .layoutPriority(1)
@@ -291,7 +293,7 @@ struct ToolPage: View {
     }
 
     private var extraFolderToggles: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
             Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
             Toggle(
@@ -301,6 +303,9 @@ struct ToolPage: View {
             .help("Same size, duration, and video format — not a byte-for-byte match")
         }
         .toggleStyle(.checkbox)
+        .controlSize(.small)
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
         .disabled(state.running)
         .onChange(of: settingsStore.settings.sortByDate) { _, _ in
             settingsStore.save()

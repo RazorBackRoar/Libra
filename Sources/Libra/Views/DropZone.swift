@@ -89,6 +89,18 @@ struct DropZone: View {
     }
 
     private func handleProviders(_ providers: [NSItemProvider]) -> Bool {
+        DropZone.loadPaths(from: providers) { paths in
+            onDrop(paths)
+        }
+        return true
+    }
+
+    /// Resolves dropped file-URL providers into paths — shared with the GPS
+    /// map, which is itself a drop surface in primary presentation.
+    static func loadPaths(
+        from providers: [NSItemProvider],
+        completion: @escaping @MainActor ([String]) -> Void
+    ) {
         Task { @MainActor in
             var urls: [URL] = []
             for provider in providers {
@@ -107,8 +119,7 @@ struct DropZone: View {
                     urls.append(url)
                 }
             }
-            onDrop(urls.map(\.path))
+            completion(urls.map(\.path))
         }
-        return true
     }
 }

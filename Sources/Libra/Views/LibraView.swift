@@ -18,14 +18,6 @@ struct LibraView: View {
             }
         }
         .background(LibraTheme.bg.ignoresSafeArea())
-        .overlay {
-            // Gold liner tracing the whole window edge — fullSizeContentView
-            // puts our content under the transparent title bar, so this border
-            // frames the traffic lights too.
-            LibraWindowBorder()
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
         .onReceive(NotificationCenter.default.publisher(for: LibraCommands.openSettings)) { _ in
             openSettings()
         }
@@ -57,62 +49,5 @@ struct LibraView: View {
             frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
         }
         window.setFrame(frame, display: true, animate: true)
-    }
-}
-
-private struct LibraWindowBorder: NSViewRepresentable {
-    func makeNSView(context: Context) -> AttachmentView { AttachmentView() }
-
-    func updateNSView(_ nsView: AttachmentView, context: Context) {
-        nsView.attachBorder()
-    }
-
-    static func dismantleNSView(_ nsView: AttachmentView, coordinator: ()) {
-        nsView.border.removeFromSuperview()
-    }
-
-    final class AttachmentView: NSView {
-        let border = BorderView()
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            attachBorder()
-        }
-
-        func attachBorder() {
-            guard let frameView = window?.contentView?.superview else {
-                border.removeFromSuperview()
-                return
-            }
-            guard border.superview !== frameView else { return }
-            border.removeFromSuperview()
-            border.frame = frameView.bounds
-            border.autoresizingMask = [.width, .height]
-            border.setAccessibilityElement(false)
-            frameView.addSubview(border, positioned: .above, relativeTo: nil)
-        }
-
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
-    }
-
-    final class BorderView: NSView {
-        override var isOpaque: Bool { false }
-
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-        override func setFrameSize(_ newSize: NSSize) {
-            super.setFrameSize(newSize)
-            needsDisplay = true
-        }
-
-        override func draw(_ dirtyRect: NSRect) {
-            let path = NSBezierPath(
-                roundedRect: bounds.insetBy(dx: 0.75, dy: 0.75),
-                xRadius: 11, yRadius: 11
-            )
-            path.lineWidth = 1
-            NSColor(LibraTheme.gold.opacity(0.85)).setStroke()
-            path.stroke()
-        }
     }
 }

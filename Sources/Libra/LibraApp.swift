@@ -38,7 +38,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         for window in NSApp?.windows ?? [] {
-            window.styleMask.insert(.fullSizeContentView)
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
             window.backgroundColor = .black

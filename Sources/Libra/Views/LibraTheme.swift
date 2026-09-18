@@ -21,15 +21,11 @@ enum LibraTheme {
     /// Hairline yellow border for dark panels.
     static var hairline: Color { yellow.opacity(0.15) }
 
-    /// Soft ambient glow cast under glossy cards.
-    static func ambient(hovering: Bool) -> Color {
-        yellow.opacity(hovering ? 0.4 : 0.22)
-    }
 }
 
-/// Card face — a very light gold-and-black gradient: pale gold wash bleeding
-/// down over near-black, thin gold border, soft ambient glow, hover
-/// lift + shine sweep.
+/// Card face — near-charcoal with a faint gold tint at the top edge only.
+/// Border is muted bronze at rest and warms to gold on hover; the glow is
+/// reserved for the hovered card so resting cards sit quiet.
 struct LibraCardFace: View {
     var hovering: Bool = false
 
@@ -38,9 +34,9 @@ struct LibraCardFace: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        LibraTheme.gold.opacity(hovering ? 0.22 : 0.16),
-                        Color(red: 0.09, green: 0.085, blue: 0.075),
-                        Color(red: 0.045, green: 0.045, blue: 0.05),
+                        LibraTheme.gold.opacity(hovering ? 0.10 : 0.05),
+                        Color(red: 0.07, green: 0.068, blue: 0.066),
+                        Color(red: 0.04, green: 0.04, blue: 0.045),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -66,8 +62,8 @@ struct LibraCardFace: View {
                     .stroke(
                         LinearGradient(
                             colors: [
-                                LibraTheme.gold.opacity(hovering ? 0.8 : 0.55),
-                                LibraTheme.amber.opacity(0.25),
+                                LibraTheme.gold.opacity(hovering ? 0.75 : 0.28),
+                                LibraTheme.amber.opacity(hovering ? 0.35 : 0.15),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -75,7 +71,11 @@ struct LibraCardFace: View {
                         lineWidth: 1
                     )
             )
-            .shadow(color: LibraTheme.ambient(hovering: hovering), radius: hovering ? 14 : 8, y: 3)
+            .shadow(
+                color: hovering ? LibraTheme.gold.opacity(0.22) : Color.black.opacity(0.4),
+                radius: hovering ? 10 : 6,
+                y: 3
+            )
             .scaleEffect(hovering ? 1.02 : 1)
             .animation(.easeOut(duration: 0.18), value: hovering)
     }
@@ -98,23 +98,6 @@ struct LibraPanel: ViewModifier {
 
 extension View {
     func libraPanel() -> some View { modifier(LibraPanel()) }
-
-    /// Hairline gold outline — eight sub-point offset copies render a
-    /// whisper-thin stroke on Retina; the original text stays on top.
-    func goldHairlineOutline(radius: CGFloat = 0.3) -> some View {
-        self.background {
-            ZStack {
-                ForEach(0..<8, id: \.self) { i in
-                    let angle = Double(i) * .pi / 4
-                    LibraTheme.gold
-                        .mask(self)
-                        .offset(x: cos(angle) * radius, y: sin(angle) * radius)
-                }
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
-    }
 }
 
 /// Yellow gloss pill — black text, for the one primary action.

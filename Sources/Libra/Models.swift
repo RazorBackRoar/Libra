@@ -132,19 +132,19 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .provid, .vidres, .keepName, .promax, .maxvid:
             return
-                "Names become “Name 4K W30 001.mov” — or folders nested by resolution, orientation, and FPS."
+                "Names become “Name 4K W30 001.mov” — or folders by resolution, orientation, FPS."
         case .iphoneSorter:
             return
-                "Into iPhone/, Other Apple/, Not Apple/ — named “Name 4K W30 🍎📱 001.mov” from probed metadata."
+                "iPhone/ · Other Apple/ · Not Apple/ — “Name 4K W30 🍎📱 001.mov”"
         case .gps:
             return
-                "Into “City, ST/” folders — “Name 4K W30 🌍 001.mov”. Resolve city names for exact destinations; no GPS → No-GPS/."
+                "“City, ST/” folders — “Name 4K W30 🌍 001.mov” · No GPS → No-GPS/"
         case .slomo:
             return
-                "Slowed copies in SloMo/ — “Name 4K W30 001.mov”; audio kept and slowed, or removed, by your choice. Needs ffmpeg."
+                "Slowed copies in SloMo/ — “Name 4K W30 001.mov”. Needs ffmpeg."
         case .oneMin:
             return
-                "Stamps creation times 60 s apart — “Name 4K W30 001.mov” copies in Adjusted/, or change originals. Needs ffmpeg."
+                "Sequential 60-second timestamps — copies in Adjusted/ or originals. Needs ffmpeg."
         case .photoSweep:
             return "Photos keep their original names — IMG_2041.HEIC moves out untouched."
         }
