@@ -105,3 +105,12 @@ Source/build version is **1.4.0** — not yet published.
 - [x] `GPSMapPanel` (compact) now renders unconditionally on every non-GPS tool page — the gold "Location details" button no longer waits for coordinate-bearing files; opens/closes on click (empty map + hint when no GPS media)
 - [x] Verified live on test build by PID (earlier dumps hit the installed /Applications copy — two same-named processes): button present on empty Libra Sorter page, expands to mini-map on click
 - [x] `swift test` 113/113 · `build/Release/Libra.dmg` + `~/Desktop/Libra.dmg` rebuilt
+
+## Final pass — consistency fixes
+
+- [x] Photos Only page brought to parity: collapsible `GPSMapPanel(files: state.photos)` added (photos carry GPS too), Preview toggle switched from `.switch` to `PreviewModeToggleStyle` gold knob, caption deduped to "Nothing will be changed.", Undo/Cancel given `LibraSecondaryButtonStyle(compact:)`
+- [x] `previewLiveCaption` `.gps` case — "Organize will move videos into city folders." (was generic "renames, moves, or copies")
+- [x] `GPSStateStrip` wrapped in horizontal ScrollView anchored trailing — many states scroll instead of clipping over the title; largest state stays rightmost
+- [x] Footer pill help text unified ("Filter the map to X")
+- [x] Audited: no stale duplicate/sortByDate/radius/isClustering refs; geocode→preview→write parity holds; synthesized CodingKeys leaves no stale settings keys; PhotoSweep undo/cancel styling fixed
+- [x] `swift test` 113/113 · `build/Release/Libra.dmg` + `~/Desktop/Libra.dmg` rebuilt (SHA `0f688d72`)

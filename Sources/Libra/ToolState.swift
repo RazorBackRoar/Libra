@@ -96,6 +96,8 @@ final class ToolState: ObservableObject {
             return oneMinMode == "copies"
                 ? "Adjust will create timestamped copies."
                 : "Adjust will change originals."
+        case .gps:
+            return "Organize will move videos into city folders."
         default:
             return "The action button renames, moves, or copies files."
         }

@@ -77,11 +77,17 @@ struct GPSStateStrip: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            ForEach(states.reversed()) { state in
-                stateButton(state)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                Spacer(minLength: 0)
+                ForEach(states.reversed()) { state in
+                    stateButton(state)
+                }
             }
+            .padding(.vertical, 6)
         }
+        .defaultScrollAnchor(.trailing)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private func stateButton(_ state: GPSStateSummary) -> some View {

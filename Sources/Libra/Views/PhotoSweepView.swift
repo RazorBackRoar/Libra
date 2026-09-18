@@ -209,6 +209,8 @@ struct PhotoSweepView: View {
             )
             .disabled(state.running)
 
+            GPSMapPanel(files: state.photos)
+
             if state.running {
                 ProgressView(
                     value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
@@ -265,18 +267,15 @@ struct PhotoSweepView: View {
 
             HStack {
                 Toggle(isOn: $state.dryRun) {
-                    Text("Preview only")
+                    Text(state.dryRun ? "Preview only" : "Live")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(LibraTheme.yellow)
+                        .foregroundColor(state.dryRun ? LibraTheme.yellow : .orange)
                 }
-                .toggleStyle(.switch)
-                .tint(LibraTheme.yellow)
+                .toggleStyle(PreviewModeToggleStyle())
                 .disabled(state.running)
+                .accessibilityLabel("Preview only")
 
-                Text(
-                    state.dryRun
-                        ? "Preview only — nothing will be changed." : "Live — photos will move."
-                )
+                Text(state.dryRun ? "Nothing will be changed." : "Live — photos will move.")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(state.dryRun ? LibraTheme.yellow : .orange)
                 .lineLimit(2)
@@ -287,12 +286,15 @@ struct PhotoSweepView: View {
                     Button("Undo last run") {
                         state.undoLastRun()
                     }
+                    .buttonStyle(LibraSecondaryButtonStyle(compact: true))
+                    .accessibilityLabel("Undo last run")
                 }
 
                 if state.running {
                     Button(state.cancelling ? "Cancelling…" : "Cancel") {
                         state.cancelActiveWork()
                     }
+                    .buttonStyle(LibraSecondaryButtonStyle(compact: true))
                     .disabled(state.cancelling)
                     .accessibilityLabel("Cancel")
                 }

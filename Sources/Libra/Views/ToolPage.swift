@@ -494,9 +494,7 @@ struct ToolPage: View {
         CountPill(
             label: label,
             value: value,
-            helpText: filter == .gps || filter == .noGps
-                ? "Show only \(label.lowercased()) pins"
-                : "Show only \(label.lowercased()) on the map",
+            helpText: "Filter the map to \(label.lowercased())",
             isSelected: gpsMapFilter == filter
         ) {
             gpsMapFilter = gpsMapFilter == filter ? .all : filter
