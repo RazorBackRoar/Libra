@@ -13,7 +13,10 @@ struct HomeView: View {
                     .foregroundColor(LibraTheme.yellow)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Libra")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 18, weight: .medium))
+                        .tracking(2.5)
+                        .foregroundStyle(.white)
+                        .goldHairlineOutline()
                     Text("Video organization toolkit")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)

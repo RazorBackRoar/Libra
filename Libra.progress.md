@@ -56,6 +56,10 @@ Source/build version is **1.4.0** — not yet published.
 - [x] Action button names the operation — "Rename N Videos" (sort family + iPhone: "Sort N Videos"), "Organize N Videos" (GPS), "Make N Slo-Mo", "Adjust N Timestamps", "Move N Photos"; confirm alert button uses the matching verb
 - [x] Home cards restyled — near-black faces with a subtle pale-gold wash over black, thin gold gradient border, gold icon/chip accents, compact fixed 148pt height; gold liner border tracing the whole window edge on every page (`LibraView`)
 - [x] Window hugs content — `LibraView.resizeWindow` animates the window to 900×445 on home and 900×860 on tool pages (top edge anchored, clamped to the visible frame); home min size 780×430, `defaultSize` 900×445
+- [x] Border implementation corrected after owner screenshots showed the titlebar still uncovered: a non-interactive AppKit overlay attaches above the window frame's native titlebar and autoresizes with the window; the content-only SwiftUI stroke is removed
+- [x] "Libra" title corrected after owner screenshots showed thick white lettering: medium weight, 2.5pt tracking, 0.3pt gold-only masks behind one white text face (the former foreground-style override left all copies white)
+- [ ] Owner visual verification of the corrected frame overlay and spaced title in the rebuilt DMG; earlier screenshot-verification claims did not establish that the top edge was correct
+- [x] razorcore release policy: `publish_release` deletes prior releases+tags by default (one release per app); opt-out `--keep-old` / `RAZORCORE_KEEP_OLD_RELEASES=1`; stale Libra v1.3.0 and MetaBurn v2.2.10 releases+tags removed — all 8 apps show one Latest release each
 - [ ] Manual UAT (owner): ⌘, Settings; drop→Preview vs Write; Cancel mid-scan; GPS pills→pins, resolve→Preview→Write gate, pin overlay filenames; iPhone sort; Photos Only; Slo-Mo audio on/off (MOV+WEBM); 1-Min copy + in-place + Undo; ~5k folder smoothness
 - [ ] Release gate (explicit ask only): `razorbuild Libra`, SHA-256, `gh release create v1.4.0`, delete v1.3.0 release+tag
 

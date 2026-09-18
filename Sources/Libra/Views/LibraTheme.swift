@@ -98,6 +98,23 @@ struct LibraPanel: ViewModifier {
 
 extension View {
     func libraPanel() -> some View { modifier(LibraPanel()) }
+
+    /// Hairline gold outline — eight sub-point offset copies render a
+    /// whisper-thin stroke on Retina; the original text stays on top.
+    func goldHairlineOutline(radius: CGFloat = 0.3) -> some View {
+        self.background {
+            ZStack {
+                ForEach(0..<8, id: \.self) { i in
+                    let angle = Double(i) * .pi / 4
+                    LibraTheme.gold
+                        .mask(self)
+                        .offset(x: cos(angle) * radius, y: sin(angle) * radius)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
 }
 
 /// Yellow gloss pill — black text, for the one primary action.
