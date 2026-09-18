@@ -137,6 +137,11 @@ struct GPSMapPanel: View {
                 ForEach(model.clusters) { cluster in
                     Annotation(cluster.pinTitle, coordinate: cluster.coordinate, anchor: .bottom) {
                         GPSMapPin(selected: model.selectedClusterID == cluster.id)
+                            .contextMenu {
+                                Button("Reveal in Finder") {
+                                    MediaOpen.reveal(cluster.files.map(\.path))
+                                }
+                            }
                     }
                     .tag(cluster.id)
                 }
@@ -328,7 +333,6 @@ struct GPSMapPanel: View {
     }
 
     private var mapStatusMessage: String? {
-        if model.isClustering { return "Placing videos on the map…" }
         if !files.contains(where: \.hasCoordinates) {
             return "No GPS coordinates found — these videos will use No-GPS/."
         }
@@ -361,6 +365,12 @@ struct GPSMapPanel: View {
                 Text(cluster.mediaCountLabel)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(LibraTheme.gold)
+            }
+            .contentShape(Rectangle())
+            .contextMenu {
+                Button("Reveal in Finder") {
+                    MediaOpen.reveal(cluster.files.map(\.path))
+                }
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -413,9 +423,14 @@ private struct CollapsedPanel: ViewModifier {
     }
 }
 
-/// Slimmer yellow map pin than the default MapKit Marker balloon.
+/// Slimmer yellow map pin than the default MapKit Marker balloon. Hover
+/// highlights the group — brighter, larger, more glow — without changing
+/// which group the file belongs to.
 private struct GPSMapPin: View {
     var selected: Bool
+    @State private var hovering = false
+
+    private var highlighted: Bool { selected || hovering }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -427,17 +442,20 @@ private struct GPSMapPin: View {
                         endPoint: .bottom
                     )
                 )
-                .frame(width: selected ? 12 : 10, height: selected ? 12 : 10)
+                .frame(width: highlighted ? 13 : 10, height: highlighted ? 13 : 10)
                 .overlay(
                     Circle()
                         .stroke(Color.black.opacity(0.45), lineWidth: 0.8)
                 )
-                .shadow(color: LibraTheme.yellow.opacity(0.5), radius: selected ? 4 : 2, y: 1)
+                .shadow(color: LibraTheme.yellow.opacity(highlighted ? 0.8 : 0.5), radius: highlighted ? 6 : 2, y: 1)
             Capsule()
                 .fill(LibraTheme.gold)
                 .frame(width: 2, height: 5)
                 .shadow(color: .black.opacity(0.25), radius: 1, y: 1)
         }
+        .scaleEffect(highlighted ? 1.15 : 1)
+        .animation(.easeOut(duration: 0.12), value: highlighted)
+        .onHover { hovering = $0 }
         .accessibilityLabel(selected ? "Selected map pin" : "Map pin")
     }
 }

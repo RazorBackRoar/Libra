@@ -36,14 +36,6 @@ struct SettingsView: View {
                 Toggle("Preview only by default", isOn: $store.settings.dryRunDefault)
                 Toggle("Confirm before applying", isOn: $store.settings.requireConfirmToWrite)
                 TextField("Default prefix", text: $defaultPrefix)
-                Toggle("Also sort by date", isOn: $store.settings.sortByDate)
-                Toggle("Also sort by camera", isOn: $store.settings.sortByCamera)
-                Toggle("Put extras in Duplicates", isOn: $store.settings.sortDuplicatesIntoFolder)
-                Text(
-                    "Duplicates match size, duration, and video format — not a byte-for-byte hash."
-                )
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -64,9 +56,6 @@ struct SettingsView: View {
         .onChange(of: defaultPrefix) { update() }
         .onChange(of: store.settings.dryRunDefault) { store.save() }
         .onChange(of: store.settings.requireConfirmToWrite) { store.save() }
-        .onChange(of: store.settings.sortByDate) { store.save() }
-        .onChange(of: store.settings.sortByCamera) { store.save() }
-        .onChange(of: store.settings.sortDuplicatesIntoFolder) { store.save() }
     }
 
     private func detect() {

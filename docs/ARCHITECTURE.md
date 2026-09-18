@@ -19,10 +19,9 @@ Developer map for the native macOS media organizer (SwiftUI + AppKit interop, Sw
 | `Sources/Libra/Services/FileOps.swift` | Symlink- and path-containment-checked move/copy/delete/rename/trash |
 | `Sources/Libra/Services/FfmpegOps.swift` | `ffmpeg` for Slo-Mo copies and 1-Min-Adjuster timestamp remux; never overwrites an existing dest |
 | `Sources/Libra/Services/ProcessRunner.swift` | `Process` wrapper — cancellation, timeout, SIGTERM→grace→SIGKILL |
-| `Sources/Libra/Services/DuplicateDetector.swift` | Likely-duplicate heuristic: same size, duration, resolution, fps, codec (not a content hash) |
 | `Sources/Libra/Services/UndoApply.swift` | Replays the `UndoRecord` log — moves files back or deletes created copies |
 | `Sources/Libra/Services/ScanSafety.swift` | Warns before scanning `/`, home, Desktop, or a volume root, and before large batches |
-| `Sources/Libra/Services/GPSGeocoder.swift`, `GPSMapModel.swift`, `GPSCoordinateParser.swift` | `CLGeocoder` only from ToolState's explicit "Resolve city names" action, 5-mile pin clustering + visual-only map filtering, ImageIO / ISO6709 coordinates |
+| `Sources/Libra/Services/GPSGeocoder.swift`, `GPSMapModel.swift`, `GPSCoordinateParser.swift` | `CLGeocoder` only from ToolState's explicit "Resolve city names" action (one call per ~1.1 km coordinate bucket), city-name pin grouping + visual-only map filtering, ImageIO / ISO6709 coordinates |
 | `Sources/Libra/Services/IPhoneSortLogic.swift` | iPhone / Other Apple / Not Apple classification |
 | `Sources/Libra/Services/FileNaming.swift` | Standardized output filenames (resolution/orientation/fps/index) |
 | `Sources/Libra/Services/PhotoMover.swift` | Moves stills out of mixed video folders |
@@ -48,12 +47,12 @@ Home is a 3×2 grid: Libra Sorter, iPhone Model Sort, GPS, Slo-Mo, 1-Min-Adjuste
 
 Destructive operations are preview-only by default, require an explicit **Write** (or Move photos) plus a confirmation dialog when that setting is on, and log an in-memory undo journal for the current run. Turning Preview off does not start a write. `FileOps` rejects symlinks and checks physical path containment before any move/copy/delete, independent of the UI confirmations.
 
-- GPS Sorter preview uses `GPS` / `No-GPS` folders until the explicit **Resolve city names** action geocodes and fills exact `City, ST/` destinations; the cached map is reused by Write so preview and write can't drift apart. Write is blocked until Resolve completes for any coordinate-bearing batch (all-no-GPS batches write straight to `No-GPS/`); a cancelled resolve keeps Write off. `GPSMapModel` is a pure view model — it never calls `GPSGeocoder`; place names arrive as a published `file.path → name` map from ToolState. Base 5-mile clustering runs once per scan off the main actor; count pills on the GPS page filter visible pins in memory (visual only — Preview/Write scope is untouched). The GPS map is always expanded and fills the workspace; pin selection shows a bottom overlay of filename buttons (no thumbnails, identification rows, or embedded playback). Other tools keep a collapsible mini-map; identification rows always show coordinates when present.
+- GPS Sorter preview uses `GPS` / `No-GPS` folders until the explicit **Resolve city names** action geocodes and fills exact `City, ST/` destinations; the cached map is reused by Write so preview and write can't drift apart. Write is blocked until Resolve completes for any coordinate-bearing batch (all-no-GPS batches write straight to `No-GPS/`); a cancelled resolve keeps Write off. `GPSMapModel` is a pure view model — it never calls `GPSGeocoder`; place names arrive as a published `file.path → name` map from ToolState. Pins group strictly by resolved city name (unresolved media shows one pin per recorded spot, ~11 m dedupe — no radius clustering anywhere); each group's files sort by creation date, and count pills on the GPS page filter visible pins in memory (visual only — Preview/Write scope is untouched). The GPS map is always expanded and fills the workspace; pin selection shows a bottom overlay of filename buttons (no thumbnails, identification rows, or embedded playback). Other tools keep a collapsible mini-map; identification rows always show coordinates when present.
 - 1-Min-Adjuster inplace mode writes the new file, then moves the original to Trash (not a permanent delete) — the Trash URL is recorded so Undo restores the original bytes and removes the adjusted copy.
 - Photos Only uses the same large-scan confirm as video tools. Photo undo goes through `UndoApply`.
 
 ## Verification
 
-CI (`.github/workflows/ci.yml`) runs `swift build` and `swift test` on a macOS runner. `Tests/LibraTests/` covers the pure-logic services, the GPS 5,000-item clustering benchmark, and the in-place undo byte-restore path.
+CI (`.github/workflows/ci.yml`) runs `swift build` and `swift test` on a macOS runner. `Tests/LibraTests/` covers the pure-logic services, the GPS 5,000-item grouping benchmark, and the in-place undo byte-restore path.
 
 Default video extensions are limited to containers AVFoundation actually reads (`mp4`, `mov`, `m4v`, `mts`, `m2ts`, `3gp`); `mkv`/`avi`/`webm` report "metadata unreadable" and are skipped by every tool.

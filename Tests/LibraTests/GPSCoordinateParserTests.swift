@@ -20,59 +20,54 @@ final class GPSCoordinateParserTests: XCTestCase {
         XCTAssertEqual(a, b)
     }
 
-    func testCluster_groupsFilesWithinFiveMiles() {
-        // ~1.1 miles apart around Cupertino — must share one pin.
+    func testGroups_mergeOnlyByResolvedCity() {
+        // ~1.1 miles apart around Cupertino — different recorded spots stay
+        // separate until they resolve to the same city name.
         let files = [
             stub(path: "/tmp/a.mov", lat: 37.3349, lon: -122.0090),
             stub(path: "/tmp/b.mov", lat: 37.3500, lon: -122.0090),
             stub(path: "/tmp/c.mov", lat: 40.0, lon: -74.0)
         ]
-        let clusters = GPSMapClustering.cluster(files: files)
+        let unresolved = GPSMapClustering.groups(files: files)
+        XCTAssertEqual(unresolved.count, 3)
+        XCTAssertTrue(unresolved.allSatisfy { $0.placeName == nil })
+
+        let resolved = GPSMapClustering.groups(
+            files: files,
+            resolvedNames: [
+                "/tmp/a.mov": "Cupertino, CA",
+                "/tmp/b.mov": "Cupertino, CA",
+                "/tmp/c.mov": "New York, NY",
+            ])
+        XCTAssertEqual(resolved.count, 2)
+        XCTAssertEqual(resolved.map(\.files.count).sorted(), [1, 2])
+        let cupertino = resolved.first { $0.placeName == "Cupertino, CA" }
+        XCTAssertEqual(cupertino?.files.map(\.path).sorted(), ["/tmp/a.mov", "/tmp/b.mov"])
+    }
+
+    func testGroups_sameSpotSharesOnePin() {
+        // Identical recorded coordinates → one spot pin, no radius involved.
+        let files = [
+            stub(path: "/tmp/a.mov", lat: 37.3349, lon: -122.0090),
+            stub(path: "/tmp/b.mov", lat: 37.3349, lon: -122.0090),
+            stub(path: "/tmp/c.mov", lat: 37.4800, lon: -122.0090)
+        ]
+        let clusters = GPSMapClustering.groups(files: files)
         XCTAssertEqual(clusters.count, 2)
         XCTAssertEqual(clusters.map(\.files.count).sorted(), [1, 2])
     }
 
-    func testCluster_keepsSeparateBeyondFiveMiles() {
-        // ~10 miles apart on the same longitude — two pins.
-        let files = [
-            stub(path: "/tmp/a.mov", lat: 37.3349, lon: -122.0090),
-            stub(path: "/tmp/b.mov", lat: 37.4800, lon: -122.0090)
-        ]
-        let clusters = GPSMapClustering.cluster(files: files)
-        XCTAssertEqual(clusters.count, 2)
-        XCTAssertEqual(clusters.map(\.files.count), [1, 1])
-    }
-
-    func testMergeByPlaceName_combinesSameCityPins() {
-        let a = GPSLocationCluster(
-            id: "a",
-            latitude: 43.49,
-            longitude: -112.03,
-            files: [stub(path: "/tmp/a.mov", lat: 43.49, lon: -112.03)],
-            placeName: "Idaho Falls, ID"
-        )
-        let b = GPSLocationCluster(
-            id: "b",
-            latitude: 43.50,
-            longitude: -112.04,
-            files: [
-                stub(path: "/tmp/b.mov", lat: 43.50, lon: -112.04),
-                stub(path: "/tmp/c.mov", lat: 43.50, lon: -112.04)
-            ],
-            placeName: "Idaho Falls, ID"
-        )
-        let c = GPSLocationCluster(
-            id: "c",
-            latitude: 41.32,
-            longitude: -112.00,
-            files: [stub(path: "/tmp/d.mov", lat: 41.32, lon: -112.00)],
-            placeName: "Pleasant View, UT"
-        )
-        let merged = GPSMapClustering.mergeByPlaceName([a, b, c])
-        XCTAssertEqual(merged.count, 2)
-        let idaho = merged.first { $0.placeName == "Idaho Falls, ID" }
-        XCTAssertEqual(idaho?.files.count, 3)
-        XCTAssertEqual(merged.first { $0.placeName == "Pleasant View, UT" }?.files.count, 1)
+    func testGroups_filesSortByCreationDate() {
+        let old = stub(path: "/tmp/old.mov", lat: 37.3349, lon: -122.0090)
+        let new = stub(path: "/tmp/new.mov", lat: 37.3349, lon: -122.0090)
+        var oldest = old
+        oldest.creationTime = Date(timeIntervalSince1970: 1_000)
+        var newest = new
+        newest.creationTime = Date(timeIntervalSince1970: 2_000)
+        // Input order deliberately backwards.
+        let clusters = GPSMapClustering.groups(files: [newest, oldest])
+        XCTAssertEqual(clusters.count, 1)
+        XCTAssertEqual(clusters[0].files.map(\.path), ["/tmp/old.mov", "/tmp/new.mov"])
     }
 
     func testMediaCountLabel_alwaysPhotosAndVideos() {

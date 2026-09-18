@@ -2,7 +2,9 @@ import XCTest
 
 @testable import Libra
 
-/// 5,000-item clustering benchmark — the stated performance target.
+/// 5,000-item grouping benchmark — the stated performance target. Grouping
+/// is a dictionary bucket by spot/city name, so it must stay far under the
+/// old radius-cluster budget.
 final class GPSClusteringBenchmarkTests: XCTestCase {
 
     private func makeFile(path: String, lat: Double, lon: Double) -> VideoInfo {
@@ -35,7 +37,7 @@ final class GPSClusteringBenchmarkTests: XCTestCase {
     }
 
     /// 5,000 files across ~500 locations (~10 files each, jittered within
-    /// ~1 km so each location forms exactly one cluster).
+    /// ~1 km — distinct recorded spots, no radius merging).
     private func makeFiles() -> [VideoInfo] {
         var files: [VideoInfo] = []
         files.reserveCapacity(5000)
@@ -53,51 +55,51 @@ final class GPSClusteringBenchmarkTests: XCTestCase {
         return files
     }
 
-    func testClusterHandles5000FilesQuickly() {
+    func testGroupsHandles5000FilesQuickly() {
         let files = makeFiles()
         let start = CFAbsoluteTimeGetCurrent()
-        let clusters = GPSMapClustering.cluster(files: files)
+        let clusters = GPSMapClustering.groups(files: files)
         let elapsed = CFAbsoluteTimeGetCurrent() - start
 
-        XCTAssertEqual(clusters.count, 500)
+        XCTAssertFalse(clusters.isEmpty)
         XCTAssertEqual(clusters.reduce(0) { $0 + $1.files.count }, 5000)
-        XCTAssertLessThan(elapsed, 2.0, "clustering 5,000 files took \(elapsed)s")
+        XCTAssertLessThan(elapsed, 2.0, "grouping 5,000 files took \(elapsed)s")
     }
 
-    /// Count-pill filters must reuse the base build — no re-clustering on
-    /// every click. Same file set → synchronous in-memory filter only.
+    /// Count-pill filters re-run grouping synchronously — it must stay cheap
+    /// on every click even at 5,000 files.
     @MainActor
     func testMapFilterSwitchIsFast() async throws {
         let files = makeFiles()
         let model = GPSMapModel()
         model.update(files: files)
-        let deadline = Date().addingTimeInterval(10)
-        while model.isClustering, Date() < deadline {
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-        XCTAssertEqual(model.clusters.count, 500)
+        XCTAssertEqual(model.clusters.reduce(0) { $0 + $1.files.count }, 5000)
 
         let start = CFAbsoluteTimeGetCurrent()
         model.update(files: files, filter: .resolution("1080p"))
         let elapsed = CFAbsoluteTimeGetCurrent() - start
 
-        XCTAssertFalse(model.isClustering)  // filter change never re-clusters
         XCTAssertEqual(model.clusters.reduce(0) { $0 + $1.files.count }, 5000)
         XCTAssertLessThan(elapsed, 0.1, "filtering 5,000 files took \(elapsed)s")
     }
 
-    func testMergeByPlaceNameHandles500Clusters() {
+    /// Resolved names collapse every spot into its city pin — 500 spots
+    /// across two names must merge to two pins cheaply.
+    func testCityGroupingHandles5000Files() {
         let files = makeFiles()
-        var clusters = GPSMapClustering.cluster(files: files)
-        for i in clusters.indices {
-            clusters[i].placeName = i % 2 == 0 ? "Boise, Idaho" : "Meridian, Idaho"
+        var names: [String: String] = [:]
+        names.reserveCapacity(files.count)
+        for (index, file) in files.enumerated() {
+            names[file.path] = index % 2 == 0 ? "Boise, Idaho" : "Meridian, Idaho"
         }
+
         let start = CFAbsoluteTimeGetCurrent()
-        let merged = GPSMapClustering.mergeByPlaceName(clusters)
+        let clusters = GPSMapClustering.groups(files: files, resolvedNames: names)
         let elapsed = CFAbsoluteTimeGetCurrent() - start
 
-        XCTAssertEqual(merged.count, 2)
-        XCTAssertEqual(merged.reduce(0) { $0 + $1.files.count }, 5000)
-        XCTAssertLessThan(elapsed, 1.0)
+        XCTAssertEqual(clusters.count, 2)
+        XCTAssertEqual(clusters.reduce(0) { $0 + $1.files.count }, 5000)
+        XCTAssertTrue(clusters.allSatisfy { $0.placeName != nil })
+        XCTAssertLessThan(elapsed, 1.0, "city grouping 5,000 files took \(elapsed)s")
     }
 }

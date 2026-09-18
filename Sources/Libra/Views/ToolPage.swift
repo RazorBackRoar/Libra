@@ -81,12 +81,9 @@ struct ToolPage: View {
             .background(LibraTheme.bg.ignoresSafeArea())
 
             if let filter = browserFilter {
-                let extras = DuplicateDetector.extraPaths(in: state.filteredFiles)
                 CategoryBrowserView(
                     title: filter.title,
-                    files: state.filteredFiles.filter {
-                        filter.matches($0, duplicateExtras: extras)
-                    },
+                    files: state.filteredFiles.filter { filter.matches($0) },
                     onBack: { browserFilter = nil }
                 )
                 .background(LibraTheme.bg)
@@ -117,18 +114,26 @@ struct ToolPage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(tool.title)
                     .font(.system(size: 20, weight: .bold))
-                Text(tool.ruleSummary)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(LibraTheme.gold)
-                    .lineLimit(2)
+                if tool != .gps {
+                    Text(tool.ruleSummary)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(LibraTheme.gold)
+                        .lineLimit(2)
+                }
             }
             Spacer(minLength: 8)
+            if tool == .gps {
+                GPSStateStrip(
+                    files: state.files,
+                    resolvedNames: state.gpsPlaceByPath
+                )
+            }
             if usesPrefixField {
                 TextField("Prefix", text: $state.prefix)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 180)
                     .disabled(state.running)
-                    .help("Replaces the original name: katie 720p W30 002.mp4")
+                    .help("Replaces the original name")
                     .onChange(of: state.prefix) { _, _ in
                         state.scheduleRerunAfterOptionsChange()
                     }
@@ -209,10 +214,6 @@ struct ToolPage: View {
             }
         }
 
-        if state.showsExtraFolderToggles {
-            extraFolderToggles
-        }
-
         if state.running {
             ProgressView(
                 value: Double(state.progress.done), total: Double(max(state.progress.total, 1)))
@@ -231,16 +232,10 @@ struct ToolPage: View {
             }
         }
 
-        if state.filteredFiles.contains(where: \.hasCoordinates) {
-            GPSMapPanel(files: state.filteredFiles)
-        }
+        GPSMapPanel(files: state.filteredFiles)
 
         if tool.isSortRenameFamily {
             sortRenameControls
-        }
-
-        if state.showsExtraFolderToggles {
-            extraFolderToggles
         }
 
         if tool == .slomo {
@@ -292,35 +287,6 @@ struct ToolPage: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    private var extraFolderToggles: some View {
-        HStack(spacing: 14) {
-            Toggle("Also sort by date", isOn: $settingsStore.settings.sortByDate)
-            Toggle("Also sort by camera", isOn: $settingsStore.settings.sortByCamera)
-            Toggle(
-                "Put extras in Duplicates",
-                isOn: $settingsStore.settings.sortDuplicatesIntoFolder
-            )
-            .help("Same size, duration, and video format — not a byte-for-byte match")
-        }
-        .toggleStyle(.checkbox)
-        .controlSize(.small)
-        .font(.system(size: 11))
-        .foregroundStyle(.secondary)
-        .disabled(state.running)
-        .onChange(of: settingsStore.settings.sortByDate) { _, _ in
-            settingsStore.save()
-            state.scheduleRerunAfterOptionsChange()
-        }
-        .onChange(of: settingsStore.settings.sortByCamera) { _, _ in
-            settingsStore.save()
-            state.scheduleRerunAfterOptionsChange()
-        }
-        .onChange(of: settingsStore.settings.sortDuplicatesIntoFolder) { _, _ in
-            settingsStore.save()
-            state.scheduleRerunAfterOptionsChange()
-        }
-    }
-
     @ViewBuilder
     private var sortRenameControls: some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
@@ -349,20 +315,9 @@ struct ToolPage: View {
             }
         }
 
-        if state.filenameStyle == .libraFormat {
-            Text("Example: \(libraFormatExample)")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-        }
         Text(state.folderDepth.detail)
             .font(.system(size: 11))
             .foregroundColor(.secondary)
-    }
-
-    private var libraFormatExample: String {
-        let prefix = state.prefix.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stem = prefix.isEmpty ? "katie" : prefix
-        return "\(stem) 720p W30 002.mp4"
     }
 
     @ViewBuilder
@@ -456,6 +411,10 @@ struct ToolPage: View {
                     .foregroundColor(state.dryRun ? LibraTheme.yellow : .orange)
                     .lineLimit(2)
 
+                if tool == .gps, !state.files.isEmpty {
+                    gpsFooterCounts
+                }
+
                 Spacer()
 
                 if state.canUndo {
@@ -500,6 +459,47 @@ struct ToolPage: View {
             if state.running {
                 state.cancelActiveWork()
             }
+        }
+    }
+
+    /// GPS footer strip — GPS / No GPS / iPhone / Unknown counts as the
+    /// same gold capsule filters the map pills use. Visual filter only;
+    /// Preview/Write scope never narrows.
+    private var gpsFooterCounts: some View {
+        HStack(spacing: 8) {
+            gpsCountPill(
+                "GPS",
+                value: state.files.filter(\.hasCoordinates).count,
+                filter: .gps)
+            gpsCountPill(
+                "No GPS",
+                value: state.files.filter { !$0.hasCoordinates }.count,
+                filter: .noGps)
+            gpsCountPill(
+                "iPhone",
+                value: state.files.filter(\.hasiPhoneModel).count,
+                filter: .iPhoneModel)
+            gpsCountPill(
+                "Unknown",
+                value: state.files.filter {
+                    !$0.isApple && $0.make.isEmpty && $0.model.isEmpty
+                }.count,
+                filter: .unknown)
+        }
+    }
+
+    private func gpsCountPill(
+        _ label: String, value: Int, filter: MediaBrowserFilter
+    ) -> some View {
+        CountPill(
+            label: label,
+            value: value,
+            helpText: filter == .gps || filter == .noGps
+                ? "Show only \(label.lowercased()) pins"
+                : "Show only \(label.lowercased()) on the map",
+            isSelected: gpsMapFilter == filter
+        ) {
+            gpsMapFilter = gpsMapFilter == filter ? .all : filter
         }
     }
 

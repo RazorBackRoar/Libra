@@ -41,13 +41,6 @@ final class ToolState: ObservableObject {
     @Published private(set) var gpsPlaceByPath: [String: String] = [:]
     @Published private(set) var gpsCitiesResolved = false
 
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
     var confirmDiscover: (@Sendable (Int) async -> Bool)?
 
     var canUndo: Bool { !undoRecords.isEmpty && !running }
@@ -92,11 +85,6 @@ final class ToolState: ObservableObject {
         case .photoSweep: return "Move \(noun)Photo\(plural)"
         default: return "Rename \(noun)Video\(plural)"
         }
-    }
-
-    var showsExtraFolderToggles: Bool {
-        if tool == .gps || tool == .iphoneSorter { return true }
-        return tool.isSortRenameFamily && folderDepth != .none
     }
 
     var previewLiveCaption: String {
@@ -345,7 +333,6 @@ final class ToolState: ObservableObject {
         let failures = outcome.supported.filter { $0.error != nil }.count
         let warnings = outcome.supported.filter { $0.warning != nil }.count
         let unsupportedCount = outcome.unsupported.count
-        let dupes = DuplicateDetector.extraCount(in: outcome.supported)
 
         switch outcome.terminal {
         case .cancelled:
@@ -366,11 +353,6 @@ final class ToolState: ObservableObject {
             }
             if unsupportedCount > 0 {
                 parts.append("\(unsupportedCount) unsupported skipped")
-            }
-            if dupes > 0 {
-                parts.append(
-                    "\(dupes) likely duplicate\(dupes == 1 ? "" : "s") (same size, duration, format)"
-                )
             }
             recap = parts.joined(separator: " · ") + "."
         }
@@ -513,7 +495,6 @@ final class ToolState: ObservableObject {
     }
 
     private func sort(target: [VideoInfo]) async {
-        let extras = DuplicateDetector.extraPaths(in: target)
         let eligible = target.filter { $0.error == nil }
         let padWidth = FileNaming.paddingWidth(forCount: eligible.count)
         var reserved = Set<String>()
@@ -528,7 +509,7 @@ final class ToolState: ObservableObject {
                 continue
             }
             index += 1
-            let folder = destinationFolder(for: file, duplicateExtra: extras.contains(file.path))
+            let folder = destinationFolder(for: file)
             let filename =
                 filenameStyle == .keepOriginal
                 ? keepNameFileName(for: file)
@@ -576,7 +557,7 @@ final class ToolState: ObservableObject {
         }
     }
 
-    /// One geocode pass over the coordinate clusters in `files`. Returns a
+    /// One geocode pass over the coordinate buckets in `files`. Returns a
     /// file.path → city-folder map for Preview/Write, a file.path → place-name
     /// map for map labels, and how many files' locations could not be named.
     /// Internal (not private) so tests can drive it with a stubbed
@@ -585,36 +566,53 @@ final class ToolState: ObservableObject {
     func geocodeGPSClusters(files: [VideoInfo]) async
         -> (byPath: [String: String], names: [String: String], unresolved: Int)
     {
-        var clusters = GPSMapClustering.cluster(files: files)
-        for index in clusters.indices {
+        // One API call per distinct ~1.1 km coordinate bucket — bucketing is
+        // geocode thrift only; city grouping happens by place name below.
+        var bucketLocation: [String: (lat: Double, lon: Double)] = [:]
+        var bucketByPath: [String: String] = [:]
+        for file in files where file.hasCoordinates {
+            guard let lat = file.latitude, let lon = file.longitude else { continue }
+            let key = GPSMapClustering.geocodeKey(latitude: lat, longitude: lon)
+            bucketByPath[file.path] = key
+            if bucketLocation[key] == nil {
+                bucketLocation[key] = (lat, lon)
+            }
+        }
+
+        var nameByBucket: [String: String] = [:]
+        for key in bucketLocation.keys.sorted() {
             if Task.isCancelled || cancelling { return ([:], [:], 0) }
-            if let cached = gpsPlaceCache[clusters[index].id] {
-                clusters[index].placeName = cached
+            guard let location = bucketLocation[key] else { continue }
+            if let cached = gpsPlaceCache[key] {
+                nameByBucket[key] = cached
                 continue
             }
-            clusters[index].placeName = await GPSGeocoder.reverseGeocode(
-                latitude: clusters[index].latitude,
-                longitude: clusters[index].longitude
+            let name = await GPSGeocoder.reverseGeocode(
+                latitude: location.lat,
+                longitude: location.lon
             )
-            if let name = clusters[index].placeName {
-                gpsPlaceCache[clusters[index].id] = name
+            if let name {
+                gpsPlaceCache[key] = name
+                nameByBucket[key] = name
             }
             // Be gentle with Apple's geocoder.
             try? await Task.sleep(nanoseconds: 250_000_000)
         }
         guard !Task.isCancelled, !cancelling else { return ([:], [:], 0) }
-        clusters = GPSMapClustering.mergeByPlaceName(clusters)
+
+        // The city name is the grouping mechanism — files that resolve to
+        // the same place share one folder regardless of distance between them.
         var byPath: [String: String] = [:]
         var names: [String: String] = [:]
         var unresolved = 0
-        for cluster in clusters {
-            if cluster.placeName == nil { unresolved += cluster.files.count }
-            let folder = GPSGeocoder.folderName(for: cluster.placeName)
-            for file in cluster.files {
-                byPath[file.path] = folder
-                if let place = cluster.placeName {
-                    names[file.path] = place
-                }
+        for file in files where file.hasCoordinates {
+            guard let key = bucketByPath[file.path] else { continue }
+            let place = nameByBucket[key]
+            byPath[file.path] = GPSGeocoder.folderName(for: place)
+            if let place {
+                names[file.path] = place
+            } else {
+                unresolved += 1
             }
         }
         return (byPath, names, unresolved)
@@ -646,7 +644,6 @@ final class ToolState: ObservableObject {
     }
 
     private func gpsSort(target: [VideoInfo]) async {
-        let extras = DuplicateDetector.extraPaths(in: target)
         // Only the explicit "Resolve city names" cache feeds destinations —
         // Write never geocodes inline (gpsWriteBlockReason gates it).
         let cityByPath = gpsCityByPath
@@ -674,7 +671,7 @@ final class ToolState: ObservableObject {
                 city = "No-GPS"
             }
             let folder = destinationFolder(
-                for: file, duplicateExtra: extras.contains(file.path), gpsCity: city)
+                for: file, gpsCity: city)
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
             let planned = (folder as NSString).appendingPathComponent(filename)
             let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
@@ -684,7 +681,6 @@ final class ToolState: ObservableObject {
     }
 
     private func iphoneSort(target: [VideoInfo]) async {
-        let extras = DuplicateDetector.extraPaths(in: target)
         let ordered = target.sorted { $0.path < $1.path }
         typealias ClassifiedFile = (file: VideoInfo, classification: IPhoneSortLogic.Classification)
         var iphoneFiles: [ClassifiedFile] = []
@@ -730,15 +726,8 @@ final class ToolState: ObservableObject {
             let classification = item.classification
             index += 1
             let filename = FileNaming.standardFileName(for: file, index: index, padWidth: padWidth)
-            var parts: [String] = []
-            if SettingsStore.shared.settings.sortDuplicatesIntoFolder, extras.contains(file.path) {
-                parts.append("Duplicates")
-            }
-            parts.append(classification.folder.rawValue)
-            if showsExtraFolderToggles {
-                parts.append(contentsOf: extraFolderParts(for: file))
-            }
-            let folder = parts.reduce(file.dir) { ($0 as NSString).appendingPathComponent($1) }
+            let folder = (file.dir as NSString)
+                .appendingPathComponent(classification.folder.rawValue)
             let planned = (folder as NSString).appendingPathComponent(filename)
             let result = await commitMove(from: file.path, planned: planned, reserved: &reserved)
             results.append(
@@ -887,30 +876,10 @@ final class ToolState: ObservableObject {
         }
     }
 
-    private func extraFolderParts(for file: VideoInfo) -> [String] {
-        let settings = SettingsStore.shared.settings
-        var parts: [String] = []
-        if settings.sortByDate, let date = file.creationTime {
-            parts.append(Self.dayFormatter.string(from: date))
-        }
-        if settings.sortByCamera {
-            let camera = FileOps.sanitizeFileName(
-                [file.make, file.model].filter { !$0.isEmpty }.joined(separator: " ")
-            )
-            if camera != "file" {
-                parts.append(camera)
-            }
-        }
-        return parts
-    }
-
     private func destinationFolder(
-        for file: VideoInfo, duplicateExtra: Bool, gpsCity: String? = nil
+        for file: VideoInfo, gpsCity: String? = nil
     ) -> String {
         var parts: [String] = []
-        if SettingsStore.shared.settings.sortDuplicatesIntoFolder, duplicateExtra {
-            parts.append("Duplicates")
-        }
         if let gpsCity {
             parts.append(gpsCity)
         } else if tool.isSortRenameFamily {
@@ -921,9 +890,6 @@ final class ToolState: ObservableObject {
                     orientation: file.orientation,
                     fpsBucket: FileNaming.fpsBucket(file.fps)
                 ))
-        }
-        if showsExtraFolderToggles {
-            parts.append(contentsOf: extraFolderParts(for: file))
         }
         return parts.reduce(file.dir) { ($0 as NSString).appendingPathComponent($1) }
     }

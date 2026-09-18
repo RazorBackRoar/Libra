@@ -47,24 +47,18 @@ struct GPSLocationCluster: Identifiable, Hashable {
 /// Pure map view-model: owns pins, camera, and selection only. It never
 /// reverse-geocodes — place names arrive from ToolState's explicit
 /// "Resolve city names" action, so opening or filtering the map can never
-/// contact Apple. Base 5-mile clustering runs once per scanned file set off
-/// the main actor; filter changes reuse it in O(clustered files).
+/// contact Apple. Grouping is synchronous: files are bucketed by resolved
+/// city name (or recorded spot when unnamed), with no distance math.
 @MainActor
 final class GPSMapModel: ObservableObject {
     @Published private(set) var clusters: [GPSLocationCluster] = []
     @Published var selectedClusterID: String?
     @Published var cameraPosition: MapCameraPosition = .automatic
-    @Published private(set) var isClustering = false
 
-    private var baseClusters: [GPSLocationCluster] = []
-    /// Sorted paths of coordinate-bearing files the base build covers.
-    private var baseSignature: [String] = []
-    /// Rejects stale async builds after a newer scan.
-    private var buildGeneration = 0
+    private var files: [VideoInfo] = []
     /// file.path → place name, from ToolState's explicit resolve.
     private var resolvedNames: [String: String] = [:]
     private var filter: MediaBrowserFilter = .all
-    private var duplicateExtras: Set<String> = []
 
     var selectedCluster: GPSLocationCluster? {
         guard let selectedClusterID else { return nil }
@@ -78,7 +72,7 @@ final class GPSMapModel: ObservableObject {
     /// Total coordinate-bearing files across every pin, ignoring the filter —
     /// used by the panel's summary line.
     var totalClusteredFiles: Int {
-        baseClusters.reduce(0) { $0 + $1.files.count }
+        files.filter(\.hasCoordinates).count
     }
 
     func update(
@@ -86,64 +80,20 @@ final class GPSMapModel: ObservableObject {
         resolvedNames: [String: String] = [:],
         filter: MediaBrowserFilter = .all
     ) {
+        self.files = files
         self.resolvedNames = resolvedNames
         self.filter = filter
-        duplicateExtras = DuplicateDetector.extraPaths(in: files)
-
-        let signature = files.filter(\.hasCoordinates).map(\.path).sorted()
-        guard signature != baseSignature else {
-            applyVisibleClusters()
-            return
-        }
-
-        baseSignature = signature
-        buildGeneration += 1
-        let generation = buildGeneration
-        isClustering = true
-        let snapshot = files
-        Task.detached(priority: .userInitiated) {
-            let built = GPSMapClustering.cluster(files: snapshot)
-            await MainActor.run {
-                guard self.buildGeneration == generation else { return }
-                self.baseClusters = built
-                self.isClustering = false
-                self.applyVisibleClusters()
-            }
-        }
+        applyVisibleClusters()
     }
 
     private func applyVisibleClusters() {
-        let extras = duplicateExtras
         let active = filter
-        var visible = baseClusters.compactMap { cluster -> GPSLocationCluster? in
-            let kept = cluster.files.filter { active.matches($0, duplicateExtras: extras) }
-            guard !kept.isEmpty else { return nil }
-            var copy = cluster
-            copy.files = kept
-            copy.placeName = sharedPlaceName(for: kept)
-            return copy
-        }
-        visible = GPSMapClustering.mergeByPlaceName(visible)
-        clusters = visible
-        cameraPosition = GPSMapClustering.fittingPosition(for: visible)
-        if let selectedClusterID, !visible.contains(where: { $0.id == selectedClusterID }) {
+        let visible = files.filter { $0.hasCoordinates && active.matches($0) }
+        clusters = GPSMapClustering.groups(files: visible, resolvedNames: resolvedNames)
+        cameraPosition = GPSMapClustering.fittingPosition(for: clusters)
+        if let selectedClusterID, !clusters.contains(where: { $0.id == selectedClusterID }) {
             self.selectedClusterID = nil
         }
-    }
-
-    /// A cluster displays a place name only when every visible file resolved
-    /// to the same name; mixed or unresolved clusters show counts/coords.
-    private func sharedPlaceName(for files: [VideoInfo]) -> String? {
-        var name: String?
-        for file in files {
-            guard let resolved = resolvedNames[file.path] else { return nil }
-            if name == nil {
-                name = resolved
-            } else if name != resolved {
-                return nil
-            }
-        }
-        return name
     }
 }
 
@@ -169,155 +119,85 @@ enum GPSMediaCounts {
 }
 
 enum GPSMapClustering {
-    /// Pins within this radius share one map marker and one media count.
-    static let proximityMeters: CLLocationDistance = 5 * 1609.344
-
-    static func cluster(files: [VideoInfo]) -> [GPSLocationCluster] {
-        struct Point {
-            let file: VideoInfo
-            let location: CLLocation
-        }
-
-        let points: [Point] = files.compactMap { file in
-            guard file.hasCoordinates, let lat = file.latitude, let lon = file.longitude else {
-                return nil
-            }
-            return Point(file: file, location: CLLocation(latitude: lat, longitude: lon))
-        }
-        .sorted { $0.file.path < $1.file.path }
-
-        // Greedy assign each file to the nearest open cluster within 5 miles.
-        var working: [(latSum: Double, lonSum: Double, files: [VideoInfo])] = []
-        for point in points {
-            var bestIndex: Int?
-            var bestDistance = proximityMeters
-            for (index, cluster) in working.enumerated() {
-                let count = Double(cluster.files.count)
-                let centroid = CLLocation(
-                    latitude: cluster.latSum / count,
-                    longitude: cluster.lonSum / count
-                )
-                let distance = point.location.distance(from: centroid)
-                if distance <= proximityMeters, distance <= bestDistance {
-                    bestDistance = distance
-                    bestIndex = index
-                }
-            }
-            if let bestIndex {
-                working[bestIndex].latSum += point.location.coordinate.latitude
-                working[bestIndex].lonSum += point.location.coordinate.longitude
-                working[bestIndex].files.append(point.file)
-            } else {
-                working.append(
-                    (
-                        latSum: point.location.coordinate.latitude,
-                        lonSum: point.location.coordinate.longitude,
-                        files: [point.file]
-                    ))
-            }
-        }
-
-        // Merge any clusters whose centroids ended up within 5 miles of each other.
-        working = mergeNearbyClusters(working)
-
-        return working.map { cluster in
-            let count = Double(cluster.files.count)
-            let latitude = cluster.latSum / count
-            let longitude = cluster.lonSum / count
-            return GPSLocationCluster(
-                id: clusterID(latitude: latitude, longitude: longitude),
-                latitude: latitude,
-                longitude: longitude,
-                files: cluster.files.sorted { $0.path < $1.path },
-                placeName: nil
-            )
-        }
-        .sorted { lhs, rhs in
-            if lhs.files.count != rhs.files.count { return lhs.files.count > rhs.files.count }
-            return lhs.id < rhs.id
-        }
+    /// Geocode granularity (~1.1 km): one Apple geocode call per distinct
+    /// coordinate bucket. This is API thrift only — it never decides which
+    /// files belong together; the resolved city name does.
+    static func geocodeKey(latitude: Double, longitude: Double) -> String {
+        String(format: "%.2f,%.2f", latitude, longitude)
     }
 
-    /// Stable key for a cluster centroid (used by tests + geocode cache).
+    /// Stable key for a coordinate bucket (used by the geocode cache).
     static func clusterKey(latitude: Double, longitude: Double) -> String {
-        clusterID(latitude: latitude, longitude: longitude)
+        geocodeKey(latitude: latitude, longitude: longitude)
     }
 
-    private static func clusterID(latitude: Double, longitude: Double) -> String {
-        // ~100 m precision — plenty for a 5-mile blob, stable across tiny centroid drift.
-        String(format: "%.3f,%.3f", latitude, longitude)
+    /// Spot granularity (~11 m) for unresolved media: files recorded at the
+    /// same spot share one pin. Different spots never merge — spots are not
+    /// groups, just where the media says it was taken.
+    private static func spotKey(latitude: Double, longitude: Double) -> String {
+        String(format: "%.4f,%.4f", latitude, longitude)
     }
 
-    private static func mergeNearbyClusters(
-        _ input: [(latSum: Double, lonSum: Double, files: [VideoInfo])]
-    ) -> [(latSum: Double, lonSum: Double, files: [VideoInfo])] {
-        var clusters = input
-        var merged = true
-        while merged {
-            merged = false
-            outer: for i in 0..<clusters.count {
-                for j in (i + 1)..<clusters.count {
-                    let leftCount = Double(clusters[i].files.count)
-                    let rightCount = Double(clusters[j].files.count)
-                    let left = CLLocation(
-                        latitude: clusters[i].latSum / leftCount,
-                        longitude: clusters[i].lonSum / leftCount
-                    )
-                    let right = CLLocation(
-                        latitude: clusters[j].latSum / rightCount,
-                        longitude: clusters[j].lonSum / rightCount
-                    )
-                    if left.distance(from: right) <= proximityMeters {
-                        clusters[i].latSum += clusters[j].latSum
-                        clusters[i].lonSum += clusters[j].lonSum
-                        clusters[i].files.append(contentsOf: clusters[j].files)
-                        clusters.remove(at: j)
-                        merged = true
-                        break outer
-                    }
-                }
+    /// Groups coordinate-bearing files for display. Files sharing a resolved
+    /// city name merge into one pin regardless of distance — the city is the
+    /// grouping mechanism. Files without a resolved name keep one pin per
+    /// recorded spot. Every group's files sort by creation date, then path.
+    static func groups(
+        files: [VideoInfo],
+        resolvedNames: [String: String] = [:]
+    ) -> [GPSLocationCluster] {
+        let sorted =
+            files
+            .filter(\.hasCoordinates)
+            .sorted {
+                ($0.creationTime ?? .distantFuture, $0.path)
+                    < ($1.creationTime ?? .distantFuture, $1.path)
+            }
+
+        var cities: [String: (latSum: Double, lonSum: Double, files: [VideoInfo])] = [:]
+        var spots: [String: (latSum: Double, lonSum: Double, files: [VideoInfo])] = [:]
+
+        for file in sorted {
+            guard let lat = file.latitude, let lon = file.longitude else { continue }
+            let place = resolvedNames[file.path]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let place, !place.isEmpty {
+                cities[place, default: (0, 0, [])].latSum += lat
+                cities[place]!.lonSum += lon
+                cities[place]!.files.append(file)
+            } else {
+                let key = spotKey(latitude: lat, longitude: lon)
+                spots[key, default: (0, 0, [])].latSum += lat
+                spots[key]!.lonSum += lon
+                spots[key]!.files.append(file)
             }
         }
-        return clusters
-    }
 
-    /// Collapse pins that reverse-geocode to the same city (e.g. two 5-mi blobs in Boise).
-    static func mergeByPlaceName(_ input: [GPSLocationCluster]) -> [GPSLocationCluster] {
-        var unnamed: [GPSLocationCluster] = []
-        var byPlace: [String: [GPSLocationCluster]] = [:]
-        for cluster in input {
-            guard let place = cluster.placeName?.trimmingCharacters(in: .whitespacesAndNewlines),
-                !place.isEmpty
-            else {
-                unnamed.append(cluster)
-                continue
-            }
-            byPlace[place, default: []].append(cluster)
-        }
-
-        var merged: [GPSLocationCluster] = unnamed
-        for (place, group) in byPlace {
-            if group.count == 1 {
-                merged.append(group[0])
-                continue
-            }
-            let files = group.flatMap(\.files).sorted { $0.path < $1.path }
-            let weight = Double(max(files.count, 1))
-            let latitude = group.reduce(0.0) { $0 + $1.latitude * Double($1.files.count) } / weight
-            let longitude =
-                group.reduce(0.0) { $0 + $1.longitude * Double($1.files.count) } / weight
-            merged.append(
+        var clusters: [GPSLocationCluster] = []
+        clusters.reserveCapacity(cities.count + spots.count)
+        for (place, group) in cities {
+            let count = Double(group.files.count)
+            clusters.append(
                 GPSLocationCluster(
                     id: "city:\(place)",
-                    latitude: latitude,
-                    longitude: longitude,
-                    files: files,
+                    latitude: group.latSum / count,
+                    longitude: group.lonSum / count,
+                    files: group.files,
                     placeName: place
-                )
-            )
+                ))
+        }
+        for (key, group) in spots {
+            let count = Double(group.files.count)
+            clusters.append(
+                GPSLocationCluster(
+                    id: "spot:\(key)",
+                    latitude: group.latSum / count,
+                    longitude: group.lonSum / count,
+                    files: group.files,
+                    placeName: nil
+                ))
         }
 
-        return merged.sorted { lhs, rhs in
+        return clusters.sorted { lhs, rhs in
             if lhs.files.count != rhs.files.count { return lhs.files.count > rhs.files.count }
             return lhs.id < rhs.id
         }

@@ -3,27 +3,31 @@ import SwiftUI
 enum MediaBrowserFilter: Hashable, Identifiable {
     case all
     case resolution(String)
+    case fps(Int)
     case gps
+    case noGps
     case appleMake
     case iPhoneModel
     case appleDevice
     case both
     case otherApple
     case notApple
-    case duplicates
+    case unknown
 
     var id: String {
         switch self {
         case .all: return "all"
         case .resolution(let label): return "res-\(label)"
+        case .fps(let value): return "fps-\(value)"
         case .gps: return "gps"
+        case .noGps: return "no-gps"
         case .appleMake: return "apple-make"
         case .iPhoneModel: return "iphone-model"
         case .appleDevice: return "apple-device"
         case .both: return "both"
         case .otherApple: return "other-apple"
         case .notApple: return "not-apple"
-        case .duplicates: return "duplicates"
+        case .unknown: return "unknown"
         }
     }
 
@@ -31,25 +35,31 @@ enum MediaBrowserFilter: Hashable, Identifiable {
         switch self {
         case .all: return "All videos"
         case .resolution(let label): return label
-        case .gps: return "Has location"
-        case .appleMake: return "Apple make"
-        case .iPhoneModel: return "iPhone model"
+        case .fps(let value): return "\(value)"
+        case .gps: return "GPS"
+        case .noGps: return "No GPS"
+        case .appleMake: return "Apple"
+        case .iPhoneModel: return "iPhone"
         case .appleDevice: return "Apple device"
         case .both: return "Apple make + iPhone model"
         case .otherApple: return "Other Apple"
         case .notApple: return "Not Apple"
-        case .duplicates: return "Likely duplicates (same size, duration, format)"
+        case .unknown: return "Unknown"
         }
     }
 
-    func matches(_ file: VideoInfo, duplicateExtras: Set<String> = []) -> Bool {
+    func matches(_ file: VideoInfo) -> Bool {
         switch self {
         case .all:
             return true
         case .resolution(let label):
             return file.resolutionClass == label
+        case .fps(let value):
+            return FileNaming.fpsBucket(file.fps) == value
         case .gps:
-            return file.hasGPS
+            return file.hasCoordinates
+        case .noGps:
+            return !file.hasCoordinates
         case .appleMake:
             return file.hasAppleMake
         case .iPhoneModel:
@@ -62,8 +72,8 @@ enum MediaBrowserFilter: Hashable, Identifiable {
             return file.hasAppleMake && !file.hasiPhoneModel
         case .notApple:
             return !file.hasAppleMake && !file.hasiPhoneModel
-        case .duplicates:
-            return duplicateExtras.contains(file.path)
+        case .unknown:
+            return !file.isApple && file.make.isEmpty && file.model.isEmpty
         }
     }
 }
@@ -85,21 +95,26 @@ struct CountPills: View {
                     shownPill(filter: .otherApple, label: "Other Apple", value: files.filter { $0.hasAppleMake && !$0.hasiPhoneModel }.count)
                     shownPill(filter: .notApple, label: "Not Apple", value: files.filter { !$0.hasAppleMake && !$0.hasiPhoneModel }.count)
                 } else {
-                    ForEach(VideoInfo.resolutionClasses, id: \.self) { label in
+                    // Fixed contract order: SD → 720p → HD → 1080p → FHD →
+                    // QHD → 4K, then bare FPS values, then device makes.
+                    ForEach(VideoInfo.resolutionClasses.reversed(), id: \.self) { label in
                         shownPill(
                             filter: .resolution(label),
                             label: label,
                             value: files.filter { $0.resolutionClass == label }.count
                         )
                     }
-                    shownPill(filter: .gps, label: "Has location", value: files.filter { $0.hasGPS }.count)
-                    shownPill(filter: .appleDevice, label: "Apple device", value: files.filter { $0.isApple }.count)
-                    shownPill(
-                        filter: .duplicates,
-                        label: "Likely duplicates",
-                        value: DuplicateDetector.extraCount(in: files),
-                        help: "Same size, duration, and video format — not a byte-for-byte match"
-                    )
+                    if tool != .photoSweep {
+                        ForEach(FileNaming.fpsBuckets, id: \.self) { bucket in
+                            shownPill(
+                                filter: .fps(bucket),
+                                label: "\(bucket)",
+                                value: files.filter { FileNaming.fpsBucket($0.fps) == bucket }.count
+                            )
+                        }
+                    }
+                    shownPill(filter: .iPhoneModel, label: "iPhone", value: files.filter { $0.hasiPhoneModel }.count)
+                    shownPill(filter: .appleMake, label: "Apple", value: files.filter { $0.hasAppleMake }.count)
                 }
             }
         }
@@ -127,6 +142,9 @@ struct CountPills: View {
     }
 }
 
+/// Gold-outlined capsule — same language as the Back button: dark fill,
+/// visible gold edge, white label with a gold count. Selected inverts to
+/// the gold gradient so the active filter is unmistakable.
 struct CountPill: View {
     let label: String
     let value: Int
@@ -139,16 +157,16 @@ struct CountPill: View {
         Button {
             action?()
         } label: {
-            HStack(spacing: 4) {
-                Text("\(value)")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(isSelected ? .black : LibraTheme.yellow)
+            HStack(spacing: 5) {
                 Text(label)
-                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .black.opacity(0.8) : .secondary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isSelected ? .black : .white)
+                Text("\(value)")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundColor(isSelected ? .black.opacity(0.7) : LibraTheme.yellow)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
             .background(
                 ZStack {
                     if isSelected {
@@ -181,8 +199,8 @@ struct CountPill: View {
             .overlay(
                 Capsule().stroke(
                     isSelected
-                        ? LibraTheme.amber.opacity(0.7)
-                        : hovering ? LibraTheme.yellow.opacity(0.45) : LibraTheme.hairline,
+                        ? LibraTheme.amber.opacity(0.8)
+                        : hovering ? LibraTheme.yellow.opacity(0.7) : LibraTheme.gold.opacity(0.45),
                     lineWidth: 1
                 )
             )

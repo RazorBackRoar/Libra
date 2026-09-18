@@ -131,22 +131,17 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
     var ruleSummary: String {
         switch self {
         case .provid, .vidres, .keepName, .promax, .maxvid:
-            return
-                "Names become “Name 4K W30 001.mov” — or folders by resolution, orientation, FPS."
+            return "Resolution, orientation, and FPS in every name — or folders by the same."
         case .iphoneSorter:
-            return
-                "iPhone/ · Other Apple/ · Not Apple/ — “Name 4K W30 🍎📱 001.mov”"
+            return "iPhone/ · Other Apple/ · Not Apple/ folders."
         case .gps:
-            return
-                "“City, ST/” folders — “Name 4K W30 🌍 001.mov” · No GPS → No-GPS/"
+            return "“City, ST/” folders · No GPS → No-GPS/"
         case .slomo:
-            return
-                "Slowed copies in SloMo/ — “Name 4K W30 001.mov”. Needs ffmpeg."
+            return "Slowed copies in SloMo/. Needs ffmpeg."
         case .oneMin:
-            return
-                "Sequential 60-second timestamps — copies in Adjusted/ or originals. Needs ffmpeg."
+            return "Sequential 60-second timestamps — copies in Adjusted/ or originals. Needs ffmpeg."
         case .photoSweep:
-            return "Photos keep their original names — IMG_2041.HEIC moves out untouched."
+            return "Moves photos out of video folders — names untouched."
         }
     }
 
@@ -170,14 +165,6 @@ enum Tool: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    var supportsExtraFolders: Bool {
-        switch self {
-        case .vidres, .keepName, .promax, .maxvid, .gps:
-            return true
-        default:
-            return false
-        }
-    }
 }
 
 struct OperationResult: Identifiable, Equatable {
@@ -230,9 +217,6 @@ struct AppSettings: Codable {
     var lastFolder: String?
     var requireConfirmToWrite: Bool
     var defaultPrefix: String
-    var sortByDate: Bool
-    var sortByCamera: Bool
-    var sortDuplicatesIntoFolder: Bool
     var sloMoKeepAudio: Bool
 
     static let `default` = AppSettings(
@@ -243,9 +227,6 @@ struct AppSettings: Codable {
         lastFolder: nil,
         requireConfirmToWrite: true,
         defaultPrefix: "",
-        sortByDate: false,
-        sortByCamera: false,
-        sortDuplicatesIntoFolder: false,
         sloMoKeepAudio: true
     )
 
@@ -257,9 +238,6 @@ struct AppSettings: Codable {
         lastFolder: String?,
         requireConfirmToWrite: Bool,
         defaultPrefix: String,
-        sortByDate: Bool,
-        sortByCamera: Bool,
-        sortDuplicatesIntoFolder: Bool,
         sloMoKeepAudio: Bool
     ) {
         self.ffmpegPath = ffmpegPath
@@ -269,9 +247,6 @@ struct AppSettings: Codable {
         self.lastFolder = lastFolder
         self.requireConfirmToWrite = requireConfirmToWrite
         self.defaultPrefix = defaultPrefix
-        self.sortByDate = sortByDate
-        self.sortByCamera = sortByCamera
-        self.sortDuplicatesIntoFolder = sortDuplicatesIntoFolder
         self.sloMoKeepAudio = sloMoKeepAudio
     }
 
@@ -289,10 +264,6 @@ struct AppSettings: Codable {
         requireConfirmToWrite =
             try container.decodeIfPresent(Bool.self, forKey: .requireConfirmToWrite) ?? true
         defaultPrefix = try container.decodeIfPresent(String.self, forKey: .defaultPrefix) ?? ""
-        sortByDate = try container.decodeIfPresent(Bool.self, forKey: .sortByDate) ?? false
-        sortByCamera = try container.decodeIfPresent(Bool.self, forKey: .sortByCamera) ?? false
-        sortDuplicatesIntoFolder =
-            try container.decodeIfPresent(Bool.self, forKey: .sortDuplicatesIntoFolder) ?? false
         sloMoKeepAudio = try container.decodeIfPresent(Bool.self, forKey: .sloMoKeepAudio) ?? true
     }
 }

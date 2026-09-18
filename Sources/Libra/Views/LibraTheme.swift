@@ -23,8 +23,8 @@ enum LibraTheme {
 
 }
 
-/// Card face — near-charcoal with a faint gold tint at the top edge only.
-/// Border is muted bronze at rest and warms to gold on hover; the glow is
+/// Card face — charcoal with a visible gold wash bleeding down from a gold
+/// top seam. Border is gold at rest and brightens on hover; the glow is
 /// reserved for the hovered card so resting cards sit quiet.
 struct LibraCardFace: View {
     var hovering: Bool = false
@@ -34,19 +34,32 @@ struct LibraCardFace: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        LibraTheme.gold.opacity(hovering ? 0.10 : 0.05),
-                        Color(red: 0.07, green: 0.068, blue: 0.066),
-                        Color(red: 0.04, green: 0.04, blue: 0.045),
+                        LibraTheme.gold.opacity(hovering ? 0.22 : 0.15),
+                        Color(red: 0.09, green: 0.084, blue: 0.07),
+                        Color(red: 0.045, green: 0.044, blue: 0.048),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
+            .overlay(alignment: .top) {
+                // Gold seam along the top edge — the card's liner.
+                LinearGradient(
+                    colors: [
+                        LibraTheme.yellow.opacity(hovering ? 0.85 : 0.55),
+                        LibraTheme.gold.opacity(0.0),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 1.5)
+                .padding(.horizontal, 12)
+            }
             .overlay {
                 // Sweeping shine on hover — a diagonal shaft sliding across.
                 GeometryReader { geo in
                     LinearGradient(
-                        colors: [.clear, Color.white.opacity(0.14), .clear],
+                        colors: [.clear, Color.white.opacity(0.16), .clear],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -62,8 +75,8 @@ struct LibraCardFace: View {
                     .stroke(
                         LinearGradient(
                             colors: [
-                                LibraTheme.gold.opacity(hovering ? 0.75 : 0.28),
-                                LibraTheme.amber.opacity(hovering ? 0.35 : 0.15),
+                                LibraTheme.gold.opacity(hovering ? 0.9 : 0.5),
+                                LibraTheme.amber.opacity(hovering ? 0.45 : 0.25),
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -72,7 +85,7 @@ struct LibraCardFace: View {
                     )
             )
             .shadow(
-                color: hovering ? LibraTheme.gold.opacity(0.22) : Color.black.opacity(0.4),
+                color: hovering ? LibraTheme.gold.opacity(0.28) : Color.black.opacity(0.4),
                 radius: hovering ? 10 : 6,
                 y: 3
             )
@@ -173,7 +186,7 @@ struct LibraSecondaryButtonStyle: ButtonStyle {
                 )
                 .overlay(
                     Capsule().stroke(
-                        hovering ? LibraTheme.yellow.opacity(0.5) : LibraTheme.hairline,
+                        hovering ? LibraTheme.yellow.opacity(0.7) : LibraTheme.gold.opacity(0.45),
                         lineWidth: 1
                     )
                 )

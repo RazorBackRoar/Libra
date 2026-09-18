@@ -64,12 +64,44 @@ Source/build version is **1.4.0** — not yet published.
 - [ ] Manual UAT (owner): ⌘, Settings; drop→Preview vs Write; Cancel mid-scan; GPS pills→pins, resolve→Preview→Write gate, pin overlay filenames; iPhone sort; Photos Only; Slo-Mo audio on/off (MOV+WEBM); 1-Min copy + in-place + Undo; ~5k folder smoothness
 - [ ] Release gate (explicit ask only): `razorbuild Libra`, SHA-256, `gh release create v1.4.0`, delete v1.3.0 release+tag
 
+### Owner-requested GPS + filter redesign (Sep 17)
+
+- [x] Filter buttons restored as real clickable capsules — gold-bordered dark pills in the exact contract order **SD → 720p → HD → 1080p → FHD → QHD → 4K → 30 → 60 → 120 → iPhone → Apple** (`MediaBrowserFilter.fps` added; bare numbers, no "FPS" text); non-GPS tools open the category browser, GPS page filters map pins
+- [x] Radius clustering removed entirely — `GPSMapClustering.groups` buckets by resolved city name (one pin per city regardless of distance); unresolved media shows one pin per recorded spot (~11 m dedupe, no distance merging); every group's files sort by creation date then path
+- [x] Geocoding buckets at ~1.1 km (`geocodeKey`) purely for API thrift — city name is the only grouping mechanism; Preview/Write still share the resolve cache; Write still gated until Resolve
+- [x] Duplicates feature removed completely — `DuplicateDetector.swift` + tests deleted, `sortDuplicatesIntoFolder` setting gone, pill/toggle/Settings entries and "Duplicates/" folder logic all removed
+- [x] GPS page checkboxes removed — `showsExtraFolderToggles` no longer includes `.gps`, so "Also sort by date / camera / Duplicates" never appear and city folders stay pure `City, ST/`
+- [x] Map pin hover highlight — pins brighten/enlarge/glow on hover; click still opens the bottom overlay listing that group's files (creation-date order)
+- [x] `GPSMapModel` regrouped synchronously — `isClustering`/detached build removed (dictionary bucketing is cheap at 5k files); benchmark tests updated
+- [ ] Owner visual verification — Mac was locked during implementation; build/test/DMG all green but the new GPS page and buttons need a live look
+
 ## Verification notes
 
-- `swift build` + `swift build -c release` clean, zero warnings · `swift test` **113/113 green**
+- `swift build` + `swift build -c release` clean, zero warnings · `swift test` **109/109 green** (5 duplicate tests removed; city-grouping tests added)
 - Test isolation: `SettingsStore.fileURLOverride` + `DryRunReport.reportDirectoryOverride` — no real Desktop reports or settings writes from tests
 - 1-Min in-place undo test restores original bytes via real Trash round-trip
 - GPS geocode test seam: `GPSGeocoder.resolver` (tests stub it, restore in defer)
 - GPS tests prove: map never geocodes, filters reuse base clusters, same-city merge, selection cleared on filter-out, Write blocked until Resolve, resolve publishes map names, preview shows exact folders
 - Format gate: each default extension has a committed `fmt-probe.*` fixture that probes cleanly
 - Live GPS verification (real app run): scan → pin click → bottom overlay with glossy filename pills + horizontal scroll; pill filters narrow pins without touching Preview/Write scope; Resolve rewrites pin/overlay to "Cupertino, CA" and Preview to exact folders; Write gated until Resolve, enabled after; write produced `Cupertino, CA/IMG_### 4K W60 🍎📱🌍 00N.mov`; Undo restored originals. Custom-annotation taps don't select via `Map(selection:)` on macOS — pins select via a `MapReader` onTap within ~24pt instead.
+
+## Follow-up: extra-folder options removed entirely
+
+- [x] "Also sort by date" / "Also sort by camera" removed from **all** tool pages (Libra Sorter, iPhone Model Sort) and Settings — `sortByDate`/`sortByCamera` settings, `extraFolderParts`, `showsExtraFolderToggles`, `Tool.supportsExtraFolders`, `dayFormatter` all deleted; destination folders are pure `City, ST/` / sort-layout / iPhone-classification only
+- [x] Filename examples removed from all `ruleSummary` strings, the sort-controls "Example:" line, and the prefix-field help — no `Name 4K W30 …` patterns anywhere in the UI
+- [x] Verified live via AX on rebuilt binary: GPS, Libra Sorter, and iPhone Model Sort pages each show only the Preview toggle; summaries clean
+- [x] `swift build` clean · `swift test` 109/109 · `build/Release/Libra.dmg` + `~/Desktop/Libra.dmg` rebuilt
+
+## GPS page: state buttons + footer counts + Finder reveal
+
+- [x] GPS ruleSummary line removed — header is Back + "GPS" + state buttons only
+- [x] `GPSStateStrip` — big gold state capsules right of the title, right-aligned, largest state rightmost and each smaller one extending left (order = file count desc); click pops a panel of that state's cities with per-city photo/video counts; right-click a city → Reveal in Finder
+- [x] Footer counts on GPS page: GPS · No GPS · iPhone · Unknown as gold capsule map filters between Preview and Organize (`.noGps` + `.unknown` added to MediaBrowserFilter; `.gps` now matches `hasCoordinates`)
+- [x] Right-click Reveal in Finder on map pins and the selected-city overlay header; `MediaOpen.reveal([paths])` added
+- [x] `swift test` 113/113 · `build/Release/Libra.dmg` + `~/Desktop/Libra.dmg` rebuilt
+
+## Collapsible map on all tool pages
+
+- [x] `GPSMapPanel` (compact) now renders unconditionally on every non-GPS tool page — the gold "Location details" button no longer waits for coordinate-bearing files; opens/closes on click (empty map + hint when no GPS media)
+- [x] Verified live on test build by PID (earlier dumps hit the installed /Applications copy — two same-named processes): button present on empty Libra Sorter page, expands to mini-map on click
+- [x] `swift test` 113/113 · `build/Release/Libra.dmg` + `~/Desktop/Libra.dmg` rebuilt
